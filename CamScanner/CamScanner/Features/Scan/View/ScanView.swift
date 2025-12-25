@@ -10,7 +10,7 @@ struct ScanView: View {
 
     var body: some View {
         ZStack {
-            CameraPreviewView(session: vm.camera.session)
+            DocumentCameraView(camera: vm.camera)
                 .ignoresSafeArea()
 
             Color.black.opacity(0.12).ignoresSafeArea()
@@ -54,14 +54,20 @@ struct ScanView: View {
                 Spacer()
             }
             .safeAreaInset(edge: .bottom) {
-                ScanBottomBar(
-                    captureMode: Binding(
-                        get: { vm.captureMode },
-                        set: { vm.captureMode = $0 }
-                    ),
-                    isCapturing: vm.isCapturing,
-                    onShutter: { vm.capture() }
-                )
+                VStack(spacing: 8) {
+                    Picker("", selection: $vm.captureMode) {
+                        ForEach(CaptureMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 64)
+                    
+                    ScanBottomBar(
+                        isCapturing: vm.isCapturing,
+                        onShutter: { vm.capture() }
+                    )
+                }
             }
 
             if panel == .settings {
@@ -77,6 +83,7 @@ struct ScanView: View {
         .onAppear {
             vm.onAppear()
             vm.applyFlashSideEffects()
+            vm.camera.resumeLivePreview()
         }
         .onDisappear { vm.onDisappear() }
         .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
@@ -84,7 +91,9 @@ struct ScanView: View {
         } message: {
             Text("Разреши доступ к камере в Настройках.")
         }
-        .fullScreenCover(isPresented: $showPreview) {
+        .fullScreenCover(isPresented: $showPreview, onDismiss: {
+            vm.camera.resumeLivePreview()
+        }, content: {
             CapturePreviewView(
                 image: vm.lastCaptured,
                 onDone: {
@@ -97,7 +106,7 @@ struct ScanView: View {
                     showPreview = false
                 }
             )
-        }
+        })
         .onChange(of: vm.lastCaptured) { _, newValue in
             if newValue != nil, vm.captureMode == .single {
                 showPreview = true

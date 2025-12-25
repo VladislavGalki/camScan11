@@ -1,0 +1,21 @@
+import UIKit
+
+extension UIImage {
+    func downscaled(maxDimension: CGFloat) -> UIImage {
+        let w = size.width
+        let h = size.height
+        let maxSide = max(w, h)
+        guard maxSide > maxDimension else { return self }
+
+        let scale = maxDimension / maxSide
+        let newSize = CGSize(width: w * scale, height: h * scale)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+}

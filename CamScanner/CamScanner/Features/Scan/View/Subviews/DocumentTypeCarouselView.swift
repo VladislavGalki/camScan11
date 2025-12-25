@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct DocumentTypeCarousel: View {
+struct DocumentTypeCarouselView: View {
     var body: some View {
         HStack(spacing: 22) {
             Text("Скан")
