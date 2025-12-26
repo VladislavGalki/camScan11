@@ -214,7 +214,46 @@ public struct Quadrilateral: Transformable {
 }
 
 extension Quadrilateral {
+    /// Лёгкое масштабирование quad относительно его центра.
+    /// factor = 1.03...1.08 обычно достаточно (3–8%)
+    func scaled(aroundCenterBy factor: CGFloat) -> Quadrilateral {
+        let c = CGPoint(
+            x: (topLeft.x + topRight.x + bottomRight.x + bottomLeft.x) / 4.0,
+            y: (topLeft.y + topRight.y + bottomRight.y + bottomLeft.y) / 4.0
+        )
 
+        func scale(_ p: CGPoint) -> CGPoint {
+            CGPoint(
+                x: c.x + (p.x - c.x) * factor,
+                y: c.y + (p.y - c.y) * factor
+            )
+        }
+
+        return Quadrilateral(
+            topLeft: scale(topLeft),
+            topRight: scale(topRight),
+            bottomRight: scale(bottomRight),
+            bottomLeft: scale(bottomLeft)
+        )
+    }
+
+    /// Подрезаем точки, чтобы не вылезали за bounds (для отрисовки)
+    func clamped(to rect: CGRect) -> Quadrilateral {
+        func clampPoint(_ p: CGPoint) -> CGPoint {
+            CGPoint(
+                x: min(max(p.x, rect.minX), rect.maxX),
+                y: min(max(p.y, rect.minY), rect.maxY)
+            )
+        }
+
+        return Quadrilateral(
+            topLeft: clampPoint(topLeft),
+            topRight: clampPoint(topRight),
+            bottomRight: clampPoint(bottomRight),
+            bottomLeft: clampPoint(bottomLeft)
+        )
+    }
+    
     /// Converts the current to the cartesian coordinate system (where 0 on the y axis is at the bottom).
     ///
     /// - Parameters:

@@ -126,6 +126,10 @@ final class DocumentCameraUIView: UIView {
         let transforms = [scaleTransform, rotationTransform, translationTransform]
         let transformedQuad = quad.applyTransforms(transforms)
 
-        quadView.drawQuadrilateral(quad: transformedQuad, animated: true)
+        let displayQuad = transformedQuad
+            .scaled(aroundCenterBy: 1.06)          // ← подбери 1.03–1.06
+            .clamped(to: quadView.bounds)
+
+        quadView.drawQuadrilateral(quad: displayQuad, animated: true)
     }
 }
