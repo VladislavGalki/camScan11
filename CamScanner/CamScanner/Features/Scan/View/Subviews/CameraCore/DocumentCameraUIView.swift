@@ -114,7 +114,6 @@ final class DocumentCameraUIView: UIView {
             return
         }
 
-        // 1:1 copy from WeScan CameraScannerViewController.didDetectQuad
         let portraitImageSize = CGSize(width: imageSize.height, height: imageSize.width)
         let scaleTransform = CGAffineTransform.scaleTransform(forSize: portraitImageSize,
                                                               aspectFillInSize: quadView.bounds.size)
@@ -127,7 +126,7 @@ final class DocumentCameraUIView: UIView {
         let transformedQuad = quad.applyTransforms(transforms)
 
         let displayQuad = transformedQuad
-            .scaled(aroundCenterBy: 1.06)          // ← подбери 1.03–1.06
+            .scaled(aroundCenterBy: 1.05)          // ← подбери 1.03–1.06
             .clamped(to: quadView.bounds)
 
         quadView.drawQuadrilateral(quad: displayQuad, animated: true)
