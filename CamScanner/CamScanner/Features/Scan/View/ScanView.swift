@@ -4,9 +4,23 @@ struct ScanView: View {
 
     let onClose: () -> Void
 
-    @StateObject private var vm = ScanViewModel()
+    @StateObject private var settings = ScanSettingsStore()
+    @StateObject private var ui = ScanUIStateStore()
+    @StateObject private var vm: ScanViewModel
+
     @State private var panel: ScanTopPanel = .none
     @State private var showPreview = false
+
+    init(onClose: @escaping () -> Void) {
+        self.onClose = onClose
+
+        // Важно: создаём VM с теми же store-объектами
+        let settingsStore = ScanSettingsStore()
+        let uiStore = ScanUIStateStore()
+        _settings = StateObject(wrappedValue: settingsStore)
+        _ui = StateObject(wrappedValue: uiStore)
+        _vm = StateObject(wrappedValue: ScanViewModel(settings: settingsStore, ui: uiStore))
+    }
 
     var body: some View {
         ZStack {
@@ -15,7 +29,7 @@ struct ScanView: View {
 
             Color.black.opacity(0.12).ignoresSafeArea()
 
-            if vm.grid {
+            if settings.grid {
                 GridOverlay()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -33,20 +47,20 @@ struct ScanView: View {
 
                 ScanTopPanelsContainer(
                     panel: $panel,
-                    flashMode: vm.flashMode,
-                    quality: vm.quality,
-                    filter: vm.filter,
+                    flashMode: ui.flashMode,
+                    quality: ui.quality,
+                    filter: ui.filter,
                     onSelectFlash: { mode in
-                        vm.flashMode = mode
+                        ui.flashMode = mode
                         vm.applyFlashSideEffects()
                         panel = .none
                     },
                     onSelectQuality: { q in
-                        vm.quality = q
+                        ui.quality = q
                         panel = .none
                     },
                     onSelectFilter: { f in
-                        vm.filter = f
+                        ui.filter = f
                         panel = .none
                     }
                 )
@@ -55,14 +69,14 @@ struct ScanView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
-                    Picker("", selection: $vm.captureMode) {
+                    Picker("", selection: $ui.captureMode) {
                         ForEach(CaptureMode.allCases) { mode in
                             Text(mode.rawValue).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 64)
-                    
+
                     ScanBottomBar(
                         isCapturing: vm.isCapturing,
                         onShutter: { vm.capture() }
@@ -108,14 +122,14 @@ struct ScanView: View {
             )
         })
         .onChange(of: vm.lastCaptured) { _, newValue in
-            if newValue != nil, vm.captureMode == .single {
+            if newValue != nil, ui.captureMode == .single {
                 showPreview = true
             }
         }
     }
 
     private var flashIconName: String {
-        switch vm.flashMode {
+        switch ui.flashMode {
         case .off: return "bolt.slash"
         case .on: return "bolt.fill"
         case .auto: return "bolt.badge.a"
