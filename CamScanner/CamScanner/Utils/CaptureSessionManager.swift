@@ -49,13 +49,18 @@ protocol RectangleDetectionDelegateProtocol: NSObjectProtocol {
 /// The CaptureSessionManager is responsible for setting up and managing the AVCaptureSession and the functions related to capturing.
 final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 
-    private let videoOutputQueue = DispatchQueue(label: "video_output_queue")
     private let videoPreviewLayer: AVCaptureVideoPreviewLayer
     private let captureSession = AVCaptureSession()
     private let rectangleFunnel = RectangleFeaturesFunnel()
     weak var delegate: RectangleDetectionDelegateProtocol?
     private var displayedRectangleResult: RectangleDetectorResult?
     private var photoOutput = AVCapturePhotoOutput()
+
+    /// Keep references to chosen device input to set zoom reliably
+    private var videoDeviceInput: AVCaptureDeviceInput?
+
+    /// Dedicated queue for starting/stopping the session
+    private let sessionQueue = DispatchQueue(label: "capture_session_queue")
 
     /// Whether the CaptureSessionManager should be detecting quadrilaterals.
     private var isDetecting = true
@@ -65,10 +70,44 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
     /// The minimum number of time required by `noRectangleCount` to validate that no rectangles have been found.
     private let noRectangleThreshold = 3
-    
+
+    // MARK: - Throttling Vision (your latest change)
+
     private let detectionMinInterval: CFTimeInterval = 0.10 // ~10 FPS
     private var lastDetectionTime: CFTimeInterval = 0
     private var isVisionInFlight = false
+
+    // MARK: - Camera selection (UltraWide + default zoom)
+
+    private func selectBackCamera() -> AVCaptureDevice? {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: .back
+        )
+        return discovery.devices.first
+    }
+
+    private func applyDefaultUltraWideZoomIfNeeded() {
+        guard let device = videoDeviceInput?.device else { return }
+
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+
+            if device.deviceType == .builtInUltraWideCamera {
+                let desired: CGFloat = 1.15
+                let clamped = min(max(desired, device.minAvailableVideoZoomFactor),
+                                  device.maxAvailableVideoZoomFactor)
+                device.videoZoomFactor = clamped
+            } else {
+                // wide camera — keep neutral
+                device.videoZoomFactor = 1.0
+            }
+        } catch {
+            print("⚠️ Failed to set default zoom:", error)
+        }
+    }
 
     // MARK: Life Cycle
 
@@ -81,11 +120,14 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
         super.init()
 
-        guard let device = AVCaptureDevice.default(for: AVMediaType.video) else {
+        guard let device = selectBackCamera() else {
             let error = ImageScannerControllerError.inputDevice
             delegate?.captureSessionManager(self, didFailWithError: error)
             return nil
         }
+
+        // IMPORTANT: make sure focus/torch uses the same chosen device
+        CaptureSession.current.device = device
 
         captureSession.beginConfiguration()
 
@@ -94,19 +136,23 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         let videoOutput = AVCaptureVideoDataOutput()
         videoOutput.alwaysDiscardsLateVideoFrames = true
 
+        // NOTE: unlock/commit in defer to match upstream style
         defer {
             device.unlockForConfiguration()
             captureSession.commitConfiguration()
         }
 
         guard let deviceInput = try? AVCaptureDeviceInput(device: device),
-            captureSession.canAddInput(deviceInput),
-            captureSession.canAddOutput(photoOutput),
-            captureSession.canAddOutput(videoOutput) else {
-                let error = ImageScannerControllerError.inputDevice
-                delegate?.captureSessionManager(self, didFailWithError: error)
-                return
+              captureSession.canAddInput(deviceInput),
+              captureSession.canAddOutput(photoOutput),
+              captureSession.canAddOutput(videoOutput) else {
+            let error = ImageScannerControllerError.inputDevice
+            delegate?.captureSessionManager(self, didFailWithError: error)
+            return
         }
+
+        // keep input ref for zoom
+        self.videoDeviceInput = deviceInput
 
         do {
             try device.lockForConfiguration()
@@ -135,7 +181,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         videoPreviewLayer.session = captureSession
         videoPreviewLayer.videoGravity = .resizeAspectFill
 
-        videoOutput.setSampleBufferDelegate(self, queue: videoOutputQueue)
+        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "video_ouput_queue"))
     }
 
     // MARK: Capture Session Life Cycle
@@ -146,13 +192,20 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
         switch authorizationStatus {
         case .authorized:
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.captureSession.startRunning()
+            sessionQueue.async { [weak self] in
+                guard let self else { return }
+                self.captureSession.startRunning()
+
+                // apply zoom right after session starts (small delay helps reliability)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.applyDefaultUltraWideZoomIfNeeded()
+                }
+
                 DispatchQueue.main.async {
-                    guard let self = self else { return }
                     self.isDetecting = true
                 }
             }
+
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: AVMediaType.video, completionHandler: { [weak self] granted in
                 DispatchQueue.main.async {
@@ -165,6 +218,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                     }
                 }
             })
+
         default:
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
@@ -175,7 +229,9 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
     }
 
     internal func stop() {
-        captureSession.stopRunning()
+        sessionQueue.async { [weak self] in
+            self?.captureSession.stopRunning()
+        }
     }
 
     internal func capturePhoto() {
@@ -209,7 +265,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         VisionRectangleDetector.rectangle(forPixelBuffer: pixelBuffer) { [weak self] rectangle in
             guard let self else { return }
             self.processRectangle(rectangle: rectangle, imageSize: imageSize)
-            self.videoOutputQueue.async { self.isVisionInFlight = false }
+            self.isVisionInFlight = false
         }
     }
 
@@ -220,23 +276,20 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             self.rectangleFunnel
                 .add(rectangle, currentlyDisplayedRectangle: self.displayedRectangleResult?.rectangle) { [weak self] result, rectangle in
 
-                guard let self else {
-                    return
-                }
+                    guard let self else { return }
 
-                let shouldAutoScan = (result == .showAndAutoScan)
-                self.displayRectangleResult(rectangleResult: RectangleDetectorResult(rectangle: rectangle, imageSize: imageSize))
-                if shouldAutoScan, CaptureSession.current.isAutoScanEnabled, !CaptureSession.current.isEditing {
-                    capturePhoto()
+                    let shouldAutoScan = (result == .showAndAutoScan)
+                    self.displayRectangleResult(rectangleResult: RectangleDetectorResult(rectangle: rectangle, imageSize: imageSize))
+
+                    if shouldAutoScan, CaptureSession.current.isAutoScanEnabled, !CaptureSession.current.isEditing {
+                        capturePhoto()
+                    }
                 }
-            }
 
         } else {
 
             DispatchQueue.main.async { [weak self] in
-                guard let self else {
-                    return
-                }
+                guard let self else { return }
                 self.noRectangleCount += 1
 
                 if self.noRectangleCount > self.noRectangleThreshold {
@@ -249,7 +302,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                 }
             }
             return
-
         }
     }
 
@@ -259,16 +311,12 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         let quad = rectangleResult.rectangle.toCartesian(withHeight: rectangleResult.imageSize.height)
 
         DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                return
-            }
-
+            guard let self else { return }
             self.delegate?.captureSessionManager(self, didDetectQuad: quad, rectangleResult.imageSize)
         }
 
         return quad
     }
-
 }
 
 extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
@@ -291,17 +339,16 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
         delegate?.didStartCapturingPicture(for: self)
 
         if let sampleBuffer = photoSampleBuffer,
-            let imageData = AVCapturePhotoOutput.jpegPhotoDataRepresentation(
-                forJPEGSampleBuffer: sampleBuffer,
-                previewPhotoSampleBuffer: nil
-            ) {
+           let imageData = AVCapturePhotoOutput.jpegPhotoDataRepresentation(
+            forJPEGSampleBuffer: sampleBuffer,
+            previewPhotoSampleBuffer: nil
+           ) {
             completeImageCapture(with: imageData)
         } else {
             let error = ImageScannerControllerError.capture
             delegate?.captureSessionManager(self, didFailWithError: error)
             return
         }
-
     }
 
     @available(iOS 11.0, *)
@@ -332,9 +379,7 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
             guard let image = UIImage(data: imageData) else {
                 let error = ImageScannerControllerError.capture
                 DispatchQueue.main.async {
-                    guard let self else {
-                        return
-                    }
+                    guard let self else { return }
                     self.delegate?.captureSessionManager(self, didFailWithError: error)
                 }
                 return
@@ -358,9 +403,7 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
             }
 
             DispatchQueue.main.async {
-                guard let self else {
-                    return
-                }
+                guard let self else { return }
                 self.delegate?.captureSessionManager(self, didCapturePicture: image, withQuad: quad)
             }
         }
@@ -375,5 +418,4 @@ private struct RectangleDetectorResult {
 
     /// The size of the image the quadrilateral was detected on.
     let imageSize: CGSize
-
 }
