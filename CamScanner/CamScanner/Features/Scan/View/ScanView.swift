@@ -24,8 +24,11 @@ struct ScanView: View {
 
     var body: some View {
         ZStack {
-            DocumentCameraView(camera: vm.camera)
-                .ignoresSafeArea()
+            DocumentCameraView(
+                camera: vm.camera,
+                isLiveDetectionEnabled: settings.autoCrop || settings.autoShoot
+            )
+            .ignoresSafeArea()
 
             Color.black.opacity(0.12).ignoresSafeArea()
 
@@ -105,9 +108,7 @@ struct ScanView: View {
         } message: {
             Text("Разреши доступ к камере в Настройках.")
         }
-        .fullScreenCover(isPresented: $showPreview, onDismiss: {
-            vm.camera.resumeLivePreview()
-        }, content: {
+        .fullScreenCover(isPresented: $showPreview, content: {
             CapturePreviewView(
                 image: vm.lastCaptured,
                 onDone: {

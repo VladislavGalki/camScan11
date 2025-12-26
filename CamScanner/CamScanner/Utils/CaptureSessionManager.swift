@@ -12,7 +12,7 @@ import Foundation
 import UIKit
 
 /// A set of functions that inform the delegate object of the state of the detection.
-protocol RectangleDetectionDelegateProtocol: NSObjectProtocol {
+protocol CaptureSessionManagerDelegate: NSObjectProtocol {
 
     /// Called when the capture of a picture has started.
     ///
@@ -52,7 +52,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
     private let videoPreviewLayer: AVCaptureVideoPreviewLayer
     private let captureSession = AVCaptureSession()
     private let rectangleFunnel = RectangleFeaturesFunnel()
-    weak var delegate: RectangleDetectionDelegateProtocol?
+    weak var delegate: CaptureSessionManagerDelegate?
     private var displayedRectangleResult: RectangleDetectorResult?
     private var photoOutput = AVCapturePhotoOutput()
 
@@ -111,7 +111,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
     // MARK: Life Cycle
 
-    init?(videoPreviewLayer: AVCaptureVideoPreviewLayer, delegate: RectangleDetectionDelegateProtocol? = nil) {
+    init?(videoPreviewLayer: AVCaptureVideoPreviewLayer, delegate: CaptureSessionManagerDelegate? = nil) {
         self.videoPreviewLayer = videoPreviewLayer
 
         if delegate != nil {

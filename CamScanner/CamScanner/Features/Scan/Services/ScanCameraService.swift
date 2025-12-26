@@ -17,8 +17,7 @@ final class ScanCameraService: NSObject, ObservableObject {
 
     @Published var authorizationDenied: Bool = false
 
-    /// Optional callback for manual capture results.
-    /// We keep this as a callback to avoid tying the service to a specific app flow.
+    /// Optional callback for capture results.
     var onCapture: ((UIImage, Quadrilateral?) -> Void)?
 
     // MARK: - Internal
@@ -27,33 +26,34 @@ final class ScanCameraService: NSObject, ObservableObject {
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
     private weak var overlayView: DocumentCameraUIView?
 
+    private var isAttached = false
+
     /// Attach the service to an `AVCaptureVideoPreviewLayer` that lives inside a UIView.
     /// This should be called exactly once per view lifetime.
     func attach(previewLayer: AVCaptureVideoPreviewLayer, overlayView: DocumentCameraUIView) {
         self.previewLayer = previewLayer
         self.overlayView = overlayView
 
-        guard captureSessionManager == nil else {
-            // Already attached.
-            return
-        }
+        guard !isAttached else { return }
+        isAttached = true
 
-        // Create WeScan capture manager with the layer from our view.
         if let manager = CaptureSessionManager(videoPreviewLayer: previewLayer, delegate: nil) {
             manager.delegate = self
             self.captureSessionManager = manager
         } else {
-            // If it fails here, we will typically get an error via delegate in WeScan,
-            // but in case init returns nil without callback, keep it safe.
             self.authorizationDenied = true
         }
     }
 
+    // MARK: - Lifecycle
+
     func start() {
         authorizationDenied = false
+
+        // Important: these flags affect WeScan internal behavior.
         CaptureSession.current.isEditing = false
-        // App uses manual shutter. Keep WeScan's auto-scan OFF.
         CaptureSession.current.isAutoScanEnabled = false
+
         overlayView?.clearQuad()
         captureSessionManager?.start()
     }
@@ -61,10 +61,12 @@ final class ScanCameraService: NSObject, ObservableObject {
     func stop() {
         captureSessionManager?.stop()
     }
-    
+
+    /// Resume preview + detection after capture / after returning from preview screen.
     func resumeLivePreview() {
+        CaptureSession.current.isEditing = false
         overlayView?.clearQuad()
-        captureSessionManager?.start()   // или startRunning внутри
+        captureSessionManager?.start()
     }
 
     // MARK: - Torch
@@ -73,7 +75,7 @@ final class ScanCameraService: NSObject, ObservableObject {
         _ = CaptureSession.current.setTorch(enabled: enabled)
     }
 
-    // MARK: - Manual capture (optional)
+    // MARK: - Manual capture
 
     func capture() {
         captureSessionManager?.capturePhoto()
@@ -82,15 +84,11 @@ final class ScanCameraService: NSObject, ObservableObject {
 
 // MARK: - RectangleDetectionDelegateProtocol
 
-extension ScanCameraService: RectangleDetectionDelegateProtocol {
+extension ScanCameraService: CaptureSessionManagerDelegate {
 
-    func didStartCapturingPicture(for captureSessionManager: CaptureSessionManager) {
-        // Keep WeScan behavior: stop session while processing capture.
-        captureSessionManager.stop()
-    }
+    func didStartCapturingPicture(for captureSessionManager: CaptureSessionManager) {}
 
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager, didDetectQuad quad: Quadrilateral?, _ imageSize: CGSize) {
-        // Publish for anyone who wants it, and update overlay exactly like WeScan's CameraScannerViewController.
         lastDetectedQuad = quad
         lastImageSize = imageSize
 
@@ -103,11 +101,17 @@ extension ScanCameraService: RectangleDetectionDelegateProtocol {
         withQuad quad: Quadrilateral?
     ) {
         onCapture?(picture, quad)
+
+        // ✅ После того как кадр отдали наружу — возвращаем live preview.
+        // Это фиксит:
+        // 1) group-mode после первого кадра
+        // 2) зависание камеры после закрытия превью-экрана
+        DispatchQueue.main.async { [weak self] in
+            self?.resumeLivePreview()
+        }
     }
 
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager, didFailWithError error: Error) {
-        // If the user denied camera permission, WeScan uses ImageScannerControllerError.authorization.
-        // We map it to our existing SwiftUI alert flag.
         if let scannerError = error as? ImageScannerControllerError,
            scannerError == .authorization {
             authorizationDenied = true

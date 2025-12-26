@@ -15,7 +15,14 @@ final class DocumentCameraUIView: UIView {
 
     /// The view that shows the focus rectangle (when the user taps to focus, similar to the Camera app)
     private var focusRectangle: FocusRectangleView?
-
+    
+    var isLiveDetectionEnabled: Bool = true {
+        didSet {
+            if !isLiveDetectionEnabled {
+                clearQuad()
+            }
+        }
+    }
     private var subjectAreaObserver: NSObjectProtocol?
 
     override init(frame: CGRect) {
@@ -30,8 +37,7 @@ final class DocumentCameraUIView: UIView {
 
     private func commonInit() {
         backgroundColor = .black
-
-        // Match WeScan defaults.
+        
         videoPreviewLayer.videoGravity = .resizeAspectFill
 
         quadView.translatesAutoresizingMaskIntoConstraints = false
@@ -45,7 +51,6 @@ final class DocumentCameraUIView: UIView {
             quadView.leadingAnchor.constraint(equalTo: leadingAnchor)
         ])
 
-        // 1:1 with WeScan: reset focus when the camera reports a subject-area change.
         subjectAreaObserver = NotificationCenter.default.addObserver(
             forName: Notification.Name.AVCaptureDeviceSubjectAreaDidChange,
             object: nil,
@@ -107,26 +112,35 @@ final class DocumentCameraUIView: UIView {
         quadView.removeQuadrilateral()
     }
 
-    /// Update quad overlay using WeScan's exact transform pipeline.
     func updateDetectedQuad(_ quad: Quadrilateral?, imageSize: CGSize) {
+        guard isLiveDetectionEnabled else {
+            quadView.removeQuadrilateral()
+            return
+        }
+
         guard let quad else {
             quadView.removeQuadrilateral()
             return
         }
 
         let portraitImageSize = CGSize(width: imageSize.height, height: imageSize.width)
-        let scaleTransform = CGAffineTransform.scaleTransform(forSize: portraitImageSize,
-                                                              aspectFillInSize: quadView.bounds.size)
+        let scaleTransform = CGAffineTransform.scaleTransform(
+            forSize: portraitImageSize,
+            aspectFillInSize: quadView.bounds.size
+        )
         let scaledImageSize = imageSize.applying(scaleTransform)
-        let rotationTransform = CGAffineTransform(rotationAngle: CGFloat.pi / 2.0)
+        let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
         let imageBounds = CGRect(origin: .zero, size: scaledImageSize).applying(rotationTransform)
-        let translationTransform = CGAffineTransform.translateTransform(fromCenterOfRect: imageBounds,
-                                                                        toCenterOfRect: quadView.bounds)
+        let translationTransform = CGAffineTransform.translateTransform(
+            fromCenterOfRect: imageBounds,
+            toCenterOfRect: quadView.bounds
+        )
+
         let transforms = [scaleTransform, rotationTransform, translationTransform]
         let transformedQuad = quad.applyTransforms(transforms)
 
         let displayQuad = transformedQuad
-            .scaled(aroundCenterBy: 1.05)          // ← подбери 1.03–1.06
+            .scaled(aroundCenterBy: 1.05)
             .clamped(to: quadView.bounds)
 
         quadView.drawQuadrilateral(quad: displayQuad, animated: true)

@@ -9,28 +9,36 @@ final class ScanSettingsStore: ObservableObject {
     // MARK: - Stored keys
 
     @Published var grid: Bool {
-        didSet { UserDefaults.standard.set(grid, forKey: ScanSettingsKeys.grid) }
+        didSet { persistIfNeeded(oldValue: oldValue, newValue: grid, key: ScanSettingsKeys.grid) }
     }
 
     @Published var autoShoot: Bool {
-        didSet { UserDefaults.standard.set(autoShoot, forKey: ScanSettingsKeys.autoShoot) }
+        didSet { persistIfNeeded(oldValue: oldValue, newValue: autoShoot, key: ScanSettingsKeys.autoShoot) }
     }
 
     @Published var autoCrop: Bool {
-        didSet { UserDefaults.standard.set(autoCrop, forKey: ScanSettingsKeys.autoCrop) }
+        didSet { persistIfNeeded(oldValue: oldValue, newValue: autoCrop, key: ScanSettingsKeys.autoCrop) }
     }
 
     @Published var textOrientationRotate: Bool {
-        didSet { UserDefaults.standard.set(textOrientationRotate, forKey: ScanSettingsKeys.textOrientationRotate) }
+        didSet { persistIfNeeded(oldValue: oldValue, newValue: textOrientationRotate, key: ScanSettingsKeys.textOrientationRotate) }
     }
 
     @Published var volumeShutter: Bool {
-        didSet { UserDefaults.standard.set(volumeShutter, forKey: ScanSettingsKeys.volumeShutter) }
+        didSet { persistIfNeeded(oldValue: oldValue, newValue: volumeShutter, key: ScanSettingsKeys.volumeShutter) }
     }
 
+    private let userDefaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
 
+    /// Защита от feedback-loop:
+    /// когда мы применяем значения, пришедшие из UserDefaults.didChangeNotification,
+    /// мы НЕ должны снова писать их обратно в UserDefaults.
+    private var isApplyingExternalChange = false
+
     init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+
         self.grid = userDefaults.bool(forKey: ScanSettingsKeys.grid)
         self.autoShoot = userDefaults.bool(forKey: ScanSettingsKeys.autoShoot)
 
@@ -40,17 +48,42 @@ final class ScanSettingsStore: ObservableObject {
         self.volumeShutter = userDefaults.object(forKey: ScanSettingsKeys.volumeShutter) as? Bool ?? true
 
         // синхронизация, если настройки меняются где-то еще
-        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification, object: userDefaults)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                let ud = UserDefaults.standard
-                self.grid = ud.bool(forKey: ScanSettingsKeys.grid)
-                self.autoShoot = ud.bool(forKey: ScanSettingsKeys.autoShoot)
-                self.autoCrop = ud.object(forKey: ScanSettingsKeys.autoCrop) as? Bool ?? true
-                self.textOrientationRotate = ud.object(forKey: ScanSettingsKeys.textOrientationRotate) as? Bool ?? true
-                self.volumeShutter = ud.object(forKey: ScanSettingsKeys.volumeShutter) as? Bool ?? true
+                self.applyFromUserDefaults()
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Persistence
+
+    private func persistIfNeeded(oldValue: Bool, newValue: Bool, key: String) {
+        guard oldValue != newValue else { return }
+        guard !isApplyingExternalChange else { return }
+        userDefaults.set(newValue, forKey: key)
+    }
+
+    private func applyFromUserDefaults() {
+        isApplyingExternalChange = true
+        defer { isApplyingExternalChange = false }
+
+        // Важно: присваиваем только если реально изменилось,
+        // чтобы не триггерить лишние обновления SwiftUI.
+        let newGrid = userDefaults.bool(forKey: ScanSettingsKeys.grid)
+        if grid != newGrid { grid = newGrid }
+
+        let newAutoShoot = userDefaults.bool(forKey: ScanSettingsKeys.autoShoot)
+        if autoShoot != newAutoShoot { autoShoot = newAutoShoot }
+
+        let newAutoCrop = userDefaults.object(forKey: ScanSettingsKeys.autoCrop) as? Bool ?? true
+        if autoCrop != newAutoCrop { autoCrop = newAutoCrop }
+
+        let newTextRotate = userDefaults.object(forKey: ScanSettingsKeys.textOrientationRotate) as? Bool ?? true
+        if textOrientationRotate != newTextRotate { textOrientationRotate = newTextRotate }
+
+        let newVolume = userDefaults.object(forKey: ScanSettingsKeys.volumeShutter) as? Bool ?? true
+        if volumeShutter != newVolume { volumeShutter = newVolume }
     }
 }

@@ -61,7 +61,6 @@ public struct Quadrilateral: Transformable {
         self.bottomRight = rectangleFeature.bottomRight
     }
 
-    @available(iOS 11.0, *)
     init(rectangleObservation: VNRectangleObservation) {
         self.topLeft = rectangleObservation.topLeft
         self.topRight = rectangleObservation.topRight
