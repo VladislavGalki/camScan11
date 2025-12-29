@@ -121,7 +121,8 @@ struct ScanView: View {
                 onRetake: {
                     vm.resetSingle()
                     showPreview = false
-                }
+                },
+                vm: vm
             )
         })
         .onChange(of: vm.lastCaptured) { _, newValue in

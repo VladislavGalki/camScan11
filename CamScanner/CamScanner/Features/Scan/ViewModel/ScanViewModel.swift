@@ -143,6 +143,20 @@ final class ScanViewModel: ObservableObject {
         }
     }
 
+    func applyEditedImage(_ image: UIImage) {
+        switch ui.captureMode {
+        case .single:
+            lastCaptured = image
+        case .group:
+            // если у тебя сейчас открыт превью для последнего кадра — логичнее заменить последний
+            if !groupCaptures.isEmpty {
+                groupCaptures[groupCaptures.count - 1] = image
+            } else {
+                groupCaptures.append(image)
+            }
+        }
+    }
+
     // MARK: - Flash / torch
     func applyFlashSideEffects() {
         camera.setTorch(enabled: ui.flashMode == .torch)

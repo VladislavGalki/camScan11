@@ -9,6 +9,7 @@ struct CapturePreviewView: View {
     let onDone: () -> Void
     let onRetake: () -> Void
 
+    @StateObject var vm: ScanViewModel
     @State private var showCropper = false
 
     var body: some View {
@@ -63,10 +64,9 @@ struct CapturePreviewView: View {
                     originalImage: originalImage,
                     autoQuad: autoQuad,
                     onCancel: { showCropper = false },
-                    onDone: { _ in
-                        // IMPORTANT:
-                        // здесь мы просто закрываем — фактическое применение результата делаем снаружи
-                        // (мы вернем cropped через onDone в ScanView через VM)
+                    onDone: { edited in
+                        vm.applyEditedImage(edited)  // ✅ обновляем превью
+                        showCropper = false
                     }
                 )
             }
