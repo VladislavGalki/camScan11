@@ -13,7 +13,6 @@ final class ScanViewModel: ObservableObject {
     private let autoShootEngine: AutoShootEngine
     private let postProcessor: CapturePostProcessor
 
-    // подписки — отдельно под камеру
     private var cameraCancellables = Set<AnyCancellable>()
     private var didBindCamera = false
 
@@ -24,7 +23,16 @@ final class ScanViewModel: ObservableObject {
     // MARK: - Output
     @Published var isCapturing: Bool = false
     @Published var showPermissionAlert: Bool = false
+
+    /// То, что показываем на экране превью (обычно: уже downscale + возможно autoCrop)
     @Published var lastCaptured: UIImage? = nil
+
+    /// Оригинальный кадр (полный, не downscale), нужен для ручной обрезки
+    @Published var lastCapturedOriginal: UIImage? = nil
+
+    /// Quad в координатах оригинального изображения, который использовали для autoCrop (если был)
+    @Published var lastAutoQuadInImageSpace: Quadrilateral? = nil
+
     @Published var groupCaptures: [UIImage] = []
 
     // MARK: - Init
@@ -63,7 +71,6 @@ final class ScanViewModel: ObservableObject {
             }
             .store(in: &cameraCancellables)
 
-        // ✅ quad + imageSize -> автошот
         camera.$lastDetectedQuad
             .combineLatest(camera.$lastImageSize)
             .receive(on: DispatchQueue.main)
@@ -87,12 +94,11 @@ final class ScanViewModel: ObservableObject {
             }
             .store(in: &cameraCancellables)
 
-        // ✅ post-process after capture
         camera.onCapture = { [weak self] image, _ in
             guard let self else { return }
             self.isCapturing = false
 
-            let final = self.postProcessor.process(
+            let output = self.postProcessor.process(
                 image: image,
                 previewQuad: self.latestPreviewQuad,
                 previewImageSize: self.latestPreviewImageSize,
@@ -100,14 +106,40 @@ final class ScanViewModel: ObservableObject {
                 quality: self.ui.quality
             )
 
+            self.lastCapturedOriginal = output.original
+            self.lastAutoQuadInImageSpace = output.autoQuadInImageSpace
+
             switch self.ui.captureMode {
             case .single:
-                self.lastCaptured = final
+                self.lastCaptured = output.preview
             case .group:
-                self.groupCaptures.append(final)
+                self.groupCaptures.append(output.preview)
             }
 
             self.autoShootEngine.notifyDidCapture()
+        }
+    }
+
+    // MARK: - Manual crop apply (вызываем после DocumentCropperView)
+    func applyManualCropResult(_ croppedOriginalSpace: UIImage) {
+        // после ручной обрезки:
+        // - превью = downscale по выбранному quality
+        // - original = тоже можно заменить на кропнутый (если дальше нужно)
+        self.lastCapturedOriginal = croppedOriginalSpace
+        self.lastAutoQuadInImageSpace = nil
+
+        let preview = croppedOriginalSpace.downscaled(maxDimension: ui.quality.maxDimension)
+
+        switch ui.captureMode {
+        case .single:
+            self.lastCaptured = preview
+        case .group:
+            // для группового — заменим последний кадр, т.к. редактируем “текущий”
+            if !groupCaptures.isEmpty {
+                groupCaptures[groupCaptures.count - 1] = preview
+            } else {
+                groupCaptures.append(preview)
+            }
         }
     }
 
@@ -123,6 +155,16 @@ final class ScanViewModel: ObservableObject {
         camera.capture()
     }
 
-    func resetSingle() { lastCaptured = nil }
-    func resetGroup() { groupCaptures.removeAll() }
+    func resetSingle() {
+        lastCaptured = nil
+        lastCapturedOriginal = nil
+        lastAutoQuadInImageSpace = nil
+    }
+
+    func resetGroup() {
+        groupCaptures.removeAll()
+        lastCaptured = nil
+        lastCapturedOriginal = nil
+        lastAutoQuadInImageSpace = nil
+    }
 }

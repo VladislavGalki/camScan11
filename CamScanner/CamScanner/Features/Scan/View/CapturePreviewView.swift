@@ -1,35 +1,74 @@
 import SwiftUI
-import UIKit
 
 struct CapturePreviewView: View {
+    
     let image: UIImage?
+    let originalImage: UIImage?
+    let autoQuad: Quadrilateral?
+
     let onDone: () -> Void
     let onRetake: () -> Void
 
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
+    @State private var showCropper = false
 
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding()
-                } else {
-                    Text("No image")
-                        .foregroundStyle(.white)
-                }
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
             }
-            .navigationTitle("Preview")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+
+            VStack {
+                HStack {
                     Button("Переснять") { onRetake() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+
+                    Spacer()
+
                     Button("Готово") { onDone() }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                 }
+
+                Spacer()
+
+                // Bottom bar (как ты просил: пока одна кнопка)
+                HStack {
+                    Button {
+                        showCropper = true
+                    } label: {
+                        Text("Обрезка")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.95))
+                            .cornerRadius(12)
+                    }
+                    .disabled(originalImage == nil)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 22)
+            }
+        }
+        .fullScreenCover(isPresented: $showCropper) {
+            if let originalImage {
+                DocumentCropperView(
+                    originalImage: originalImage,
+                    autoQuad: autoQuad,
+                    onCancel: { showCropper = false },
+                    onDone: { _ in
+                        // IMPORTANT:
+                        // здесь мы просто закрываем — фактическое применение результата делаем снаружи
+                        // (мы вернем cropped через onDone в ScanView через VM)
+                    }
+                )
             }
         }
     }

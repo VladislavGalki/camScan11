@@ -1,9 +1,11 @@
 import UIKit
-import CoreGraphics
 
-/// Пост-обработка уже сделанного снимка:
-/// - (опционально) crop/deskew по quad из превью (масштабируем в координаты photo + учитываем rotationAngle)
-/// - downscale ПОСЛЕ кропа
+struct CapturePostProcessOutput {
+    let original: UIImage
+    let preview: UIImage
+    let autoQuadInImageSpace: Quadrilateral?
+}
+
 final class CapturePostProcessor {
 
     func process(
@@ -12,27 +14,35 @@ final class CapturePostProcessor {
         previewImageSize: CGSize,
         autoCrop: Bool,
         quality: QualityPreset
-    ) -> UIImage {
+    ) -> CapturePostProcessOutput {
 
-        var final = image
+        let original = image
+        var previewImage = image
+        var usedQuad: Quadrilateral? = nil
 
         if autoCrop,
            let previewQuad,
            previewImageSize.width > 0,
            previewImageSize.height > 0 {
 
-            let angle = SmartCropper.rotationAngle(for: final.imageOrientation)
+            let angle = SmartCropper.rotationAngle(for: previewImage.imageOrientation)
+            let quadInImageSpace = previewQuad.scale(previewImageSize, previewImage.size, withRotationAngle: angle)
 
-            // quad из детектора (preview) -> координаты реального фото (с учётом rotationAngle как в WeScan)
-            let quadInImageSpace = previewQuad.scale(previewImageSize, final.size, withRotationAngle: angle)
-
-            if let cropped = SmartCropper.cropAndDeskew(image: final, quad: quadInImageSpace) {
-                final = cropped
+            if let cropped = SmartCropper.cropAndDeskew(image: previewImage, quad: quadInImageSpace) {
+                previewImage = cropped
+                usedQuad = quadInImageSpace
+            } else {
+                usedQuad = quadInImageSpace
             }
         }
 
-        // downscale ПОСЛЕ кропа
-        final = final.downscaled(maxDimension: quality.maxDimension)
-        return final
+        // downscale для превью/дальнейшего пайплайна
+        previewImage = previewImage.downscaled(maxDimension: quality.maxDimension)
+
+        return CapturePostProcessOutput(
+            original: original,
+            preview: previewImage,
+            autoQuadInImageSpace: usedQuad
+        )
     }
 }

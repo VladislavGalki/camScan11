@@ -111,6 +111,8 @@ struct ScanView: View {
         .fullScreenCover(isPresented: $showPreview, content: {
             CapturePreviewView(
                 image: vm.lastCaptured,
+                originalImage: vm.lastCapturedOriginal,
+                autoQuad: vm.lastAutoQuadInImageSpace,
                 onDone: {
                     vm.resetSingle()
                     showPreview = false
