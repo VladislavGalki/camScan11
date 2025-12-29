@@ -144,15 +144,19 @@ final class ScanViewModel: ObservableObject {
     }
 
     func applyEditedImage(_ image: UIImage) {
-        switch ui.captureMode {
-        case .single:
-            lastCaptured = image
-        case .group:
-            // если у тебя сейчас открыт превью для последнего кадра — логичнее заменить последний
-            if !groupCaptures.isEmpty {
-                groupCaptures[groupCaptures.count - 1] = image
-            } else {
-                groupCaptures.append(image)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            
+            switch ui.captureMode {
+            case .single:
+                lastCaptured = image
+            case .group:
+                // если у тебя сейчас открыт превью для последнего кадра — логичнее заменить последний
+                if !groupCaptures.isEmpty {
+                    groupCaptures[groupCaptures.count - 1] = image
+                } else {
+                    groupCaptures.append(image)
+                }
             }
         }
     }

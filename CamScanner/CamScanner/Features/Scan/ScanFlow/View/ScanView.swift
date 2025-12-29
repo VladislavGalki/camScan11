@@ -1,77 +1,75 @@
 import SwiftUI
 
 struct ScanView: View {
-
+    
     let onClose: () -> Void
-
-    @StateObject private var settings = ScanSettingsStore()
-    @StateObject private var ui = ScanUIStateStore()
+    
+    @StateObject private var settings: ScanSettingsStore
+    @StateObject private var ui: ScanUIStateStore
     @StateObject private var vm: ScanViewModel
-
+    
     @State private var panel: ScanTopPanel = .none
     @State private var showPreview = false
-
+    
     init(onClose: @escaping () -> Void) {
         self.onClose = onClose
-
-        // Важно: создаём VM с теми же store-объектами
+        
         let settingsStore = ScanSettingsStore()
         let uiStore = ScanUIStateStore()
         _settings = StateObject(wrappedValue: settingsStore)
         _ui = StateObject(wrappedValue: uiStore)
         _vm = StateObject(wrappedValue: ScanViewModel(settings: settingsStore, ui: uiStore))
     }
-
+    
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            ScanTopBar(
+                flashIconName: flashIconName,
+                onClose: onClose,
+                onFlashTap: { toggle(.flash) },
+                onQualityTap: { toggle(.quality) },
+                onFiltersTap: { toggle(.filters) },
+                onSettingsTap: { toggle(.settings) }
+            )
+           
+            ScanTopPanelsContainer(
+                panel: $panel,
+                flashMode: ui.flashMode,
+                quality: ui.quality,
+                filter: ui.filter,
+                onSelectFlash: { mode in
+                    ui.flashMode = mode
+                    vm.applyFlashSideEffects()
+                    panel = .none
+                },
+                onSelectQuality: { q in
+                    ui.quality = q
+                    panel = .none
+                },
+                onSelectFilter: { f in
+                    ui.filter = f
+                    panel = .none
+                }
+            )
+            
             DocumentCameraView(
                 camera: vm.camera,
-                isLiveDetectionEnabled: settings.autoCrop || settings.autoShoot
+                isLiveDetectionEnabled: settings.isLivePreviewEnabled && ui.getSelectedDocumentType() == .scan
             )
-            .ignoresSafeArea()
-
-            Color.black.opacity(0.12).ignoresSafeArea()
-
-            if settings.grid {
-                GridOverlay()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
+            .overlay {
+                if ui.getSelectedDocumentType() == .id {
+                    IdCameraView()
+                }
             }
-
-            VStack(spacing: 0) {
-                ScanTopBar(
-                    flashIconName: flashIconName,
-                    onClose: onClose,
-                    onFlashTap: { toggle(.flash) },
-                    onQualityTap: { toggle(.quality) },
-                    onFiltersTap: { toggle(.filters) },
-                    onSettingsTap: { toggle(.settings) }
-                )
-
-                ScanTopPanelsContainer(
-                    panel: $panel,
-                    flashMode: ui.flashMode,
-                    quality: ui.quality,
-                    filter: ui.filter,
-                    onSelectFlash: { mode in
-                        ui.flashMode = mode
-                        vm.applyFlashSideEffects()
-                        panel = .none
-                    },
-                    onSelectQuality: { q in
-                        ui.quality = q
-                        panel = .none
-                    },
-                    onSelectFilter: { f in
-                        ui.filter = f
-                        panel = .none
-                    }
-                )
-
-                Spacer()
+            .overlay {
+                if settings.grid {
+                    GridOverlay()
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
             }
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 8) {
+            .overlay(alignment: .bottom) {
+                if ui.getSelectedDocumentType() == .scan {
                     Picker("", selection: $ui.captureMode) {
                         ForEach(CaptureMode.allCases) { mode in
                             Text(mode.rawValue).tag(mode)
@@ -79,34 +77,48 @@ struct ScanView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 64)
-
-                    ScanBottomBar(
-                        isCapturing: vm.isCapturing,
-                        onShutter: { vm.capture() }
-                    )
+                    .padding(.bottom, 16)
                 }
             }
+            
+            Spacer()
+            
+            VStack(spacing: 14) {
+                DocumentTypeCarouselView(uiState: ui)
 
+                ShutterButton(isBusy: vm.isCapturing) {
+                    vm.capture()
+                }
+            }
+            .padding(.top, 10)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity)
+            .background(Color.black)
+        }
+        .overlay {
             if panel == .settings {
                 ScanSettingsOverlayCard(isPresented: Binding(
                     get: { panel == .settings },
                     set: { if !$0 { panel = .none } }
                 ))
                 .transition(.opacity)
-                .zIndex(10)
             }
         }
-        .background(Color.black)
+        .background(
+            Color.black.ignoresSafeArea()
+        )
+        .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
+            Button("Ок", role: .cancel) {}
+        } message: {
+            Text("Разреши доступ к камере в Настройках.")
+        }
         .onAppear {
             vm.onAppear()
             vm.applyFlashSideEffects()
             vm.camera.resumeLivePreview()
         }
-        .onDisappear { vm.onDisappear() }
-        .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
-            Button("Ок", role: .cancel) {}
-        } message: {
-            Text("Разреши доступ к камере в Настройках.")
+        .onDisappear {
+            vm.onDisappear()
         }
         .fullScreenCover(isPresented: $showPreview, content: {
             CapturePreviewView(
@@ -131,7 +143,7 @@ struct ScanView: View {
             }
         }
     }
-
+    
     private var flashIconName: String {
         switch ui.flashMode {
         case .off: return "bolt.slash"
@@ -140,7 +152,7 @@ struct ScanView: View {
         case .torch: return "flashlight.on.fill"
         }
     }
-
+    
     private func toggle(_ target: ScanTopPanel) {
         withAnimation(.easeInOut(duration: 0.2)) {
             panel = (panel == target) ? .none : target

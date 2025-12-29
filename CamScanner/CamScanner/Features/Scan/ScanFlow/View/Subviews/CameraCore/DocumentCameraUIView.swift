@@ -12,9 +12,6 @@ final class DocumentCameraUIView: UIView {
     // MARK: - Overlay
 
     private let quadView = QuadrilateralView()
-
-    /// The view that shows the focus rectangle (when the user taps to focus, similar to the Camera app)
-    private var focusRectangle: FocusRectangleView?
     
     var isLiveDetectionEnabled: Bool = true {
         didSet {
@@ -23,7 +20,6 @@ final class DocumentCameraUIView: UIView {
             }
         }
     }
-    private var subjectAreaObserver: NSObjectProtocol?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -50,57 +46,6 @@ final class DocumentCameraUIView: UIView {
             trailingAnchor.constraint(equalTo: quadView.trailingAnchor),
             quadView.leadingAnchor.constraint(equalTo: leadingAnchor)
         ])
-
-        subjectAreaObserver = NotificationCenter.default.addObserver(
-            forName: Notification.Name.AVCaptureDeviceSubjectAreaDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.subjectAreaDidChange()
-        }
-    }
-
-    deinit {
-        if let subjectAreaObserver {
-            NotificationCenter.default.removeObserver(subjectAreaObserver)
-        }
-    }
-
-    // MARK: - Focus (tap to focus)
-
-    private func subjectAreaDidChange() {
-        do {
-            try CaptureSession.current.resetFocusToAuto()
-        } catch {
-            // Ignore: upstream can surface errors if desired.
-        }
-
-        if let focusRectangle {
-            CaptureSession.current.removeFocusRectangleIfNeeded(focusRectangle, animated: true)
-        }
-    }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesBegan(touches, with: event)
-
-        guard let touch = touches.first else { return }
-        let touchPoint = touch.location(in: self)
-        let convertedTouchPoint = videoPreviewLayer.captureDevicePointConverted(fromLayerPoint: touchPoint)
-
-        if let focusRectangle {
-            CaptureSession.current.removeFocusRectangleIfNeeded(focusRectangle, animated: false)
-        }
-
-        let newFocus = FocusRectangleView(touchPoint: touchPoint)
-        newFocus.setBorder(color: UIColor.white.cgColor)
-        addSubview(newFocus)
-        focusRectangle = newFocus
-
-        do {
-            try CaptureSession.current.setFocusPointToTapPoint(convertedTouchPoint)
-        } catch {
-            // Ignore: upstream can surface errors if desired.
-        }
     }
 
     override func layoutSubviews() {

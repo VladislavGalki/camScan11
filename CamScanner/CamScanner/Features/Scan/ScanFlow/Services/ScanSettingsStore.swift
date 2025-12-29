@@ -30,6 +30,10 @@ final class ScanSettingsStore: ObservableObject {
 
     private let userDefaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
+    
+    public var isLivePreviewEnabled: Bool {
+        autoCrop || autoShoot
+    }
 
     /// Защита от feedback-loop:
     /// когда мы применяем значения, пришедшие из UserDefaults.didChangeNotification,
