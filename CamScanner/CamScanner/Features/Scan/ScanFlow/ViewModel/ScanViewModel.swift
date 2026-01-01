@@ -20,17 +20,16 @@ final class ScanViewModel: ObservableObject {
     private var latestPreviewQuad: Quadrilateral?
     private var latestPreviewImageSize: CGSize = .zero
 
+    // ✅ ID: сохраняем rect рамки в координатах preview + размер preview
+    private var latestIdFrameRectInPreview: CGRect?
+    private var latestIdPreviewSize: CGSize?
+
     // MARK: - Output
     @Published var isCapturing: Bool = false
     @Published var showPermissionAlert: Bool = false
 
-    /// То, что показываем на экране превью (обычно: уже downscale + возможно autoCrop)
     @Published var lastCaptured: UIImage? = nil
-
-    /// Оригинальный кадр (полный, не downscale), нужен для ручной обрезки
     @Published var lastCapturedOriginal: UIImage? = nil
-
-    /// Quad в координатах оригинального изображения, который использовали для autoCrop (если был)
     @Published var lastAutoQuadInImageSpace: Quadrilateral? = nil
 
     @Published var groupCaptures: [UIImage] = []
@@ -98,6 +97,31 @@ final class ScanViewModel: ObservableObject {
             guard let self else { return }
             self.isCapturing = false
 
+            let docType = self.ui.getSelectedDocumentType()
+
+            if docType == .id,
+               let frameRect = self.latestIdFrameRectInPreview,
+               let previewSize = self.latestIdPreviewSize,
+               previewSize.width > 0, previewSize.height > 0,
+               frameRect.width > 1, frameRect.height > 1 {
+
+                let output = self.postProcessor.processIdByFrame(
+                    image: image,
+                    frameRectInPreview: frameRect,
+                    previewSize: previewSize,
+                    quality: self.ui.quality
+                )
+
+                self.lastCapturedOriginal = output.original
+                self.lastAutoQuadInImageSpace = nil
+                self.lastCaptured = output.preview
+
+                self.latestIdFrameRectInPreview = nil
+                self.latestIdPreviewSize = nil
+                return
+            }
+
+            // ✅ SCAN mode
             let output = self.postProcessor.process(
                 image: image,
                 previewQuad: self.latestPreviewQuad,
@@ -119,7 +143,7 @@ final class ScanViewModel: ObservableObject {
             self.autoShootEngine.notifyDidCapture()
         }
     }
-
+    
     // MARK: - Manual crop apply (вызываем после DocumentCropperView)
     func applyManualCropResult(_ croppedOriginalSpace: UIImage) {
         // после ручной обрезки:
@@ -170,6 +194,31 @@ final class ScanViewModel: ObservableObject {
     func capture() {
         guard !isCapturing else { return }
         isCapturing = true
+
+        if ui.getSelectedDocumentType() == .id {
+            let raw = ui.idFrameRectInCameraSpace
+
+            if let previewSize = camera.previewBoundsSize() {
+                let previewRect = CGRect(origin: .zero, size: previewSize)
+                let clipped = raw.intersection(previewRect)
+
+                print("🪪 FRAME raw =", raw)
+                print("🪪 FRAME clipped =", clipped)
+                print("📷 previewBoundsSize =", previewSize)
+
+                if !clipped.isNull, clipped.width > 10, clipped.height > 10 {
+                    latestIdFrameRectInPreview = clipped
+                    latestIdPreviewSize = previewSize
+                } else {
+                    latestIdFrameRectInPreview = nil
+                    latestIdPreviewSize = nil
+                }
+            } else {
+                latestIdFrameRectInPreview = nil
+                latestIdPreviewSize = nil
+            }
+        }
+
         camera.capture()
     }
 
@@ -177,6 +226,8 @@ final class ScanViewModel: ObservableObject {
         lastCaptured = nil
         lastCapturedOriginal = nil
         lastAutoQuadInImageSpace = nil
+        latestIdFrameRectInPreview = nil
+        latestIdPreviewSize = nil
     }
 
     func resetGroup() {
@@ -184,5 +235,7 @@ final class ScanViewModel: ObservableObject {
         lastCaptured = nil
         lastCapturedOriginal = nil
         lastAutoQuadInImageSpace = nil
+        latestIdFrameRectInPreview = nil
+        latestIdPreviewSize = nil
     }
 }

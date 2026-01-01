@@ -1,26 +1,26 @@
 import SwiftUI
 
 struct ScanView: View {
-    
+
     let onClose: () -> Void
-    
+
     @StateObject private var settings: ScanSettingsStore
     @StateObject private var ui: ScanUIStateStore
     @StateObject private var vm: ScanViewModel
-    
+
     @State private var panel: ScanTopPanel = .none
     @State private var showPreview = false
-    
+
     init(onClose: @escaping () -> Void) {
         self.onClose = onClose
-        
+
         let settingsStore = ScanSettingsStore()
         let uiStore = ScanUIStateStore()
         _settings = StateObject(wrappedValue: settingsStore)
         _ui = StateObject(wrappedValue: uiStore)
         _vm = StateObject(wrappedValue: ScanViewModel(settings: settingsStore, ui: uiStore))
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             ScanTopBar(
@@ -28,10 +28,16 @@ struct ScanView: View {
                 onClose: onClose,
                 onFlashTap: { toggle(.flash) },
                 onQualityTap: { toggle(.quality) },
-                onFiltersTap: { toggle(.filters) },
-                onSettingsTap: { toggle(.settings) }
+                onFiltersTap: {
+                    // ✅ В режиме удостоверения — фильтры скрываем/не открываем
+                    if ui.getSelectedDocumentType() == .scan {
+                        toggle(.filters)
+                    }
+                },
+                onSettingsTap: { toggle(.settings) },
+                isFiltersHidden: ui.getSelectedDocumentType() == .id  // ✅ нужно добавить параметр в ScanTopBar
             )
-           
+
             ScanTopPanelsContainer(
                 panel: $panel,
                 flashMode: ui.flashMode,
@@ -51,14 +57,15 @@ struct ScanView: View {
                     panel = .none
                 }
             )
-            
+
             DocumentCameraView(
                 camera: vm.camera,
                 isLiveDetectionEnabled: settings.isLivePreviewEnabled && ui.getSelectedDocumentType() == .scan
             )
+            .coordinateSpace(name: "cameraSpace")
             .overlay {
                 if ui.getSelectedDocumentType() == .id {
-                    IdCameraView()
+                    IdCameraView(ui: ui)
                 }
             }
             .overlay {
@@ -80,9 +87,9 @@ struct ScanView: View {
                     .padding(.bottom, 16)
                 }
             }
-            
+
             Spacer()
-            
+
             VStack(spacing: 14) {
                 DocumentTypeCarouselView(uiState: ui)
 
@@ -104,9 +111,7 @@ struct ScanView: View {
                 .transition(.opacity)
             }
         }
-        .background(
-            Color.black.ignoresSafeArea()
-        )
+        .background(Color.black.ignoresSafeArea())
         .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
             Button("Ок", role: .cancel) {}
         } message: {
@@ -120,30 +125,56 @@ struct ScanView: View {
         .onDisappear {
             vm.onDisappear()
         }
-        .fullScreenCover(isPresented: $showPreview, content: {
-            CapturePreviewView(
-                image: vm.lastCaptured,
-                originalImage: vm.lastCapturedOriginal,
-                autoQuad: vm.lastAutoQuadInImageSpace,
-                onDone: {
-                    vm.resetSingle()
-                    showPreview = false
-                    onClose()
-                },
-                onRetake: {
-                    vm.resetSingle()
-                    showPreview = false
-                },
-                vm: vm
-            )
-        })
+        .fullScreenCover(isPresented: $showPreview) {
+            if ui.getSelectedDocumentType() == .scan {
+                CapturePreviewView(
+                    image: vm.lastCaptured,
+                    originalImage: vm.lastCapturedOriginal,
+                    autoQuad: vm.lastAutoQuadInImageSpace,
+                    onDone: {
+                        vm.resetSingle()
+                        showPreview = false
+                        onClose()
+                    },
+                    onRetake: {
+                        vm.resetSingle()
+                        showPreview = false
+                    },
+                    vm: vm
+                )
+            } else {
+                IdCapturePreviewView(
+                    image: vm.lastCaptured,
+                    originalImage: vm.lastCapturedOriginal,
+                    autoQuad: vm.lastAutoQuadInImageSpace,
+                    idType: ui.selectedIdType,
+                    onDone: {
+                        vm.resetSingle()
+                        showPreview = false
+                        onClose()
+                    },
+                    onRetake: {
+                        vm.resetSingle()
+                        showPreview = false
+                    }
+                )
+            }
+        }
         .onChange(of: vm.lastCaptured) { _, newValue in
-            if newValue != nil, ui.captureMode == .single {
+            guard newValue != nil else { return }
+
+            if ui.getSelectedDocumentType() == .id {
+                // ✅ Для ID превью всегда показываем
                 showPreview = true
+            } else {
+                // ✅ Для Scan — только single
+                if ui.captureMode == .single {
+                    showPreview = true
+                }
             }
         }
     }
-    
+
     private var flashIconName: String {
         switch ui.flashMode {
         case .off: return "bolt.slash"
@@ -152,7 +183,7 @@ struct ScanView: View {
         case .torch: return "flashlight.on.fill"
         }
     }
-    
+
     private func toggle(_ target: ScanTopPanel) {
         withAnimation(.easeInOut(duration: 0.2)) {
             panel = (panel == target) ? .none : target

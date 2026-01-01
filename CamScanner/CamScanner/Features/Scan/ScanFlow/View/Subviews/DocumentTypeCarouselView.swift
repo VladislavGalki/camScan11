@@ -14,6 +14,8 @@ struct DocumentTypeCarouselView: View {
                         }
                 }
             }
+            .padding(.horizontal, 20)
         }
+        .scrollIndicators(.never)
     }
 }

@@ -9,6 +9,7 @@ struct ScanTopBar: View {
     let onQualityTap: () -> Void
     let onFiltersTap: () -> Void
     let onSettingsTap: () -> Void
+    let isFiltersHidden: Bool
 
     var body: some View {
         HStack(spacing: 18) {
@@ -34,10 +35,15 @@ struct ScanTopBar: View {
                     .frame(width: 44, height: 44)
             }
 
-            Button(action: onFiltersTap) {
-                Image(systemName: "circle.lefthalf.filled")
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
+            if !isFiltersHidden {
+                Button(action: onFiltersTap) {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                }
+            } else {
+                // чтобы spacing/баланс визуально не “прыгал”
+                Color.clear.frame(width: 44, height: 44)
             }
 
             Button(action: onSettingsTap) {
