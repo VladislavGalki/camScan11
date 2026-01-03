@@ -28,9 +28,11 @@ final class ScanUIStateStore: ObservableObject {
     // ID flow
     @Published var isIdIntroVisible: Bool = true
     @Published var selectedIdType: IdDocumentTypeEnum = .general
-
     @Published var idFrameRectInCameraSpace: CGRect = .zero
-    
+
+    /// ✅ какая сторона сейчас снимается (для 2-сторонних)
+    @Published var idCaptureSide: IdCaptureSide = .front
+
     init() {
         setupDocumentTypes()
     }
@@ -44,10 +46,11 @@ final class ScanUIStateStore: ObservableObject {
             let id = selectedDocumentType[index].id
             selectedDocumentType[index].isSelected = documentType.id == id
         }
-        
+
         if documentType.type == .id {
             isIdIntroVisible = true
             selectedIdType = .general
+            idCaptureSide = .front
         }
     }
 

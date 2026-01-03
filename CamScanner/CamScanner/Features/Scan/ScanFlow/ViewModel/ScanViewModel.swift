@@ -16,15 +16,15 @@ final class ScanViewModel: ObservableObject {
     private var cameraCancellables = Set<AnyCancellable>()
     private var didBindCamera = false
 
-    // Последний quad из превью (координаты детектора) + размер imageSize детектора
+    // Scan-mode (детект)
     private var latestPreviewQuad: Quadrilateral?
     private var latestPreviewImageSize: CGSize = .zero
 
-    // ✅ ID: сохраняем rect рамки в координатах preview + размер preview
+    // ID-mode (рамка)
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
 
-    // MARK: - Output
+    // MARK: - Output (Scan)
     @Published var isCapturing: Bool = false
     @Published var showPermissionAlert: Bool = false
 
@@ -33,6 +33,10 @@ final class ScanViewModel: ObservableObject {
     @Published var lastAutoQuadInImageSpace: Quadrilateral? = nil
 
     @Published var groupCaptures: [UIImage] = []
+
+    // MARK: - Output (ID)
+    @Published var idResult: IdCaptureResult
+    @Published var isIdReadyToPreview: Bool = false
 
     // MARK: - Init
     init(
@@ -45,6 +49,13 @@ final class ScanViewModel: ObservableObject {
         self.ui = ui
         self.autoShootEngine = autoShootEngine
         self.postProcessor = postProcessor
+
+        // ✅ стартовое состояние для ID
+        self.idResult = IdCaptureResult(
+            idType: ui.selectedIdType,
+            front: .init(),
+            back: ui.selectedIdType.requiresBackSide ? .init() : nil
+        )
     }
 
     // MARK: - Lifecycle
@@ -70,6 +81,7 @@ final class ScanViewModel: ObservableObject {
             }
             .store(in: &cameraCancellables)
 
+        // Scan auto-shoot engine
         camera.$lastDetectedQuad
             .combineLatest(camera.$lastImageSize)
             .receive(on: DispatchQueue.main)
@@ -99,29 +111,12 @@ final class ScanViewModel: ObservableObject {
 
             let docType = self.ui.getSelectedDocumentType()
 
-            if docType == .id,
-               let frameRect = self.latestIdFrameRectInPreview,
-               let previewSize = self.latestIdPreviewSize,
-               previewSize.width > 0, previewSize.height > 0,
-               frameRect.width > 1, frameRect.height > 1 {
-
-                let output = self.postProcessor.processIdByFrame(
-                    image: image,
-                    frameRectInPreview: frameRect,
-                    previewSize: previewSize,
-                    quality: self.ui.quality
-                )
-
-                self.lastCapturedOriginal = output.original
-                self.lastAutoQuadInImageSpace = nil
-                self.lastCaptured = output.preview
-
-                self.latestIdFrameRectInPreview = nil
-                self.latestIdPreviewSize = nil
+            if docType == .id {
+                self.handleIdCapture(image: image)
                 return
             }
 
-            // ✅ SCAN mode
+            // ✅ SCAN mode (старый пайплайн)
             let output = self.postProcessor.process(
                 image: image,
                 previewQuad: self.latestPreviewQuad,
@@ -143,12 +138,74 @@ final class ScanViewModel: ObservableObject {
             self.autoShootEngine.notifyDidCapture()
         }
     }
-    
-    // MARK: - Manual crop apply (вызываем после DocumentCropperView)
+
+    // MARK: - ID capture pipeline (front/back)
+    private func handleIdCapture(image: UIImage) {
+        // если интро ещё на экране — ничего не делаем
+        guard ui.isIdIntroVisible == false else { return }
+
+        // актуализируем idResult.idType
+        if idResult.idType != ui.selectedIdType {
+            resetIdFlowForNewType(ui.selectedIdType)
+        }
+
+        guard let frameRect = latestIdFrameRectInPreview,
+              let previewSize = latestIdPreviewSize,
+              previewSize.width > 0, previewSize.height > 0,
+              frameRect.width > 1, frameRect.height > 1 else {
+            return
+        }
+
+        let output = postProcessor.processIdByFrame(
+            image: image,
+            frameRectInPreview: frameRect,
+            previewSize: previewSize,
+            quality: ui.quality
+        )
+
+        let captured = CapturedFrame(
+            preview: output.preview,
+            original: output.original,
+            quad: output.autoQuadInImageSpace
+        )
+
+        // записываем в front/back
+        if ui.selectedIdType.requiresBackSide {
+            if idResult.back == nil { idResult.back = .init() }
+
+            switch ui.idCaptureSide {
+            case .front:
+                idResult.front = captured
+                ui.idCaptureSide = .back
+
+            case .back:
+                idResult.back = captured
+            }
+        } else {
+            idResult.front = captured
+            idResult.back = nil
+        }
+
+        // готовность
+        isIdReadyToPreview = idResult.isReadyForPreview
+
+        // сбрасываем кэш рамки
+        latestIdFrameRectInPreview = nil
+        latestIdPreviewSize = nil
+    }
+
+    private func resetIdFlowForNewType(_ type: IdDocumentTypeEnum) {
+        idResult = IdCaptureResult(
+            idType: type,
+            front: .init(),
+            back: type.requiresBackSide ? .init() : nil
+        )
+        isIdReadyToPreview = false
+        ui.idCaptureSide = .front
+    }
+
+    // MARK: - Manual crop apply (SCAN)
     func applyManualCropResult(_ croppedOriginalSpace: UIImage) {
-        // после ручной обрезки:
-        // - превью = downscale по выбранному quality
-        // - original = тоже можно заменить на кропнутый (если дальше нужно)
         self.lastCapturedOriginal = croppedOriginalSpace
         self.lastAutoQuadInImageSpace = nil
 
@@ -158,7 +215,6 @@ final class ScanViewModel: ObservableObject {
         case .single:
             self.lastCaptured = preview
         case .group:
-            // для группового — заменим последний кадр, т.к. редактируем “текущий”
             if !groupCaptures.isEmpty {
                 groupCaptures[groupCaptures.count - 1] = preview
             } else {
@@ -170,12 +226,11 @@ final class ScanViewModel: ObservableObject {
     func applyEditedImage(_ image: UIImage) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            
+
             switch ui.captureMode {
             case .single:
                 lastCaptured = image
             case .group:
-                // если у тебя сейчас открыт превью для последнего кадра — логичнее заменить последний
                 if !groupCaptures.isEmpty {
                     groupCaptures[groupCaptures.count - 1] = image
                 } else {
@@ -202,10 +257,6 @@ final class ScanViewModel: ObservableObject {
                 let previewRect = CGRect(origin: .zero, size: previewSize)
                 let clipped = raw.intersection(previewRect)
 
-                print("🪪 FRAME raw =", raw)
-                print("🪪 FRAME clipped =", clipped)
-                print("📷 previewBoundsSize =", previewSize)
-
                 if !clipped.isNull, clipped.width > 10, clipped.height > 10 {
                     latestIdFrameRectInPreview = clipped
                     latestIdPreviewSize = previewSize
@@ -226,16 +277,21 @@ final class ScanViewModel: ObservableObject {
         lastCaptured = nil
         lastCapturedOriginal = nil
         lastAutoQuadInImageSpace = nil
+
         latestIdFrameRectInPreview = nil
         latestIdPreviewSize = nil
+
+        isIdReadyToPreview = false
+        // idResult не трогаем тут — зависит от твоего UX
     }
 
     func resetGroup() {
         groupCaptures.removeAll()
-        lastCaptured = nil
-        lastCapturedOriginal = nil
-        lastAutoQuadInImageSpace = nil
-        latestIdFrameRectInPreview = nil
-        latestIdPreviewSize = nil
+        resetSingle()
+    }
+
+    /// если пользователь нажал “Переснять” в ID превью — сбрасываем ID-флоу полностью
+    func resetIdCaptures() {
+        resetIdFlowForNewType(ui.selectedIdType)
     }
 }

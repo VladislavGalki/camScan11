@@ -144,17 +144,14 @@ struct ScanView: View {
                 )
             } else {
                 IdCapturePreviewView(
-                    image: vm.lastCaptured,
-                    originalImage: vm.lastCapturedOriginal,
-                    autoQuad: vm.lastAutoQuadInImageSpace,
-                    idType: ui.selectedIdType,
+                    result: vm.idResult,
                     onDone: {
-                        vm.resetSingle()
+                        vm.resetIdCaptures()
                         showPreview = false
                         onClose()
                     },
                     onRetake: {
-                        vm.resetSingle()
+                        vm.resetIdCaptures()
                         showPreview = false
                     }
                 )
@@ -164,13 +161,17 @@ struct ScanView: View {
             guard newValue != nil else { return }
 
             if ui.getSelectedDocumentType() == .id {
-                // ✅ Для ID превью всегда показываем
+                return
+            }
+
+            if ui.captureMode == .single {
                 showPreview = true
-            } else {
-                // ✅ Для Scan — только single
-                if ui.captureMode == .single {
-                    showPreview = true
-                }
+            }
+        }
+        .onChange(of: vm.isIdReadyToPreview) { _, ready in
+            guard ready else { return }
+            if ui.getSelectedDocumentType() == .id {
+                showPreview = true
             }
         }
     }

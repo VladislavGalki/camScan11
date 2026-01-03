@@ -3,11 +3,7 @@ import UIKit
 
 struct IdCapturePreviewView: View {
 
-    let image: UIImage?
-    let originalImage: UIImage?
-    let autoQuad: Quadrilateral?
-    let idType: IdDocumentTypeEnum
-
+    let result: IdCaptureResult
     let onDone: () -> Void
     let onRetake: () -> Void
 
@@ -15,18 +11,47 @@ struct IdCapturePreviewView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(.top, 56)
-                    .padding(.bottom, 140)
-            }
+            content
 
             VStack(spacing: 0) {
                 topBar
                 Spacer()
                 bottomBar
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if result.requiresBackSide {
+            // 2 фото: показываем оба (как CamScanner-like превью)
+            VStack(spacing: 12) {
+                if let img = result.front.preview {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .cornerRadius(12)
+                }
+
+                if let img = result.back?.preview {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.top, 56)
+            .padding(.bottom, 140)
+            .padding(.horizontal, 16)
+
+        } else {
+            // 1 фото
+            if let img = result.front.preview {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(.top, 56)
+                    .padding(.bottom, 140)
             }
         }
     }
@@ -41,7 +66,7 @@ struct IdCapturePreviewView: View {
 
             Spacer()
 
-            Text(idType.title)
+            Text(result.idType.title)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
 
@@ -59,10 +84,15 @@ struct IdCapturePreviewView: View {
 
     private var bottomBar: some View {
         VStack(spacing: 10) {
-            // здесь позже добавим “Обрезка/Фильтры/Тени/…” если нужно
-            Text("Превью удостоверения")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+            if result.requiresBackSide {
+                Text("Превью удостоверения (2 стороны)")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+            } else {
+                Text("Превью удостоверения")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+            }
         }
         .padding(.bottom, 32)
     }
