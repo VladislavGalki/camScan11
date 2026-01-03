@@ -1,10 +1,11 @@
 import AVFoundation
 import UIKit
 
+/// UIKit-контроллер ручной обрезки (WeScan-style), но с API под SwiftUI
 final class DocumentCropViewController: UIViewController {
 
     // MARK: - Public callbacks
-    var onCropped: ((UIImage) -> Void)?
+    var onCropped: ((UIImage, Quadrilateral) -> Void)?
 
     // MARK: - State
     private var image: UIImage
@@ -96,18 +97,10 @@ final class DocumentCropViewController: UIViewController {
     func rotateLeft() { rotate90(direction: .left) }
     func rotateRight() { rotate90(direction: .right) }
 
+    /// ✅ Теперь возвращаем (croppedImage + quadInImageSpace) чтобы можно было сохранить ручные углы
     func commitCrop() {
-        guard let cropped = cropCurrent() else { return }
-        onCropped?(cropped)
-    }
-
-    // MARK: - ✅ PATCH: persist user's edited quad before rotate
-    /// Если пользователь руками двигал рамку, она живёт в `quadView`.
-    /// Перед поворотом (и в целом при нужде) сохраняем её в `quad` в координатах `image.size`.
-    private func persistCurrentQuadFromViewIfNeeded() {
-        guard let drawn = quadView.quad else { return }
-        let scaled = drawn.scale(quadView.bounds.size, image.size)
-        quad = scaled.reorganized()
+        guard let (cropped, quadInImageSpace) = cropCurrentReturningQuad() else { return }
+        onCropped?(cropped, quadInImageSpace)
     }
 
     // MARK: - Rotation (PIXEL-ROTATION)
@@ -117,12 +110,9 @@ final class DocumentCropViewController: UIViewController {
         guard !isProcessing else { return }
         isProcessing = true
 
-        // ✅ PATCH: перед поворотом сохраняем текущую рамку, если пользователь её менял
-        persistCurrentQuadFromViewIfNeeded()
-
-        // Важно: берём текущие quad’ы в координатах ИСХОДНОГО изображения
+        // важно: берём текущие quad’ы в координатах ИСХОДНОГО изображения
         let oldImage = image
-        let oldQuad = quad
+        let oldQuad = currentQuadInImageSpace() ?? quad
         let oldAuto = autoQuadInImageSpace
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -133,7 +123,6 @@ final class DocumentCropViewController: UIViewController {
                 return
             }
 
-            // Размер старого изображения нужен для правильного пересчёта координат
             let newQuad = oldQuad.rotated90(direction: direction, inImageOfSize: oldImage.size).reorganized()
             let newAuto = oldAuto?.rotated90(direction: direction, inImageOfSize: oldImage.size).reorganized()
 
@@ -156,44 +145,41 @@ final class DocumentCropViewController: UIViewController {
         }
     }
 
-    /// Поворот пикселей на 90° (получаем UIImage с ориентацией .up и корректным size)
+    /// Поворот пикселей на 90° (UIImage с ориентацией .up и корректным size)
     private func rotatedPixels90(_ image: UIImage, direction: RotationDirection) -> UIImage? {
-        // Работаем в points, но сохраняем scale исходного UIImage
         let oldSize = image.size
         let newSize = CGSize(width: oldSize.height, height: oldSize.width)
 
         let format = UIGraphicsImageRendererFormat()
-        format.scale = image.scale          // ✅ ключевое: НЕ 1
+        format.scale = image.scale
         format.opaque = true
 
         let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
         return renderer.image { ctx in
             let c = ctx.cgContext
-
-            // переводим origin в центр нового холста
             c.translateBy(x: newSize.width / 2, y: newSize.height / 2)
 
-            // крутим
             switch direction {
             case .right: c.rotate(by: .pi / 2)
             case .left:  c.rotate(by: -.pi / 2)
             }
 
-            // рисуем исходное изображение по центру (в points)
             c.translateBy(x: -oldSize.width / 2, y: -oldSize.height / 2)
             image.draw(in: CGRect(origin: .zero, size: oldSize))
         }
     }
 
     // MARK: - Crop
-    private func cropCurrent() -> UIImage? {
+    /// ✅ Возвращаем и cropped, и quadInImageSpace (после ручных правок)
+    private func cropCurrentReturningQuad() -> (UIImage, Quadrilateral)? {
         guard let drawnQuad = quadView.quad,
               let ciImage = CIImage(image: image) else { return nil }
 
         let cgOrientation = CGImagePropertyOrientation(image.imageOrientation)
         let orientedImage = ciImage.oriented(forExifOrientation: Int32(cgOrientation.rawValue))
 
-        let scaledQuad = drawnQuad.scale(quadView.bounds.size, image.size)
+        // drawnQuad (quadView space) -> image space
+        let scaledQuad = drawnQuad.scale(quadView.bounds.size, image.size).reorganized()
         quad = scaledQuad
 
         var cartesian = scaledQuad.toCartesian(withHeight: image.size.height)
@@ -206,7 +192,14 @@ final class DocumentCropViewController: UIViewController {
             "inputBottomRight": CIVector(cgPoint: cartesian.topRight)
         ])
 
-        return UIImage.from(ciImage: filtered)
+        let cropped = UIImage.from(ciImage: filtered)
+        return (cropped, scaledQuad)
+    }
+
+    /// ✅ Получить текущий quad в image space без кропа (нужно для rotate)
+    private func currentQuadInImageSpace() -> Quadrilateral? {
+        guard let drawnQuad = quadView.quad else { return nil }
+        return drawnQuad.scale(quadView.bounds.size, image.size).reorganized()
     }
 
     // MARK: - Quad overlay
@@ -229,9 +222,7 @@ final class DocumentCropViewController: UIViewController {
 
     // MARK: - Zoom gesture
     private func rebuildZoomController() {
-        if let panGesture {
-            view.removeGestureRecognizer(panGesture)
-        }
+        if let panGesture { view.removeGestureRecognizer(panGesture) }
 
         zoomGestureController = ZoomGestureController(image: image, quadView: quadView)
 
@@ -265,13 +256,10 @@ private extension Quadrilateral {
                    inImageOfSize size: CGSize) -> Quadrilateral {
 
         func rotRight(_ p: CGPoint) -> CGPoint {
-            // old size: (w, h) -> new size: (h, w)
-            // (x, y) -> (h - y, x)
             CGPoint(x: size.height - p.y, y: p.x)
         }
 
         func rotLeft(_ p: CGPoint) -> CGPoint {
-            // (x, y) -> (y, w - x)
             CGPoint(x: p.y, y: size.width - p.x)
         }
 

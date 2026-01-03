@@ -28,7 +28,9 @@ final class ScanCameraService: NSObject, ObservableObject {
             manager.delegate = self
             self.captureSessionManager = manager
         } else {
-            self.authorizationDenied = true
+            DispatchQueue.main.async { [weak self] in
+                self?.authorizationDenied = true
+            }
         }
     }
 

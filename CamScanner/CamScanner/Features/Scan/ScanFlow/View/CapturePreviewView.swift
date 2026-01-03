@@ -64,7 +64,7 @@ struct CapturePreviewView: View {
                     originalImage: originalImage,
                     autoQuad: autoQuad,
                     onCancel: { showCropper = false },
-                    onDone: { edited in
+                    onDone: { edited, _ in
                         vm.applyEditedImage(edited)  // ✅ обновляем превью
                         showCropper = false
                     }

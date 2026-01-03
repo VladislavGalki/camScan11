@@ -50,7 +50,6 @@ final class ScanViewModel: ObservableObject {
         self.autoShootEngine = autoShootEngine
         self.postProcessor = postProcessor
 
-        // ✅ стартовое состояние для ID
         self.idResult = IdCaptureResult(
             idType: ui.selectedIdType,
             front: .init(),
@@ -116,7 +115,7 @@ final class ScanViewModel: ObservableObject {
                 return
             }
 
-            // ✅ SCAN mode (старый пайплайн)
+            // ✅ SCAN mode
             let output = self.postProcessor.process(
                 image: image,
                 previewQuad: self.latestPreviewQuad,
@@ -141,10 +140,8 @@ final class ScanViewModel: ObservableObject {
 
     // MARK: - ID capture pipeline (front/back)
     private func handleIdCapture(image: UIImage) {
-        // если интро ещё на экране — ничего не делаем
         guard ui.isIdIntroVisible == false else { return }
 
-        // актуализируем idResult.idType
         if idResult.idType != ui.selectedIdType {
             resetIdFlowForNewType(ui.selectedIdType)
         }
@@ -163,13 +160,16 @@ final class ScanViewModel: ObservableObject {
             quality: ui.quality
         )
 
+        // ✅ ВАЖНО:
+        // original = FULL
+        // preview = CROPPED
+        // quad = рамка в координатах FULL
         let captured = CapturedFrame(
             preview: output.preview,
             original: output.original,
             quad: output.autoQuadInImageSpace
         )
 
-        // записываем в front/back
         if ui.selectedIdType.requiresBackSide {
             if idResult.back == nil { idResult.back = .init() }
 
@@ -186,10 +186,8 @@ final class ScanViewModel: ObservableObject {
             idResult.back = nil
         }
 
-        // готовность
         isIdReadyToPreview = idResult.isReadyForPreview
 
-        // сбрасываем кэш рамки
         latestIdFrameRectInPreview = nil
         latestIdPreviewSize = nil
     }
@@ -219,6 +217,28 @@ final class ScanViewModel: ObservableObject {
                 groupCaptures[groupCaptures.count - 1] = preview
             } else {
                 groupCaptures.append(preview)
+            }
+        }
+    }
+
+    // MARK: - ID Manual edit apply
+    func applyManualEditForId(side: IdCaptureSide, croppedOriginal: UIImage, quad: Quadrilateral) {
+        let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
+
+        // ✅ original оставляем FULL (чтобы повторное редактирование было 1:1)
+        // поэтому тут НЕ заменяем original, а обновляем preview + quad
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            
+            switch side {
+            case .front:
+                idResult.front.preview = preview
+                idResult.front.quad = quad
+                // original оставляем прежний (full)
+            case .back:
+                if idResult.back == nil { idResult.back = .init() }
+                idResult.back?.preview = preview
+                idResult.back?.quad = quad
             }
         }
     }
@@ -282,7 +302,6 @@ final class ScanViewModel: ObservableObject {
         latestIdPreviewSize = nil
 
         isIdReadyToPreview = false
-        // idResult не трогаем тут — зависит от твоего UX
     }
 
     func resetGroup() {
@@ -290,7 +309,6 @@ final class ScanViewModel: ObservableObject {
         resetSingle()
     }
 
-    /// если пользователь нажал “Переснять” в ID превью — сбрасываем ID-флоу полностью
     func resetIdCaptures() {
         resetIdFlowForNewType(ui.selectedIdType)
     }

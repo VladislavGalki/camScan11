@@ -7,7 +7,7 @@ struct DocumentCropperView: View {
     let autoQuad: Quadrilateral?
 
     let onCancel: () -> Void
-    let onDone: (UIImage) -> Void
+    let onDone: (UIImage, Quadrilateral) -> Void   // ✅
 
     @State private var action: CropperAction? = nil
 
@@ -17,14 +17,13 @@ struct DocumentCropperView: View {
                 image: originalImage,
                 autoQuad: autoQuad,
                 action: $action,
-                onCropped: { cropped in
-                    onDone(cropped)
+                onCropped: { cropped, quad in
+                    onDone(cropped, quad)
                 }
             )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Top bar
                 HStack {
                     Button(action: onCancel) {
                         Image(systemName: "chevron.left")
@@ -55,7 +54,6 @@ struct DocumentCropperView: View {
 
                 Spacer()
 
-                // Bottom actions (CamScanner-like)
                 HStack(spacing: 0) {
                     Button { action = .rotateLeft } label: {
                         VStack(spacing: 6) {
@@ -114,36 +112,29 @@ private struct CropperControllerRepresentable: UIViewControllerRepresentable {
     let autoQuad: Quadrilateral?
 
     @Binding var action: CropperAction?
-    let onCropped: (UIImage) -> Void
+    let onCropped: (UIImage, Quadrilateral) -> Void
 
     func makeUIViewController(context: Context) -> DocumentCropViewController {
         let vc = DocumentCropViewController(image: image, autoQuad: autoQuad)
-        vc.onCropped = { cropped in
-            onCropped(cropped)
+        vc.onCropped = { cropped, quad in
+            onCropped(cropped, quad)
         }
         context.coordinator.vc = vc
         return vc
     }
 
     func updateUIViewController(_ uiViewController: DocumentCropViewController, context: Context) {
-        guard let currentAction = action else { return }
-
-        // ✅ НЕЛЬЗЯ: action = nil синхронно внутри update cycle
+        guard let action else { return }
         DispatchQueue.main.async {
             self.action = nil
         }
 
-        switch currentAction {
-        case .rotateLeft:
-            uiViewController.rotateLeft()
-        case .rotateRight:
-            uiViewController.rotateRight()
-        case .setAll:
-            uiViewController.setAllQuad()
-        case .setAuto:
-            uiViewController.setAutoQuad()
-        case .commit:
-            uiViewController.commitCrop()
+        switch action {
+        case .rotateLeft: uiViewController.rotateLeft()
+        case .rotateRight: uiViewController.rotateRight()
+        case .setAll: uiViewController.setAllQuad()
+        case .setAuto: uiViewController.setAutoQuad()
+        case .commit: uiViewController.commitCrop()
         }
     }
 

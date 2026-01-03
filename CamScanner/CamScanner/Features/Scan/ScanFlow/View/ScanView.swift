@@ -145,6 +145,9 @@ struct ScanView: View {
             } else {
                 IdCapturePreviewView(
                     result: vm.idResult,
+                    onEdit: { side, cropped, quad in
+                        vm.applyManualEditForId(side: side, croppedOriginal: cropped, quad: quad)
+                    },
                     onDone: {
                         vm.resetIdCaptures()
                         showPreview = false
