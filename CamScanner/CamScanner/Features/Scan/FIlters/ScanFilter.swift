@@ -1,0 +1,33 @@
+import Foundation
+
+enum PreviewFilter: CaseIterable, Identifiable, Equatable {
+    case original
+    case omnifix
+    case noShadow
+    case noHandwriting
+    case brighter
+    case enhance
+    case eco
+    case grayscale
+    case blackWhite
+    case invert
+
+    var id: String { title }
+
+    var title: String {
+        switch self {
+        case .original: return "Оригинал"
+        case .omnifix: return "OmniFix"
+        case .noShadow: return "Без тени"
+        case .noHandwriting: return "Без почерка"
+        case .brighter: return "Светлее"
+        case .enhance: return "Улучшить"
+        case .eco: return "Эко"
+        case .grayscale: return "Градации серого"
+        case .blackWhite: return "Ч/Б"
+        case .invert: return "Отменить"
+        }
+    }
+
+    var isOmnifix: Bool { self == .omnifix }
+}
