@@ -93,8 +93,26 @@ struct ScanView: View {
             VStack(spacing: 14) {
                 DocumentTypeCarouselView(uiState: ui)
 
-                ShutterButton(isBusy: vm.isCapturing) {
-                    vm.capture()
+                HStack(alignment: .center, spacing: 18) {
+
+                    // слева — заглушка, чтобы шаттер был по центру
+                    Color.clear
+                        .frame(width: 52, height: 52)
+
+                    ShutterButton(isBusy: vm.isCapturing) {
+                        vm.capture()
+                    }
+
+                    // справа — мини превью только для group + scan
+                    GroupMiniPreviewButton(
+                        isVisible: ui.getSelectedDocumentType() == .scan
+                            && ui.captureMode == .group
+                            && !vm.scanResult.isEmpty,
+                        image: vm.scanResult.last?.preview,
+                        count: vm.scanResult.count,
+                        onTap: { showPreview = true }
+                    )
+                    .frame(width: 52, height: 52)
                 }
             }
             .padding(.top, 10)
@@ -128,16 +146,22 @@ struct ScanView: View {
         .fullScreenCover(isPresented: $showPreview) {
             if ui.getSelectedDocumentType() == .scan {
                 CapturePreviewView(
-                    image: vm.lastCaptured,
-                    originalImage: vm.lastCapturedOriginal,
-                    autoQuad: vm.lastAutoQuadInImageSpace,
+                    pages: vm.scanResult,
                     onDone: {
-                        vm.resetSingle()
+                        if ui.captureMode == .group {
+                            vm.resetGroup()
+                        } else {
+                            vm.resetSingle()
+                        }
                         showPreview = false
                         onClose()
                     },
                     onRetake: {
-                        vm.resetSingle()
+                        if ui.captureMode == .group {
+                            vm.resetGroup()
+                        } else {
+                            vm.resetSingle()
+                        }
                         showPreview = false
                     },
                     vm: vm

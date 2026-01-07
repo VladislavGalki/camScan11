@@ -21,6 +21,11 @@ struct IdCapturePreviewView: View {
     // ✅ compare state (press & hold)
     @State private var isComparingOriginal: Bool = false
 
+    // ✅ export state
+    @State private var showExportDialog: Bool = false
+    @State private var shareItems: [Any] = []
+    @State private var showShareSheet: Bool = false
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -36,22 +41,83 @@ struct IdCapturePreviewView: View {
         .fullScreenCover(isPresented: $showCropper) {
             cropperSheet
         }
-        .onAppear {
-            recomputeFilters()
+        .sheet(isPresented: $showShareSheet) {
+            if shareItems.count > 0 {
+                DocumentExporterSheet(items: shareItems) {
+                    self.shareItems = []
+                }
+            }
         }
+        .confirmationDialog("Экспорт", isPresented: $showExportDialog, titleVisibility: .visible) {
+            ForEach(DocumentExportFormat.allCases) { format in
+                Button(format.rawValue) {
+                    export(format: format)
+                }
+                .disabled(!format.isImplemented) // PPT/Word/Excel (soon)
+            }
+
+            Button("Отмена", role: .cancel) {}
+        }
+        .onAppear { recomputeFilters() }
         .onChange(of: selectedFilter) { _, _ in
             recomputeFilters()
         }
     }
 
+    // MARK: - Export
+
+    private func export(format: DocumentExportFormat) {
+        // ✅ экспортируем то, что видит пользователь (с фильтром)
+        let images = exportImages()
+        guard !images.isEmpty else { return }
+
+        let baseName = "ID_\(result.idType.title)"
+
+        // ✅ JPEG/PNG теперь сохраняем сразу в Photos (без шита)
+        DocumentExporter.shared.exportOrSave(
+            images: images,
+            format: format,
+            fileName: baseName
+        ) { result in
+            switch result {
+            case .success(let urls):
+                // urls будут:
+                // - [] для jpeg/png (мы уже сохранили в галерею)
+                // - [url] для pdf/long image/soon
+                guard !urls.isEmpty else { return }
+
+                self.shareItems = urls
+                self.showShareSheet = true
+
+            case .failure:
+                // если хочешь — покажем alert
+                break
+            }
+        }
+    }
+
+    private func exportImages() -> [UIImage] {
+        func pick(original: UIImage?, filtered: UIImage?) -> UIImage? {
+            if selectedFilter == .original { return original }
+            return filtered ?? original
+        }
+
+        var out: [UIImage] = []
+        if let f = pick(original: result.front.preview, filtered: filteredFront) { out.append(f) }
+        if result.requiresBackSide, let b = pick(original: result.back?.preview, filtered: filteredBack) { out.append(b) }
+        return out
+    }
+
+    // MARK: - Filters
+
     private func recomputeFilters() {
         let front = result.front.preview
         let back = result.back?.preview
+        let filter = selectedFilter
 
         DispatchQueue.global(qos: .userInitiated).async {
-            // OmniFix если у тебя "soon" — он и так внутри FilterEngine возвращает оригинал
-            let fFront = front.map { FilterEngine.shared.apply(selectedFilter, to: $0) }
-            let fBack  = back.map  { FilterEngine.shared.apply(selectedFilter, to: $0) }
+            let fFront = front.map { FilterEngine.shared.apply(filter, to: $0) }
+            let fBack  = back.map  { FilterEngine.shared.apply(filter, to: $0) }
 
             DispatchQueue.main.async {
                 self.filteredFront = fFront
@@ -94,9 +160,7 @@ struct IdCapturePreviewView: View {
                                 .clipShape(Capsule())
                                 .padding(10)
                         }
-                        .onTapGesture {
-                            editingSide = .front
-                        }
+                        .onTapGesture { editingSide = .front }
                 }
 
                 if let img = backDisplayImage {
@@ -113,13 +177,11 @@ struct IdCapturePreviewView: View {
                                 .clipShape(Capsule())
                                 .padding(10)
                         }
-                        .onTapGesture {
-                            editingSide = .back
-                        }
+                        .onTapGesture { editingSide = .back }
                 }
             }
             .padding(.top, 56)
-            .padding(.bottom, 170) // ✅ чуть больше из-за фильтров
+            .padding(.bottom, 170)
             .padding(.horizontal, 16)
 
         } else {
@@ -133,6 +195,7 @@ struct IdCapturePreviewView: View {
         }
     }
 
+    // ✅ добавили кнопку "Сохранить" слева от "Готово"
     private var topBar: some View {
         HStack {
             Button(action: onRetake) {
@@ -148,6 +211,15 @@ struct IdCapturePreviewView: View {
                 .foregroundColor(.white)
 
             Spacer()
+
+            Button {
+                showExportDialog = true
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .foregroundColor(.blue)
+            .padding(.trailing, 8)
 
             Button(action: onDone) {
                 Text("Готово")
@@ -166,9 +238,7 @@ struct IdCapturePreviewView: View {
 
             if result.requiresBackSide {
                 HStack(spacing: 12) {
-                    Button {
-                        editingSide = .front
-                    } label: {
+                    Button { editingSide = .front } label: {
                         Text("Лицевая")
                             .font(.system(size: 13, weight: editingSide == .front ? .semibold : .regular))
                             .padding(.horizontal, 12)
@@ -177,9 +247,7 @@ struct IdCapturePreviewView: View {
                             .clipShape(Capsule())
                     }
 
-                    Button {
-                        editingSide = .back
-                    } label: {
+                    Button { editingSide = .back } label: {
                         Text("Оборот")
                             .font(.system(size: 13, weight: editingSide == .back ? .semibold : .regular))
                             .padding(.horizontal, 12)
@@ -261,7 +329,7 @@ struct IdCapturePreviewView: View {
                 autoQuad: quad,
                 onCancel: { showCropper = false },
                 onDone: { cropped, newQuad in
-                    onEdit(editingSide, cropped, newQuad)   // ✅
+                    onEdit(editingSide, cropped, newQuad)
                     showCropper = false
                 }
             )

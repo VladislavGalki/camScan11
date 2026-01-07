@@ -32,8 +32,8 @@ final class ScanViewModel: ObservableObject {
     @Published var lastCapturedOriginal: UIImage? = nil
     @Published var lastAutoQuadInImageSpace: Quadrilateral? = nil
 
-    @Published var groupCaptures: [UIImage] = []
-
+    @Published var scanResult: [CapturedFrame] = []
+    
     // MARK: - Output (ID)
     @Published var idResult: IdCaptureResult
     @Published var isIdReadyToPreview: Bool = false
@@ -124,14 +124,23 @@ final class ScanViewModel: ObservableObject {
                 quality: self.ui.quality
             )
 
+            let captured = CapturedFrame(
+                preview: output.preview,
+                original: output.original,
+                quad: output.autoQuadInImageSpace
+            )
+
+            // legacy поля — оставим пока
             self.lastCapturedOriginal = output.original
             self.lastAutoQuadInImageSpace = output.autoQuadInImageSpace
 
             switch self.ui.captureMode {
             case .single:
                 self.lastCaptured = output.preview
+                self.scanResult = [captured]
+
             case .group:
-                self.groupCaptures.append(output.preview)
+                self.scanResult.append(captured)
             }
 
             self.autoShootEngine.notifyDidCapture()
@@ -201,22 +210,24 @@ final class ScanViewModel: ObservableObject {
         isIdReadyToPreview = false
         ui.idCaptureSide = .front
     }
+    
+    // MARK: - Scan Manual edit apply (как в ID)
+    func applyManualEditForScan(index: Int, croppedOriginal: UIImage, quad: Quadrilateral) {
+        let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
 
-    // MARK: - Manual crop apply (SCAN)
-    func applyManualCropResult(_ croppedOriginalSpace: UIImage) {
-        self.lastCapturedOriginal = croppedOriginalSpace
-        self.lastAutoQuadInImageSpace = nil
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard self.scanResult.indices.contains(index) else { return }
 
-        let preview = croppedOriginalSpace.downscaled(maxDimension: ui.quality.maxDimension)
+            // ✅ original НЕ трогаем (FULL), обновляем только preview + quad
+            self.scanResult[index].preview = preview
+            self.scanResult[index].quad = quad
 
-        switch ui.captureMode {
-        case .single:
-            self.lastCaptured = preview
-        case .group:
-            if !groupCaptures.isEmpty {
-                groupCaptures[groupCaptures.count - 1] = preview
-            } else {
-                groupCaptures.append(preview)
+            // ✅ если это single — синхронизируем legacy превью
+            if self.ui.captureMode == .single, index == 0 {
+                self.lastCaptured = preview
+                self.lastAutoQuadInImageSpace = quad
+                // lastCapturedOriginal оставляем прежний (FULL)
             }
         }
     }
@@ -239,23 +250,6 @@ final class ScanViewModel: ObservableObject {
                 if idResult.back == nil { idResult.back = .init() }
                 idResult.back?.preview = preview
                 idResult.back?.quad = quad
-            }
-        }
-    }
-
-    func applyEditedImage(_ image: UIImage) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            switch ui.captureMode {
-            case .single:
-                lastCaptured = image
-            case .group:
-                if !groupCaptures.isEmpty {
-                    groupCaptures[groupCaptures.count - 1] = image
-                } else {
-                    groupCaptures.append(image)
-                }
             }
         }
     }
@@ -297,6 +291,7 @@ final class ScanViewModel: ObservableObject {
         lastCaptured = nil
         lastCapturedOriginal = nil
         lastAutoQuadInImageSpace = nil
+        scanResult.removeAll()
 
         latestIdFrameRectInPreview = nil
         latestIdPreviewSize = nil
@@ -305,7 +300,7 @@ final class ScanViewModel: ObservableObject {
     }
 
     func resetGroup() {
-        groupCaptures.removeAll()
+        scanResult.removeAll()
         resetSingle()
     }
 
