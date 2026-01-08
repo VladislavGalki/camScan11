@@ -11,9 +11,7 @@ struct CapturePreviewView: View {
 
     @StateObject var vm: ScanViewModel
 
-    // какая страница выбрана для редактирования
     @State private var editingIndex: Int = 0
-
     @State private var showCropper = false
 
     // фильтры
@@ -23,10 +21,15 @@ struct CapturePreviewView: View {
     // compare
     @State private var isComparingOriginal: Bool = false
 
-    // export state (оставляем как было)
+    // export state
     @State private var showExportDialog: Bool = false
     @State private var shareItems: [Any] = []
     @State private var showShareSheet: Bool = false
+
+    // ✅ OCR state
+    @State private var showOCR = false
+    @State private var ocrText: String = ""
+    @State private var isOCRLoading: Bool = false
 
     var body: some View {
         ZStack {
@@ -63,6 +66,11 @@ struct CapturePreviewView: View {
                 DocumentExporterSheet(items: shareItems) {
                     self.shareItems = []
                 }
+            }
+        }
+        .sheet(isPresented: $showOCR) {
+            OCREditorView(title: "Текст (OCR)", text: $ocrText) {
+                showOCR = false
             }
         }
         .confirmationDialog("Экспорт", isPresented: $showExportDialog, titleVisibility: .visible) {
@@ -108,7 +116,6 @@ struct CapturePreviewView: View {
     private var bottomBar: some View {
         VStack(spacing: 12) {
 
-            // ✅ как в Id — фильтры сверху
             ScrollView(.horizontal) {
                 HStack(spacing: 12) {
                     ForEach(PreviewFilter.allCases, id: \.self) { f in
@@ -119,7 +126,6 @@ struct CapturePreviewView: View {
             }
             .scrollIndicators(.never)
 
-            // ✅ если страниц > 1 — показываем горизонтальный выбор страницы (что редактируем)
             if pages.count > 1 {
                 ScrollView(.horizontal) {
                     HStack(spacing: 10) {
@@ -132,10 +138,25 @@ struct CapturePreviewView: View {
                 .scrollIndicators(.never)
             }
 
-            // ✅ Compare + Crop row (как в Id)
             HStack(spacing: 12) {
                 compareButton
                     .frame(width: 120)
+
+                Button {
+                    runOCRForAllPages()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.viewfinder")
+                        Text(isOCRLoading ? "OCR..." : "Текст")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.12))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(isOCRLoading || pages.isEmpty)
 
                 Button {
                     showCropper = true
@@ -157,8 +178,6 @@ struct CapturePreviewView: View {
         }
         .padding(.bottom, 22)
     }
-
-    // MARK: - Page selection chip
 
     private func pageChip(_ idx: Int) -> some View {
         let isSelected = (idx == editingIndex)
@@ -202,8 +221,6 @@ struct CapturePreviewView: View {
         )
     }
 
-    // MARK: - Filter chip
-
     private func filterChip(_ f: PreviewFilter) -> some View {
         let isSelected = (f == selectedFilter)
 
@@ -225,11 +242,8 @@ struct CapturePreviewView: View {
         guard pages.indices.contains(editingIndex) else { return nil }
 
         let base = pages[editingIndex].preview
-
         if isComparingOriginal { return base }
-
         if selectedFilter == .original { return base }
-
         return filteredPages[editingIndex] ?? base
     }
 
@@ -254,6 +268,47 @@ struct CapturePreviewView: View {
         }
     }
 
+    // MARK: - OCR
+
+    private func imagesForOCR() -> [UIImage] {
+        let base = pages.compactMap { $0.preview }
+        guard !base.isEmpty else { return [] }
+
+        if selectedFilter == .original { return base }
+        return base.map { FilterEngine.shared.apply(selectedFilter, to: $0) }
+    }
+
+    private func runOCRForAllPages() {
+        guard !isOCRLoading else { return }
+
+        let imgs = imagesForOCR()
+        guard !imgs.isEmpty else { return }
+
+        isOCRLoading = true
+        ocrText = ""
+
+        Task {
+            var blocks: [String] = []
+            let total = imgs.count
+
+            for (idx, img) in imgs.enumerated() {
+                let pageTitle = "СТРАНИЦА \(idx + 1)/\(total)"
+                do {
+                    let res = try await OCRService.shared.recognizeText(in: img)
+                    blocks.append("\(pageTitle)\n\(res.text)")
+                } catch {
+                    blocks.append("\(pageTitle)\n(ошибка OCR)")
+                }
+            }
+
+            await MainActor.run {
+                self.ocrText = blocks.joined(separator: "\n\n")
+                self.isOCRLoading = false
+                self.showOCR = true
+            }
+        }
+    }
+
     // MARK: - Cropper
 
     private var currentOriginal: UIImage? {
@@ -270,14 +325,12 @@ struct CapturePreviewView: View {
     private var cropperSheet: some View {
         if let original = currentOriginal {
             DocumentCropperView(
-                originalImage: original,      // ✅ FULL
-                autoQuad: currentQuad,        // ✅ quad
+                originalImage: original,
+                autoQuad: currentQuad,
                 onCancel: { showCropper = false },
                 onDone: { cropped, newQuad in
                     vm.applyManualEditForScan(index: editingIndex, croppedOriginal: cropped, quad: newQuad)
                     showCropper = false
-
-                    // после редактирования — сбросим фильтр-кэш страницы
                     filteredPages[editingIndex] = nil
                     recomputeFilter(for: editingIndex)
                 }
@@ -312,13 +365,8 @@ struct CapturePreviewView: View {
     }
 
     private func exportImages() -> [UIImage] {
-        // экспортируем то, что видит пользователь: выбранный фильтр применяется к каждой странице
         let originals = pages.compactMap { $0.preview }
-
-        if selectedFilter == .original {
-            return originals
-        }
-
+        if selectedFilter == .original { return originals }
         return originals.map { FilterEngine.shared.apply(selectedFilter, to: $0) }
     }
 }

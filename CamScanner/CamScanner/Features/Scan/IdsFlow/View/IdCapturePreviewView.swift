@@ -26,6 +26,11 @@ struct IdCapturePreviewView: View {
     @State private var shareItems: [Any] = []
     @State private var showShareSheet: Bool = false
 
+    // ✅ OCR state
+    @State private var showOCR = false
+    @State private var ocrText: String = ""
+    @State private var isOCRLoading: Bool = false
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -48,6 +53,11 @@ struct IdCapturePreviewView: View {
                 }
             }
         }
+        .sheet(isPresented: $showOCR) {
+            OCREditorView(title: "Текст (OCR)", text: $ocrText) {
+                showOCR = false
+            }
+        }
         .confirmationDialog("Экспорт", isPresented: $showExportDialog, titleVisibility: .visible) {
             ForEach(DocumentExportFormat.allCases) { format in
                 Button(format.rawValue) {
@@ -67,13 +77,11 @@ struct IdCapturePreviewView: View {
     // MARK: - Export
 
     private func export(format: DocumentExportFormat) {
-        // ✅ экспортируем то, что видит пользователь (с фильтром)
         let images = exportImages()
         guard !images.isEmpty else { return }
 
         let baseName = "ID_\(result.idType.title)"
 
-        // ✅ JPEG/PNG теперь сохраняем сразу в Photos (без шита)
         DocumentExporter.shared.exportOrSave(
             images: images,
             format: format,
@@ -81,16 +89,10 @@ struct IdCapturePreviewView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                // urls будут:
-                // - [] для jpeg/png (мы уже сохранили в галерею)
-                // - [url] для pdf/long image/soon
                 guard !urls.isEmpty else { return }
-
                 self.shareItems = urls
                 self.showShareSheet = true
-
             case .failure:
-                // если хочешь — покажем alert
                 break
             }
         }
@@ -106,6 +108,39 @@ struct IdCapturePreviewView: View {
         if let f = pick(original: result.front.preview, filtered: filteredFront) { out.append(f) }
         if result.requiresBackSide, let b = pick(original: result.back?.preview, filtered: filteredBack) { out.append(b) }
         return out
+    }
+
+    // MARK: - OCR
+
+    private func runOCR() {
+        guard !isOCRLoading else { return }
+
+        let images = exportImages()
+        guard !images.isEmpty else { return }
+
+        isOCRLoading = true
+        ocrText = ""
+
+        Task {
+            var blocks: [String] = []
+            let total = images.count
+
+            for (idx, img) in images.enumerated() {
+                let pageTitle = "СТРАНИЦА \(idx + 1)/\(total)"
+                do {
+                    let res = try await OCRService.shared.recognizeText(in: img)
+                    blocks.append("\(pageTitle)\n\(res.text)")
+                } catch {
+                    blocks.append("\(pageTitle)\n(ошибка OCR)")
+                }
+            }
+
+            await MainActor.run {
+                self.ocrText = blocks.joined(separator: "\n\n")
+                self.isOCRLoading = false
+                self.showOCR = true
+            }
+        }
     }
 
     // MARK: - Filters
@@ -195,7 +230,6 @@ struct IdCapturePreviewView: View {
         }
     }
 
-    // ✅ добавили кнопку "Сохранить" слева от "Готово"
     private var topBar: some View {
         HStack {
             Button(action: onRetake) {
@@ -259,7 +293,7 @@ struct IdCapturePreviewView: View {
                 .foregroundColor(.white)
             }
 
-            // ✅ Compare + Crop row
+            // ✅ Compare + OCR + Crop row
             HStack(spacing: 12) {
 
                 Button {} label: {
@@ -284,6 +318,22 @@ struct IdCapturePreviewView: View {
                     },
                     perform: {}
                 )
+
+                Button {
+                    runOCR()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.viewfinder")
+                        Text(isOCRLoading ? "OCR..." : "Текст")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.10))
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                }
+                .disabled(isOCRLoading)
 
                 Button {
                     showCropper = true
