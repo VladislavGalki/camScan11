@@ -28,6 +28,21 @@ enum PreviewFilter: CaseIterable, Identifiable, Equatable {
         case .invert: return "Отменить"
         }
     }
+    
+    var persistKey: String {
+        switch self {
+        case .original: return "original"
+        case .omnifix: return "omnifix"
+        case .noShadow: return "noShadow"
+        case .noHandwriting: return "noHandwriting"
+        case .brighter: return "brighter"
+        case .enhance: return "enhance"
+        case .eco: return "eco"
+        case .grayscale: return "grayscale"
+        case .blackWhite: return "blackWhite"
+        case .invert: return "invert"
+        }
+    }
 
     var isOmnifix: Bool { self == .omnifix }
 }

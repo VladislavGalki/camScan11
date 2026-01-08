@@ -11,6 +11,7 @@ struct CapturePreviewView: View {
 
     @StateObject var vm: ScanViewModel
 
+    // какая страница выбрана для редактирования
     @State private var editingIndex: Int = 0
     @State private var showCropper = false
 
@@ -104,10 +105,12 @@ struct CapturePreviewView: View {
             .foregroundColor(.blue)
             .padding(.trailing, 8)
 
-            Button("Готово") { onDone() }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            Button("Готово") {
+                saveToDatabaseAndFinish()
+            }
+            .foregroundColor(.blue)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
     }
 
@@ -368,5 +371,41 @@ struct CapturePreviewView: View {
         let originals = pages.compactMap { $0.preview }
         if selectedFilter == .original { return originals }
         return originals.map { FilterEngine.shared.apply(selectedFilter, to: $0) }
+    }
+
+    // MARK: - Save to DB (Scan)
+
+    private func saveToDatabaseAndFinish() {
+        // ✅ сохраняем full originals (без фильтра), а фильтр — remembered
+        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { (_, p) -> DocumentRepository.PageInput? in
+            guard let original = p.original else { return nil }
+
+            return DocumentRepository.PageInput(
+                image: original,
+                quad: p.quad,
+                filterRaw: selectedFilter.persistKey
+            )
+        }
+
+        guard !inputs.isEmpty else {
+            onDone()
+            return
+        }
+
+        let remembered = selectedFilter.persistKey
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                _ = try DocumentRepository.shared.saveDocument(
+                    kind: .scan,
+                    idTypeRaw: nil,
+                    rememberedFilterRaw: remembered,
+                    pages: inputs
+                )
+                DispatchQueue.main.async { onDone() }
+            } catch {
+                print("!!! Error saving document: \(error)")
+            }
+        }
     }
 }

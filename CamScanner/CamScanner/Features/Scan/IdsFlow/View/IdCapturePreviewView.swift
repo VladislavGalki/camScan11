@@ -63,9 +63,8 @@ struct IdCapturePreviewView: View {
                 Button(format.rawValue) {
                     export(format: format)
                 }
-                .disabled(!format.isImplemented) // PPT/Word/Excel (soon)
+                .disabled(!format.isImplemented)
             }
-
             Button("Отмена", role: .cancel) {}
         }
         .onAppear { recomputeFilters() }
@@ -255,7 +254,9 @@ struct IdCapturePreviewView: View {
             .foregroundColor(.blue)
             .padding(.trailing, 8)
 
-            Button(action: onDone) {
+            Button {
+                saveToDatabaseAndFinish()
+            } label: {
                 Text("Готово")
                     .font(.system(size: 17, weight: .semibold))
             }
@@ -387,6 +388,47 @@ struct IdCapturePreviewView: View {
             Color.black.ignoresSafeArea()
                 .overlay { ProgressView().tint(.white) }
                 .onAppear { showCropper = false }
+        }
+    }
+
+    // MARK: - Save to DB (ID)
+
+    private func saveToDatabaseAndFinish() {
+        var inputs: [DocumentRepository.PageInput] = []
+
+        if let frontOriginal = result.front.original {
+            inputs.append(.init(
+                image: frontOriginal,
+                quad: result.front.quad,
+                filterRaw: selectedFilter.persistKey
+            ))
+        }
+
+        if result.requiresBackSide, let backOriginal = result.back?.original {
+            inputs.append(.init(
+                image: backOriginal,
+                quad: result.back?.quad,
+                filterRaw: selectedFilter.persistKey
+            ))
+        }
+
+        guard !inputs.isEmpty else {
+            onDone()
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                _ = try DocumentRepository.shared.saveDocument(
+                    kind: .id,
+                    idTypeRaw: result.idType.id,              // у тебя id = title
+                    rememberedFilterRaw: selectedFilter.persistKey,
+                    pages: inputs
+                )
+                DispatchQueue.main.async { onDone() }
+            } catch {
+                print("!!! Error saving document: \(error)")
+            }
         }
     }
 }
