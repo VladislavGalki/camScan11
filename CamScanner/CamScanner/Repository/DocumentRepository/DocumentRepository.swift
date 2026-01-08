@@ -51,7 +51,7 @@ final class DocumentRepository {
             let page = PageEntity(context: context)
             page.id = pageID
             page.index = Int16(idx)
-            page.imagePath = url.path
+            page.imagePath = "\(docID.uuidString)/\(pageID.uuidString).jpg"
             page.quadData = p.quad.flatMap { QuadCodec.encode($0) }
             page.filter = p.filterRaw
             page.document = doc

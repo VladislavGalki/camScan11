@@ -6,7 +6,7 @@ struct TabContainerView: View {
 
     var body: some View {
         switch selectedTab {
-        case .home: HomePlaceholderView()
+        case .home: HomeView()
         case .files: FilesPlaceholderView()
         case .tools: ToolsPlaceholderView()
         case .profile: ProfilePlaceholderView()

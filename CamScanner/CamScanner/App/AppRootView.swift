@@ -8,8 +8,6 @@ struct AppRootView: View {
             root: AppEntryView(),
             destinationBuilder: resolve
         )
-        .environment(\.managedObjectContext,
-                      persistence.container.viewContext)
     }
 
     private func resolve(_ route: any Route) -> AnyView {

@@ -86,6 +86,11 @@ final class FileStore {
         let docFolder = rootURL.appendingPathComponent(docID.uuidString, isDirectory: true)
         try? fm.removeItem(at: docFolder)
     }
+    
+    func url(forRelativePath rel: String) -> URL {
+        // rootURL уже = .../Application Support/Documents
+        return rootURL.appendingPathComponent(rel)
+    }
 }
 
 extension FileStore {
