@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct AppRootView: View {
-    let persistence = PersistenceController.shared
-
     var body: some View {
         RootNavigationView(
             root: AppEntryView(),

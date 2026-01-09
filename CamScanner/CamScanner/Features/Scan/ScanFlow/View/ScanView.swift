@@ -29,13 +29,12 @@ struct ScanView: View {
                 onFlashTap: { toggle(.flash) },
                 onQualityTap: { toggle(.quality) },
                 onFiltersTap: {
-                    // ✅ В режиме удостоверения — фильтры скрываем/не открываем
                     if ui.getSelectedDocumentType() == .scan {
                         toggle(.filters)
                     }
                 },
                 onSettingsTap: { toggle(.settings) },
-                isFiltersHidden: ui.getSelectedDocumentType() == .id  // ✅ нужно добавить параметр в ScanTopBar
+                isFiltersHidden: ui.getSelectedDocumentType() == .id
             )
 
             ScanTopPanelsContainer(
@@ -145,7 +144,8 @@ struct ScanView: View {
         }
         .fullScreenCover(isPresented: $showPreview) {
             if ui.getSelectedDocumentType() == .scan {
-                CapturePreviewView(
+                // ✅ Новый автономный превью + коллбек на редактирование страницы
+                ScanCameraPreviewView(
                     pages: vm.scanResult,
                     onDone: {
                         if ui.captureMode == .group {
@@ -164,10 +164,13 @@ struct ScanView: View {
                         }
                         showPreview = false
                     },
-                    vm: vm
+                    onEditPage: { index, croppedFull, quad in
+                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
+                    }
                 )
             } else {
-                IdCapturePreviewView(
+                // ✅ ID превью (переименовано)
+                IdCameraPreviewView(
                     result: vm.idResult,
                     onEdit: { side, cropped, quad in
                         vm.applyManualEditForId(side: side, croppedOriginal: cropped, quad: quad)
@@ -186,11 +189,7 @@ struct ScanView: View {
         }
         .onChange(of: vm.lastCaptured) { _, newValue in
             guard newValue != nil else { return }
-
-            if ui.getSelectedDocumentType() == .id {
-                return
-            }
-
+            if ui.getSelectedDocumentType() == .id { return }
             if ui.captureMode == .single {
                 showPreview = true
             }

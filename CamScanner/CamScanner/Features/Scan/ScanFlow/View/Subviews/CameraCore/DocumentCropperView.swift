@@ -18,7 +18,9 @@ struct DocumentCropperView: View {
                 autoQuad: autoQuad,
                 action: $action,
                 onCropped: { cropped, quad in
-                    onDone(cropped, quad)
+                    DispatchQueue.main.async {
+                        onDone(cropped, quad)
+                    }
                 }
             )
             .ignoresSafeArea()
