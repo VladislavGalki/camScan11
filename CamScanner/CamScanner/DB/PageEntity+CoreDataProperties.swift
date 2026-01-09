@@ -22,6 +22,7 @@ extension PageEntity {
     @NSManaged public var quadData: Data?
     @NSManaged public var filter: String?
     @NSManaged public var document: DocumentEntity?
+    @NSManaged public var originalPath: String?
 
 }
 

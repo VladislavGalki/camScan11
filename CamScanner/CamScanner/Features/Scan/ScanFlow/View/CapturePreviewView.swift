@@ -377,13 +377,13 @@ struct CapturePreviewView: View {
 
     private func saveToDatabaseAndFinish() {
         // ✅ сохраняем full originals (без фильтра), а фильтр — remembered
-        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { (_, p) -> DocumentRepository.PageInput? in
-            guard let original = p.original else { return nil }
-
+        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { idx, p in
+            guard let display = p.preview, let full = p.original else { return nil }
             return DocumentRepository.PageInput(
-                image: original,
+                displayImage: display,
+                originalFullImage: full,
                 quad: p.quad,
-                filterRaw: selectedFilter.persistKey
+                filterRaw: nil
             )
         }
 

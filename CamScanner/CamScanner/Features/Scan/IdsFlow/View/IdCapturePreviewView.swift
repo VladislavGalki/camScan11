@@ -393,20 +393,30 @@ struct IdCapturePreviewView: View {
 
     // MARK: - Save to DB (ID)
 
+    // MARK: - Save to DB (ID)
+
     private func saveToDatabaseAndFinish() {
         var inputs: [DocumentRepository.PageInput] = []
 
-        if let frontOriginal = result.front.original {
+        // В БД сохраняем:
+        // - displayImage: то, что показываем в превью (без фильтра) — это preview
+        // - originalFullImage: full для повторного редактирования — это original
+        if let frontPreview = result.front.preview,
+           let frontFull = result.front.original {
             inputs.append(.init(
-                image: frontOriginal,
+                displayImage: frontPreview,
+                originalFullImage: frontFull,
                 quad: result.front.quad,
                 filterRaw: selectedFilter.persistKey
             ))
         }
 
-        if result.requiresBackSide, let backOriginal = result.back?.original {
+        if result.requiresBackSide,
+           let backPreview = result.back?.preview,
+           let backFull = result.back?.original {
             inputs.append(.init(
-                image: backOriginal,
+                displayImage: backPreview,
+                originalFullImage: backFull,
                 quad: result.back?.quad,
                 filterRaw: selectedFilter.persistKey
             ))
@@ -421,7 +431,7 @@ struct IdCapturePreviewView: View {
             do {
                 _ = try DocumentRepository.shared.saveDocument(
                     kind: .id,
-                    idTypeRaw: result.idType.id,              // у тебя id = title
+                    idTypeRaw: result.idType.id,                 // у тебя id = title
                     rememberedFilterRaw: selectedFilter.persistKey,
                     pages: inputs
                 )

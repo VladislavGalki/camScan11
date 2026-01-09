@@ -14,6 +14,7 @@
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="imagePath" attributeType="String"/>
         <attribute name="index" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="originalPath" optional="YES" attributeType="String"/>
         <attribute name="quadData" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
         <relationship name="document" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="DocumentEntity" inverseName="pages" inverseEntity="DocumentEntity"/>
     </entity>

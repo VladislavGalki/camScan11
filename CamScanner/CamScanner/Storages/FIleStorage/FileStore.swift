@@ -28,9 +28,14 @@ final class FileStore {
     /// Создаёт папку если надо
     private func ensureRootFolder() throws {
         let fm = FileManager.default
+
+        if !fm.fileExists(atPath: appSupportURL.path) {
+            try fm.createDirectory(at: appSupportURL, withIntermediateDirectories: true, attributes: nil)
+        }
+
         if !fm.fileExists(atPath: rootURL.path) {
             do {
-                try fm.createDirectory(at: rootURL, withIntermediateDirectories: true)
+                try fm.createDirectory(at: rootURL, withIntermediateDirectories: true, attributes: nil)
             } catch {
                 throw FileStoreError.failedToCreateFolder
             }
@@ -39,24 +44,20 @@ final class FileStore {
 
     /// Сохраняем страницу как JPEG: Documents/<docID>/<pageID>.jpg
     @discardableResult
-    func saveJPEG(image: UIImage, docID: UUID, pageID: UUID, quality: CGFloat = 0.92) throws -> URL {
+    func saveJPEG(image: UIImage, docID: UUID, pageID: UUID, fileName: String, quality: CGFloat = 0.92) throws -> URL {
         try ensureRootFolder()
 
         let fm = FileManager.default
         let docFolder = rootURL.appendingPathComponent(docID.uuidString, isDirectory: true)
         if !fm.fileExists(atPath: docFolder.path) {
-            do {
-                try fm.createDirectory(at: docFolder, withIntermediateDirectories: true)
-            } catch {
-                throw FileStoreError.failedToCreateFolder
-            }
+            try fm.createDirectory(at: docFolder, withIntermediateDirectories: true)
         }
 
         guard let data = image.jpegData(compressionQuality: quality) else {
             throw FileStoreError.failedToEncodeJPEG
         }
 
-        let fileURL = docFolder.appendingPathComponent("\(pageID.uuidString).jpg")
+        let fileURL = docFolder.appendingPathComponent(fileName)
 
         do {
             try data.write(to: fileURL, options: [.atomic])
@@ -64,13 +65,11 @@ final class FileStore {
             throw FileStoreError.failedToWrite
         }
 
-        // ✅ Не бэкапить (по желанию)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var mutableURL = fileURL
         try? mutableURL.setResourceValues(values)
 
-        // ✅ File protection (шифрование, когда телефон заблокирован)
         try? fm.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: fileURL.path)
 
         return fileURL
@@ -86,15 +85,27 @@ final class FileStore {
         let docFolder = rootURL.appendingPathComponent(docID.uuidString, isDirectory: true)
         try? fm.removeItem(at: docFolder)
     }
-    
-    func url(forRelativePath rel: String) -> URL {
-        // rootURL уже = .../Application Support/Documents
-        return rootURL.appendingPathComponent(rel)
-    }
 }
 
 extension FileStore {
 
+    func relativePath(fromAbsolute url: URL) -> String {
+        let root = rootURL.path
+        let full = url.path
+        if full.hasPrefix(root + "/") {
+            return String(full.dropFirst(root.count + 1)) // без ведущего "/"
+        }
+        return full // fallback
+    }
+
+    func url(forRelativePath rel: String) -> URL {
+        // если вдруг в базе лежит абсолютный путь — поддержим
+        if rel.hasPrefix("/") {
+            return URL(fileURLWithPath: rel)
+        }
+        return rootURL.appendingPathComponent(rel)
+    }
+    
     /// Удалить конкретный файл по path (если существует)
     func deleteFileIfExists(atPath path: String) {
         let fm = FileManager.default
