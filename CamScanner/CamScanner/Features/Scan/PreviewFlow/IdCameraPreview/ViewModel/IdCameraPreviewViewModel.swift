@@ -25,9 +25,13 @@ final class IdCameraPreviewViewModel: ObservableObject {
 
     // Crop
     @Published var showCropper: Bool = false
+    
+    private let previewMode: PreviewMode
 
-    init(result: IdCaptureResult) {
+    init(result: IdCaptureResult, previewMode: PreviewMode, rememberedFilterKey: String?) {
         self.result = result
+        self.previewMode = previewMode
+        self.selectedFilter = PreviewFilter.fromPersistKey(rememberedFilterKey) ?? .original
     }
 
     var isCompareEnabled: Bool { selectedFilter != .original }
@@ -136,7 +140,7 @@ final class IdCameraPreviewViewModel: ObservableObject {
 
     // MARK: - Save to DB (ID)
 
-    func saveToDatabase() {
+    func saveOrUpdate() {
         var inputs: [DocumentRepository.PageInput] = []
 
         if let frontPreview = result.front.preview,
@@ -162,16 +166,31 @@ final class IdCameraPreviewViewModel: ObservableObject {
 
         guard !inputs.isEmpty else { return }
 
+        let remembered = selectedFilter.persistKey
+        let idTypeRaw = result.idType.id
+
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                _ = try DocumentRepository.shared.saveDocument(
-                    kind: .id,
-                    idTypeRaw: self.result.idType.id,
-                    rememberedFilterRaw: self.selectedFilter.persistKey,
-                    pages: inputs
-                )
+                switch self.previewMode {
+                case .newFromCamera:
+                    _ = try DocumentRepository.shared.saveDocument(
+                        kind: .id,
+                        idTypeRaw: idTypeRaw,
+                        rememberedFilterRaw: remembered,
+                        pages: inputs
+                    )
+
+                case .existing(let docID):
+                    try DocumentRepository.shared.updateDocument(
+                        docID: docID,
+                        kind: .id,
+                        idTypeRaw: idTypeRaw,
+                        rememberedFilterRaw: remembered,
+                        pages: inputs
+                    )
+                }
             } catch {
-                print("!!! Error saving ID: \(error)")
+                print("!!! Error saveOrUpdate id:", error)
             }
         }
     }

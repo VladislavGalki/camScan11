@@ -2,22 +2,26 @@ import SwiftUI
 import UIKit
 
 struct IdCameraPreviewView: View {
-    let onDone: () -> Void
-    let onRetake: () -> Void
-    let onEdit: (_ side: IdCaptureSide, _ croppedOriginal: UIImage, _ quad: Quadrilateral) -> Void
-
     @StateObject private var vm: IdCameraPreviewViewModel
+    
+    let onDone: () -> Void
+    let onRetake: (() -> Void)?
+    let onEdit: ((_ side: IdCaptureSide, _ croppedOriginal: UIImage, _ quad: Quadrilateral) -> Void)?
 
     init(
-        result: IdCaptureResult,
-        onEdit: @escaping (_ side: IdCaptureSide, _ croppedOriginal: UIImage, _ quad: Quadrilateral) -> Void,
+        inputModel: IdPreviewInputModel,
         onDone: @escaping () -> Void,
-        onRetake: @escaping () -> Void
+        onRetake: (() -> Void)? = nil,
+        onEdit: ((_ side: IdCaptureSide, _ croppedOriginal: UIImage, _ quad: Quadrilateral) -> Void)? = nil
     ) {
         self.onEdit = onEdit
         self.onDone = onDone
         self.onRetake = onRetake
-        _vm = StateObject(wrappedValue: IdCameraPreviewViewModel(result: result))
+        _vm = StateObject(wrappedValue: IdCameraPreviewViewModel(
+            result: inputModel.result,
+            previewMode: inputModel.previewMode,
+            rememberedFilterKey: inputModel.selectedFilterKey)
+        )
     }
 
     var body: some View {
@@ -109,11 +113,13 @@ struct IdCameraPreviewView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: onRetake) {
-                Text("Переснять").font(.system(size: 17))
+            if let onRetake {
+                Button(action: onRetake) {
+                    Text("Переснять").font(.system(size: 17))
+                }
+                .foregroundColor(.blue)
             }
-            .foregroundColor(.blue)
-
+        
             Spacer()
 
             Text(vm.result.idType.title)
@@ -130,7 +136,7 @@ struct IdCameraPreviewView: View {
             .padding(.trailing, 8)
 
             Button {
-                vm.saveToDatabase()
+                vm.saveOrUpdate()
                 onDone()
             } label: {
                 Text("Готово").font(.system(size: 17, weight: .semibold))
@@ -244,7 +250,7 @@ struct IdCameraPreviewView: View {
                 onCancel: { vm.showCropper = false },
                 onDone: { cropped, newQuad in
                     vm.applyCropResult(croppedDisplay: cropped, quad: newQuad)
-                    onEdit(vm.editingSide, cropped, newQuad)
+                    onEdit?(vm.editingSide, cropped, newQuad)
                     vm.showCropper = false
                 }
             )

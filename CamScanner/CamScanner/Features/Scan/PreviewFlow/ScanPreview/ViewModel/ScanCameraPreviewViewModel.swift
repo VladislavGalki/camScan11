@@ -26,12 +26,16 @@ final class ScanCameraPreviewViewModel: ObservableObject {
 
     // Crop
     @Published var showCropper: Bool = false
+    
+    private let previewMode: PreviewMode
 
     // MARK: - Init
 
-    init(pages: [CapturedFrame]) {
+    init(pages: [CapturedFrame], previewMode: PreviewMode, rememberedFilterKey: String?) {
         self.pages = pages
-        self.editingIndex = min(0, max(0, pages.count - 1))
+        self.editingIndex = 0
+        self.previewMode = previewMode
+        self.selectedFilter = PreviewFilter.fromPersistKey(rememberedFilterKey) ?? .original
     }
 
     // MARK: - Derived
@@ -170,8 +174,7 @@ final class ScanCameraPreviewViewModel: ObservableObject {
 
     // MARK: - Save to DB (Scan)
 
-    func saveToDatabase(kind: DocumentRepository.DocKind = .scan) {
-        // ✅ сохраняем: display = preview, full = original (оба без фильтра), rememberedFilter = selectedFilter
+    func saveOrUpdate(kind: DocumentRepository.DocKind = .scan) {
         let inputs: [DocumentRepository.PageInput] = pages.compactMap { p in
             guard let display = p.preview, let full = p.original else { return nil }
             return DocumentRepository.PageInput(
@@ -181,21 +184,33 @@ final class ScanCameraPreviewViewModel: ObservableObject {
                 filterRaw: nil
             )
         }
-
+        
         guard !inputs.isEmpty else { return }
 
         let remembered = selectedFilter.persistKey
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                _ = try DocumentRepository.shared.saveDocument(
-                    kind: kind,
-                    idTypeRaw: nil,
-                    rememberedFilterRaw: remembered,
-                    pages: inputs
-                )
+                switch self.previewMode {
+                case .newFromCamera:
+                    _ = try DocumentRepository.shared.saveDocument(
+                        kind: kind,
+                        idTypeRaw: nil,
+                        rememberedFilterRaw: remembered,
+                        pages: inputs
+                    )
+
+                case .existing(let docID):
+                    try DocumentRepository.shared.updateDocument(
+                        docID: docID,
+                        kind: kind,
+                        idTypeRaw: nil,
+                        rememberedFilterRaw: remembered,
+                        pages: inputs
+                    )
+                }
             } catch {
-                print("!!! Error saving document: \(error)")
+                print("!!! Error saveOrUpdate scan:", error)
             }
         }
     }

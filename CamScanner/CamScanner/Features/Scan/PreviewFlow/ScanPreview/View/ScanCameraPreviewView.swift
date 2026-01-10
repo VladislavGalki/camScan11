@@ -2,23 +2,26 @@ import SwiftUI
 import UIKit
 
 struct ScanCameraPreviewView: View {
-
-    let onDone: () -> Void
-    let onRetake: () -> Void
-    let onEditPage: (_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void
-
     @StateObject private var vm: ScanCameraPreviewViewModel
 
+    let onDone: () -> Void
+    let onRetake: (() -> Void)?
+    let onEditPage: ((_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void)?
+
     init(
-        pages: [CapturedFrame],
+        inputModel: ScanPreviewInputModel,
         onDone: @escaping () -> Void,
-        onRetake: @escaping () -> Void,
-        onEditPage: @escaping (_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void
+        onRetake: (() -> Void)? = nil,
+        onEditPage: ((_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void)? = nil
     ) {
         self.onDone = onDone
         self.onRetake = onRetake
         self.onEditPage = onEditPage
-        _vm = StateObject(wrappedValue: ScanCameraPreviewViewModel(pages: pages))
+        _vm = StateObject(wrappedValue: ScanCameraPreviewViewModel(
+            pages: inputModel.pages,
+            previewMode: inputModel.previewMode,
+            rememberedFilterKey: inputModel.selectedFilterKey)
+        )
     }
 
     var body: some View {
@@ -65,10 +68,12 @@ struct ScanCameraPreviewView: View {
 
     private var topBar: some View {
         HStack {
-            Button("Переснять") { onRetake() }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            if let onRetake {
+                Button("Переснять") { onRetake() }
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
 
             Spacer()
 
@@ -80,7 +85,7 @@ struct ScanCameraPreviewView: View {
             .padding(.trailing, 8)
 
             Button("Готово") {
-                vm.saveToDatabase(kind: .scan)
+                vm.saveOrUpdate(kind: .scan)
                 onDone()
             }
             .foregroundColor(.blue)
@@ -227,7 +232,7 @@ struct ScanCameraPreviewView: View {
                         newQuad: newQuad
                     )
                     // 2) даём наверх (камера-сессия) применить в VM (если нужно)
-                    onEditPage(vm.editingIndex, croppedFull, newQuad)
+                    onEditPage?(vm.editingIndex, croppedFull, newQuad)
 
                     vm.showCropper = false
                 }

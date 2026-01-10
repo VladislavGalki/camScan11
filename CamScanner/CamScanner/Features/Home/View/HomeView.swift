@@ -3,56 +3,59 @@ import UIKit
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
-
+    
+    @EnvironmentObject private var router: Router
+    
     // ✅ для подтверждения удаления
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
-
+    
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if vm.items.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(vm.items) { item in
-                            DocumentCard(
-                                item: item,
-                                thumbnail: vm.thumbnails[item.id]
-                            )
-                            .padding(.horizontal, 16)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    deleteCandidate = item
-                                    showDeleteAlert = true
-                                } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if vm.items.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(vm.items) { item in
+                        DocumentCard(
+                            item: item,
+                            thumbnail: vm.thumbnails[item.id]
+                        )
+                        .padding(.horizontal, 16)
+                        .onTapGesture {
+                            router.push(HomeRoute.openDocument(id: item.id))
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteCandidate = item
+                                showDeleteAlert = true
+                            } label: {
+                                Label("Удалить", systemImage: "trash")
                             }
                         }
                     }
                 }
-                .padding(.top, 12)
-                .padding(.bottom, 24)
             }
-            .background(Color.white.ignoresSafeArea())
-            .navigationTitle("Главная")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("Удалить документ?", isPresented: $showDeleteAlert) {
-                Button("Удалить", role: .destructive) {
-                    guard let doc = deleteCandidate else { return }
-                    vm.delete(docID: doc.id)
-                    deleteCandidate = nil
-                }
-                Button("Отмена", role: .cancel) {
-                    deleteCandidate = nil
-                }
-            } message: {
-                Text("Документ и все его страницы будут удалены без возможности восстановления.")
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .background(Color.white.ignoresSafeArea())
+        .navigationTitle("Главная")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Удалить документ?", isPresented: $showDeleteAlert) {
+            Button("Удалить", role: .destructive) {
+                guard let doc = deleteCandidate else { return }
+                vm.delete(docID: doc.id)
+                deleteCandidate = nil
             }
+            Button("Отмена", role: .cancel) {
+                deleteCandidate = nil
+            }
+        } message: {
+            Text("Документ и все его страницы будут удалены без возможности восстановления.")
         }
     }
-
+    
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "doc.text.image")
@@ -74,16 +77,16 @@ struct HomeView: View {
 // MARK: - Card
 
 private struct DocumentCard: View {
-
+    
     let item: DocumentListItem
     let thumbnail: UIImage?
-
+    
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.white.opacity(0.06))
-
+                
                 if let thumbnail {
                     Image(uiImage: thumbnail)
                         .resizable()
@@ -100,19 +103,19 @@ private struct DocumentCard: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             )
-
+            
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.black)
-
+                
                 Text(subtitle)
                     .font(.system(size: 13))
                     .foregroundStyle(.black)
             }
-
+            
             Spacer()
-
+            
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.black)
@@ -127,7 +130,7 @@ private struct DocumentCard: View {
                 .stroke(Color.white.opacity(0.10), lineWidth: 1)
         )
     }
-
+    
     private var title: String {
         let kind = item.kind.lowercased()
         if kind == "id" {
@@ -135,7 +138,7 @@ private struct DocumentCard: View {
         }
         return "Скан • \(item.pageCount) стр."
     }
-
+    
     private var subtitle: String {
         let df = DateFormatter()
         df.locale = Locale(identifier: "ru_RU")

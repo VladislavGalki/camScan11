@@ -46,3 +46,10 @@ enum PreviewFilter: CaseIterable, Identifiable, Equatable {
 
     var isOmnifix: Bool { self == .omnifix }
 }
+
+extension PreviewFilter {
+    static func fromPersistKey(_ key: String?) -> PreviewFilter? {
+        guard let key else { return nil }
+        return Self.allCases.first(where: { $0.persistKey == key })
+    }
+}

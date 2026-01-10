@@ -25,6 +25,7 @@ final class DocumentsStore: NSObject, ObservableObject {
     private var frc: NSFetchedResultsController<DocumentEntity>!
 
     private var thumbInFlight = Set<UUID>()
+    private var changedDocIDs = Set<UUID>()
     
     override init() {
         super.init()
@@ -154,7 +155,41 @@ final class DocumentsStore: NSObject, ObservableObject {
 // MARK: - NSFetchedResultsControllerDelegate
 
 extension DocumentsStore: @preconcurrency NSFetchedResultsControllerDelegate {
+
+    func controller(
+        _ controller: NSFetchedResultsController<NSFetchRequestResult>,
+        didChange anObject: Any,
+        at indexPath: IndexPath?,
+        for type: NSFetchedResultsChangeType,
+        newIndexPath: IndexPath?
+    ) {
+        guard let doc = anObject as? DocumentEntity else { return }
+        guard let id = doc.id else { return }
+
+        switch type {
+        case .update, .move:
+            changedDocIDs.insert(id)
+        case .delete:
+            // на delete мы и так чистим кэш в delete(docID:)
+            break
+        case .insert:
+            // insert можно не трогать
+            break
+        @unknown default:
+            break
+        }
+    }
+
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        // ✅ перед rebuild сбрасываем thumbs у изменённых документов
+        if !changedDocIDs.isEmpty {
+            for id in changedDocIDs {
+                thumbnails[id] = nil
+                thumbInFlight.remove(id)
+            }
+            changedDocIDs.removeAll()
+        }
+
         rebuildItemsFromFRC()
     }
 }

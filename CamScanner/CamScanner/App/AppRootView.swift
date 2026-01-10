@@ -9,6 +9,16 @@ struct AppRootView: View {
     }
 
     private func resolve(_ route: any Route) -> AnyView {
-        AnyView(EmptyView())
+        switch route {
+
+        case let r as HomeRoute:
+            switch r {
+            case .openDocument(let id):
+                return AnyView(DocumentPreviewEntryView(documentID: id))
+            }
+
+        default:
+            return AnyView(EmptyView())
+        }
     }
 }
