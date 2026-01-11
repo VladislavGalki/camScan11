@@ -8,7 +8,7 @@ final class DocumentRepository {
         context: PersistenceController.shared.container.viewContext
     )
 
-    private let context: NSManagedObjectContext
+    internal let context: NSManagedObjectContext
 
     init(context: NSManagedObjectContext) {
         self.context = context

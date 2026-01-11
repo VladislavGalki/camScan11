@@ -23,7 +23,9 @@ extension DocumentEntity {
     @NSManaged public var kind: String?
     @NSManaged public var idType: String?
     @NSManaged public var pages: NSSet?
-
+    @NSManaged public var isLocked: Bool
+    @NSManaged public var passwordSalt: Data?
+    @NSManaged public var passwordHash: Data?
 }
 
 // MARK: Generated accessors for pages

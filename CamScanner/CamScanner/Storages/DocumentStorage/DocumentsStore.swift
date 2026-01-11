@@ -5,6 +5,7 @@ import UIKit
 // ✅ То, что удобно рендерить в SwiftUI (без CoreData объектов в UI)
 struct DocumentListItem: Identifiable, Equatable {
     let id: UUID
+    let isLocked: Bool
     let createdAt: Date
     let kind: String          // "scan" / "id"
     let idType: String?       // для "id"
@@ -95,6 +96,7 @@ final class DocumentsStore: NSObject, ObservableObject {
 
             return DocumentListItem(
                 id: id,
+                isLocked: doc.isLocked,
                 createdAt: doc.createdAt ?? Date(),
                 kind: (doc.kind ?? "scan"),
                 idType: doc.idType,

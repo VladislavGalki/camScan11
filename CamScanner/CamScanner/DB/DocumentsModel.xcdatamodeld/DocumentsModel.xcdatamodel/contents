@@ -4,8 +4,11 @@
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="idType" optional="YES" attributeType="String"/>
+        <attribute name="isLocked" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="kind" attributeType="String"/>
         <attribute name="pageCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="passwordHash" optional="YES" attributeType="Binary"/>
+        <attribute name="passwordSalt" optional="YES" attributeType="Binary"/>
         <attribute name="rememberedFilter" optional="YES" attributeType="String"/>
         <relationship name="pages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PageEntity" inverseName="document" inverseEntity="PageEntity"/>
     </entity>

@@ -23,7 +23,29 @@ struct HomeView: View {
                         )
                         .padding(.horizontal, 16)
                         .onTapGesture {
-                            router.push(HomeRoute.openDocument(id: item.id))
+                            if !item.isLocked {
+                                router.push(HomeRoute.openDocument(id: item.id))
+                                return
+                            }
+                            
+                            PasswordPromptView.shared.present(
+                                title: "Введите пароль",
+                                message: nil
+                            ) { password in
+                                let ok = (try? DocumentRepository.shared.verifyPassword(
+                                    docID: item.id,
+                                    password: password
+                                )) ?? false
+
+                                if ok {
+                                    router.push(HomeRoute.openDocument(id: item.id))
+                                }
+                            } onRemove: { password in
+                                try? DocumentRepository.shared.removePassword(
+                                    docID: item.id,
+                                    password: password
+                                )
+                            }
                         }
                         .contextMenu {
                             Button(role: .destructive) {
@@ -31,6 +53,17 @@ struct HomeView: View {
                                 showDeleteAlert = true
                             } label: {
                                 Label("Удалить", systemImage: "trash")
+                            }
+                            Button("Установить пароль") {
+                                PasswordPromptView.shared.present(
+                                    title: "Установить пароль",
+                                    message: "До 6 символов"
+                                ) { password in
+                                    try? DocumentRepository.shared.setPassword(
+                                        docID: item.id,
+                                        password: password
+                                    )
+                                }
                             }
                         }
                     }
