@@ -2,15 +2,16 @@ import Foundation
 import UIKit
 
 @MainActor
-final class ScanCameraPreviewViewModel: ObservableObject {
+final class DocumentPreviewViewModel: ObservableObject {
 
-    // MARK: - Input/Output
-
+    // Input
     @Published var pages: [CapturedFrame]
+    let kind: DocumentPreviewKind
+    private let previewMode: PreviewMode
 
+    // UI state
     @Published var editingIndex: Int = 0
     @Published var selectedFilter: PreviewFilter = .original
-
     @Published var filteredPages: [Int: UIImage] = [:]
     @Published var isComparingOriginal: Bool = false
 
@@ -26,19 +27,27 @@ final class ScanCameraPreviewViewModel: ObservableObject {
 
     // Crop
     @Published var showCropper: Bool = false
-    
-    private let previewMode: PreviewMode
 
     // MARK: - Init
 
-    init(pages: [CapturedFrame], previewMode: PreviewMode, rememberedFilterKey: String?) {
-        self.pages = pages
+    init(input: DocumentPreviewInputModel) {
+        self.pages = input.pages
+        self.kind = input.kind
+        self.previewMode = input.previewMode
+        self.selectedFilter = PreviewFilter.fromPersistKey(input.rememberedFilterKey) ?? .original
         self.editingIndex = 0
-        self.previewMode = previewMode
-        self.selectedFilter = PreviewFilter.fromPersistKey(rememberedFilterKey) ?? .original
     }
 
     // MARK: - Derived
+
+    var title: String {
+        switch kind {
+        case .scan:
+            return "Скан"
+        case .id(_, let t):
+            return t
+        }
+    }
 
     var currentPageCount: Int { pages.count }
 
@@ -62,6 +71,10 @@ final class ScanCameraPreviewViewModel: ObservableObject {
     }
 
     var isCompareEnabled: Bool { selectedFilter != .original }
+
+    func pageTitle(for index: Int) -> String {
+        "Стр. \(index + 1)"
+    }
 
     // MARK: - UI events
 
@@ -144,9 +157,18 @@ final class ScanCameraPreviewViewModel: ObservableObject {
 
     // MARK: - Export
 
-    func export(format: DocumentExportFormat, fileName: String = "Scan") {
+    func export(format: DocumentExportFormat) {
         let images = exportImages()
         guard !images.isEmpty else { return }
+
+        let fileName: String = {
+            switch kind {
+            case .scan:
+                return "Scan"
+            case .id(_, let t):
+                return "ID_\(t)"
+            }
+        }()
 
         DocumentExporter.shared.exportOrSave(
             images: images,
@@ -172,19 +194,19 @@ final class ScanCameraPreviewViewModel: ObservableObject {
         return originals.map { FilterEngine.shared.apply(selectedFilter, to: $0) }
     }
 
-    // MARK: - Save to DB (Scan)
+    // MARK: - Save / Update
 
-    func saveOrUpdate(kind: DocumentRepository.DocKind = .scan) {
+    func saveOrUpdate() {
         let inputs: [DocumentRepository.PageInput] = pages.compactMap { p in
             guard let display = p.preview, let full = p.original else { return nil }
             return DocumentRepository.PageInput(
                 displayImage: display,
                 originalFullImage: full,
                 quad: p.quad,
-                filterRaw: nil
+                filterRaw: selectedFilter.persistKey
             )
         }
-        
+
         guard !inputs.isEmpty else { return }
 
         let remembered = selectedFilter.persistKey
@@ -193,31 +215,52 @@ final class ScanCameraPreviewViewModel: ObservableObject {
             do {
                 switch self.previewMode {
                 case .newFromCamera:
-                    _ = try DocumentRepository.shared.saveDocument(
-                        kind: kind,
-                        idTypeRaw: nil,
-                        rememberedFilterRaw: remembered,
-                        pages: inputs
-                    )
+                    switch self.kind {
+                    case .scan:
+                        _ = try DocumentRepository.shared.saveDocument(
+                            kind: .scan,
+                            idTypeRaw: nil,
+                            rememberedFilterRaw: remembered,
+                            pages: inputs
+                        )
+                    case .id(let idTypeRaw, _):
+                        _ = try DocumentRepository.shared.saveDocument(
+                            kind: .id,
+                            idTypeRaw: idTypeRaw,
+                            rememberedFilterRaw: remembered,
+                            pages: inputs
+                        )
+                    }
 
                 case .existing(let docID):
-                    try DocumentRepository.shared.updateDocument(
-                        docID: docID,
-                        kind: kind,
-                        idTypeRaw: nil,
-                        rememberedFilterRaw: remembered,
-                        pages: inputs
-                    )
+                    switch self.kind {
+                    case .scan:
+                        try DocumentRepository.shared.updateDocument(
+                            docID: docID,
+                            kind: .scan,
+                            idTypeRaw: nil,
+                            rememberedFilterRaw: remembered,
+                            pages: inputs
+                        )
+                    case .id(let idTypeRaw, _):
+                        try DocumentRepository.shared.updateDocument(
+                            docID: docID,
+                            kind: .id,
+                            idTypeRaw: idTypeRaw,
+                            rememberedFilterRaw: remembered,
+                            pages: inputs
+                        )
+                    }
                 }
             } catch {
-                print("!!! Error saveOrUpdate scan:", error)
+                print("!!! Error saveOrUpdate preview:", error)
             }
         }
     }
 
     // MARK: - Crop apply
 
-    /// UI отдаёт сюда результат кропа, а наружу (камера/хранилище) — через closure.
+    /// Важно: FULL не заменяем, меняем только preview + quad (как ты уже зафиксировал)
     func applyCropResult(index: Int, newDisplay: UIImage, newQuad: Quadrilateral?) {
         guard pages.indices.contains(index) else { return }
 

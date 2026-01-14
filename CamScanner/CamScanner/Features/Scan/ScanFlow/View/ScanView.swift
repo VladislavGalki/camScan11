@@ -144,11 +144,11 @@ struct ScanView: View {
         }
         .fullScreenCover(isPresented: $showPreview) {
             if ui.getSelectedDocumentType() == .scan {
-                // ✅ Новый автономный превью + коллбек на редактирование страницы
-                ScanCameraPreviewView(
-                    inputModel: ScanPreviewInputModel(
+                DocumentPreviewView(
+                    inputModel: .scan(
                         pages: vm.scanResult,
-                        previewMode: .newFromCamera
+                        previewMode: .newFromCamera,
+                        rememberedFilterKey: nil
                     ),
                     onDone: {
                         if ui.captureMode == .group {
@@ -172,11 +172,11 @@ struct ScanView: View {
                     }
                 )
             } else {
-                // ✅ ID превью (переименовано)
-                IdCameraPreviewView(
-                    inputModel: IdPreviewInputModel(
+                DocumentPreviewView(
+                    inputModel: .id(
                         result: vm.idResult,
-                        previewMode: .newFromCamera
+                        previewMode: .newFromCamera,
+                        rememberedFilterKey: nil
                     ),
                     onDone: {
                         vm.resetIdCaptures()
@@ -187,8 +187,9 @@ struct ScanView: View {
                         vm.resetIdCaptures()
                         showPreview = false
                     },
-                    onEdit: { side, cropped, quad in
-                        vm.applyManualEditForId(side: side, croppedOriginal: cropped, quad: quad)
+                    onEditPage: { index, croppedFull, quad in
+                        let side: IdCaptureSide = (index == 0 ? .front : .back)
+                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
                     }
                 )
             }

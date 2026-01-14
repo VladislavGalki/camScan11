@@ -1,15 +1,16 @@
 import SwiftUI
 import UIKit
 
-struct ScanCameraPreviewView: View {
-    @StateObject private var vm: ScanCameraPreviewViewModel
+struct DocumentPreviewView: View {
+
+    @StateObject private var vm: DocumentPreviewViewModel
 
     let onDone: () -> Void
     let onRetake: (() -> Void)?
     let onEditPage: ((_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void)?
 
     init(
-        inputModel: ScanPreviewInputModel,
+        inputModel: DocumentPreviewInputModel,
         onDone: @escaping () -> Void,
         onRetake: (() -> Void)? = nil,
         onEditPage: ((_ index: Int, _ croppedFull: UIImage, _ quad: Quadrilateral) -> Void)? = nil
@@ -17,11 +18,7 @@ struct ScanCameraPreviewView: View {
         self.onDone = onDone
         self.onRetake = onRetake
         self.onEditPage = onEditPage
-        _vm = StateObject(wrappedValue: ScanCameraPreviewViewModel(
-            pages: inputModel.pages,
-            previewMode: inputModel.previewMode,
-            rememberedFilterKey: inputModel.selectedFilterKey)
-        )
+        _vm = StateObject(wrappedValue: DocumentPreviewViewModel(input: inputModel))
     }
 
     var body: some View {
@@ -77,6 +74,12 @@ struct ScanCameraPreviewView: View {
 
             Spacer()
 
+            Text(vm.title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+
+            Spacer()
+
             Button { vm.showExportDialog = true } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 17, weight: .semibold))
@@ -85,7 +88,7 @@ struct ScanCameraPreviewView: View {
             .padding(.trailing, 8)
 
             Button("Готово") {
-                vm.saveOrUpdate(kind: .scan)
+                vm.saveOrUpdate()
                 onDone()
             }
             .foregroundColor(.blue)
@@ -165,7 +168,7 @@ struct ScanCameraPreviewView: View {
     private func pageChip(_ idx: Int) -> some View {
         let isSelected = (idx == vm.editingIndex)
 
-        return Text("Стр. \(idx + 1)")
+        return Text(vm.pageTitle(for: idx))
             .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -215,7 +218,7 @@ struct ScanCameraPreviewView: View {
             .onTapGesture { vm.selectFilter(f) }
     }
 
-    // MARK: - Cropper sheet
+    // MARK: - Cropper
 
     @ViewBuilder
     private var cropperSheet: some View {
@@ -228,10 +231,10 @@ struct ScanCameraPreviewView: View {
                     // 1) обновляем локально в превью
                     vm.applyCropResult(
                         index: vm.editingIndex,
-                        newDisplay: croppedFull,   // можно downscale если хочешь
+                        newDisplay: croppedFull,
                         newQuad: newQuad
                     )
-                    // 2) даём наверх (камера-сессия) применить в VM (если нужно)
+                    // 2) наверх (камера-сессия) — опционально
                     onEditPage?(vm.editingIndex, croppedFull, newQuad)
 
                     vm.showCropper = false

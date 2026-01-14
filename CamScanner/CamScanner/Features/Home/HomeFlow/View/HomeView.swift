@@ -75,6 +75,15 @@ struct HomeView: View {
         .background(Color.white.ignoresSafeArea())
         .navigationTitle("Главная")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    router.push(MergeRoute.selectDocuments)
+                } label: {
+                    Image(systemName: "square.stack.3d.up")
+                }
+            }
+        }
         .alert("Удалить документ?", isPresented: $showDeleteAlert) {
             Button("Удалить", role: .destructive) {
                 guard let doc = deleteCandidate else { return }

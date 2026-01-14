@@ -22,23 +22,22 @@ struct DocumentPreviewEntryView: View {
                     .background(Color.black.ignoresSafeArea())
 
             case .scan(let pages, let remembered):
-                ScanCameraPreviewView(
-                    inputModel: ScanPreviewInputModel(
+                DocumentPreviewView(
+                    inputModel: .scan(
                         pages: pages,
                         previewMode: .existing(docID: documentID),
-                        selectedFilterKey: remembered
+                        rememberedFilterKey: remembered
                     ),
                     onDone: {
                         router.pop()
                     }
                 )
-
             case .id(let result, let remembered):
-                IdCameraPreviewView(
-                    inputModel: IdPreviewInputModel(
+                DocumentPreviewView(
+                    inputModel: .id(
                         result: result,
                         previewMode: .existing(docID: documentID),
-                        selectedFilterKey: remembered
+                        rememberedFilterKey: remembered
                     ),
                     onDone: {
                         router.pop()
