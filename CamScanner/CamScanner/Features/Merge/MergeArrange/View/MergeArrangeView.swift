@@ -4,7 +4,6 @@ import UIKit
 struct MergeArrangeView: View {
     @StateObject private var vm: MergeArrangeViewModel
     @EnvironmentObject private var router: Router
-    @Environment(\.dismiss) private var dismiss
 
     init(inputIDs: [UUID]) {
         _vm = StateObject(wrappedValue: MergeArrangeViewModel(docIDs: inputIDs))
@@ -54,9 +53,8 @@ struct MergeArrangeView: View {
         }
         .safeAreaInset(edge: .bottom) {
             Button {
-                vm.mergeAndSave { _ in
-                    // после сохранения вернемся назад (или можно popToRoot / открыть новый документ)
-                    dismiss()
+                vm.mergeAndSave { newID in
+                    router.popToRoot()
                 }
             } label: {
                 Text("Объединить")
@@ -70,6 +68,9 @@ struct MergeArrangeView: View {
                     .padding(.bottom, 12)
             }
             .background(Color.white.ignoresSafeArea())
+        }
+        .onAppear {
+            vm.onAppear()
         }
     }
 }
