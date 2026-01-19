@@ -7,8 +7,8 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
 
     enum State {
         case loading
-        case scan(pages: [CapturedFrame], rememberedFilterKey: String?, drawingBaseMap: [Int : UIImage])
-        case id(result: IdCaptureResult, rememberedFilterKey: String?, drawingBaseMap: [Int : UIImage])
+        case scan(pages: [CapturedFrame], rememberedFilterKey: String?)
+        case id(result: IdCaptureResult, rememberedFilterKey: String?)
         case error(String)
     }
 
@@ -35,26 +35,16 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
                     }
                     return
                 }
-                
-                let drawingBaseMap = self.buildDrawingBaseImages(pages: pages)
 
                 if kind == "id" {
                     let result = try self.buildIdResult(doc: doc, pages: pages)
                     DispatchQueue.main.async {
-                        self.state = .id(
-                            result: result,
-                            rememberedFilterKey: remembered,
-                            drawingBaseMap: drawingBaseMap
-                        )
+                        self.state = .id(result: result, rememberedFilterKey: remembered)
                     }
                 } else {
                     let frames = try self.buildScanFrames(pages: pages)
                     DispatchQueue.main.async {
-                        self.state = .scan(
-                            pages: frames,
-                            rememberedFilterKey: remembered,
-                            drawingBaseMap: drawingBaseMap
-                        )
+                        self.state = .scan(pages: frames, rememberedFilterKey: remembered)
                     }
                 }
 
@@ -64,19 +54,6 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
                 }
             }
         }
-    }
-    
-    private func buildDrawingBaseImages(pages: [PageEntity]) -> [Int: UIImage] {
-        var out: [Int: UIImage] = [:]
-
-        for (idx, p) in pages.enumerated() {
-            guard let rel = p.drawingBasePath else { continue }
-            let url = FileStore.shared.url(forRelativePath: rel)
-            if let img = FileStore.shared.loadImage(at: url) {
-                out[idx] = img
-            }
-        }
-        return out
     }
 
     // MARK: - Fetch
@@ -102,32 +79,44 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
             }
 
             let displayURL = FileStore.shared.url(forRelativePath: displayRel)
-            let fullURL = FileStore.shared.url(forRelativePath: fullRel)
+            let fullURL    = FileStore.shared.url(forRelativePath: fullRel)
 
             let display = FileStore.shared.loadImage(at: displayURL)
-            let full = FileStore.shared.loadImage(at: fullURL)
+            let full    = FileStore.shared.loadImage(at: fullURL)
+            let quad    = p.quadData.flatMap { QuadCodec.decode($0) }
 
-            let quad = p.quadData.flatMap { QuadCodec.decode($0) }
+            // ✅ drawing base
+            let base: UIImage? = {
+                guard let rel = p.drawingBasePath, !rel.isEmpty else { return nil }
+                let url = FileStore.shared.url(forRelativePath: rel)
+                return FileStore.shared.loadImage(at: url)
+            }()
 
-            return CapturedFrame(preview: display, original: full, quad: quad, drawingData: p.drawingData)
+            return CapturedFrame(
+                preview: display,
+                original: full,
+                quad: quad,
+                drawingData: p.drawingData,
+                drawingBase: base
+            )
         }
     }
 
     // MARK: - Build ID
 
     private func buildIdResult(doc: DocumentEntity, pages: [PageEntity]) throws -> IdCaptureResult {
-        // idType хранится как String? (ты сохранял result.idType.id)
         let idType = IdDocumentTypeEnum.allCases.first(where: { $0.id == doc.idType }) ?? .general
 
         var result = IdCaptureResult(idType: idType, front: .init(), back: idType.requiresBackSide ? .init() : nil)
 
-        let frames = try buildScanFrames(pages: pages) // переиспользуем (формат тот же)
-        // pages[0] -> front, pages[1] -> back (если есть)
+        let frames = try buildScanFrames(pages: pages)
+
         if let first = frames.first {
             result.front.preview = first.preview
             result.front.original = first.original
             result.front.quad = first.quad
             result.front.drawingData = first.drawingData
+            result.front.drawingBase = first.drawingBase
         }
 
         if idType.requiresBackSide, frames.count > 1 {
@@ -136,6 +125,7 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
             back.original = frames[1].original
             back.quad = frames[1].quad
             back.drawingData = frames[1].drawingData
+            back.drawingBase = frames[1].drawingBase
             result.back = back
         } else {
             result.back = nil

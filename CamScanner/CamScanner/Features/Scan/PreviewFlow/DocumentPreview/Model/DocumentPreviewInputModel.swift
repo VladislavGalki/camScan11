@@ -11,42 +11,36 @@ struct DocumentPreviewInputModel {
     let pages: [CapturedFrame]
     let previewMode: PreviewMode
     let rememberedFilterKey: String?
-    let drawingBaseImagesByIndex: [Int: UIImage]
 
     init(
         kind: DocumentPreviewKind,
         pages: [CapturedFrame],
         previewMode: PreviewMode,
-        rememberedFilterKey: String? = nil,
-        drawingBaseImagesByIndex: [Int: UIImage] = [:]
+        rememberedFilterKey: String? = nil
     ) {
         self.kind = kind
         self.pages = pages
         self.previewMode = previewMode
         self.rememberedFilterKey = rememberedFilterKey
-        self.drawingBaseImagesByIndex = drawingBaseImagesByIndex
     }
 
     static func scan(
         pages: [CapturedFrame],
         previewMode: PreviewMode,
-        rememberedFilterKey: String? = nil,
-        drawingBaseImagesByIndex: [Int: UIImage] = [:]
+        rememberedFilterKey: String? = nil
     ) -> DocumentPreviewInputModel {
         .init(
             kind: .scan,
             pages: pages,
             previewMode: previewMode,
-            rememberedFilterKey: rememberedFilterKey,
-            drawingBaseImagesByIndex: drawingBaseImagesByIndex
+            rememberedFilterKey: rememberedFilterKey
         )
     }
 
     static func id(
         result: IdCaptureResult,
         previewMode: PreviewMode,
-        rememberedFilterKey: String? = nil,
-        drawingBaseImagesByIndex: [Int: UIImage] = [:]
+        rememberedFilterKey: String? = nil
     ) -> DocumentPreviewInputModel {
         var pages: [CapturedFrame] = []
         pages.append(result.front)
@@ -58,8 +52,7 @@ struct DocumentPreviewInputModel {
             kind: .id(idTypeRaw: result.idType.id, title: result.idType.title),
             pages: pages,
             previewMode: previewMode,
-            rememberedFilterKey: rememberedFilterKey,
-            drawingBaseImagesByIndex: drawingBaseImagesByIndex
+            rememberedFilterKey: rememberedFilterKey
         )
     }
 }

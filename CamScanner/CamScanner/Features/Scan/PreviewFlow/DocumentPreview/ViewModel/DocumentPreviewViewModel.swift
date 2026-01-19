@@ -26,8 +26,6 @@ final class DocumentPreviewViewModel: ObservableObject {
     @Published var isOCRLoading: Bool = false
 
     // Drawing
-    @Published var drawingBaseByPage: [Int: UIImage] = [:]
-    @Published var drawingStrokesByPage: [Int: [Stroke]] = [:]
     @Published var showDrawing: Bool = false
     
     // Crop
@@ -40,7 +38,6 @@ final class DocumentPreviewViewModel: ObservableObject {
         self.kind = input.kind
         self.previewMode = input.previewMode
         self.selectedFilter = PreviewFilter.fromPersistKey(input.rememberedFilterKey) ?? .original
-        self.drawingBaseByPage = input.drawingBaseImagesByIndex
         self.editingIndex = 0
     }
 
@@ -91,8 +88,7 @@ final class DocumentPreviewViewModel: ObservableObject {
 
     var currentPreviewForDrawing: UIImage? {
         guard pages.indices.contains(editingIndex) else { return nil }
-        // ✅ если уже рисовали — берём сохранённую чистую базу
-        return drawingBaseByPage[editingIndex] ?? pages[editingIndex].preview
+        return pages[editingIndex].drawingBase ?? pages[editingIndex].preview
     }
     
     var currentDrawingStrokes: [Stroke] {
@@ -154,23 +150,17 @@ final class DocumentPreviewViewModel: ObservableObject {
     func applyDrawingResult(_ merged: UIImage, _ strokes: [Stroke]) {
         guard pages.indices.contains(editingIndex) else { return }
 
-        // ✅ 1) Сначала берём текущую "базу" ДО перезаписи preview
-        // Если база уже была сохранена ранее — используем её, иначе берём текущий preview.
-        let base = drawingBaseByPage[editingIndex] ?? pages[editingIndex].preview
-
-        // ✅ 2) Фиксируем базу (она должна быть БЕЗ рисунка)
-        if drawingBaseByPage[editingIndex] == nil {
-            drawingBaseByPage[editingIndex] = base
+        // ✅ база "до рисунка" должна быть неизменной
+        if pages[editingIndex].drawingBase == nil {
+            pages[editingIndex].drawingBase = pages[editingIndex].preview
         }
 
-        // ✅ 3) Сохраняем strokes (и в память, и в page.drawingData — для повторного открытия/БД)
-        drawingStrokesByPage[editingIndex] = strokes
+        // ✅ strokes храним в drawingData (это единственное что нужно)
         pages[editingIndex].drawingData = StrokeCodec.encode(strokes)
 
-        // ✅ 4) И только потом обновляем preview на merged (чтобы в превью было видно рисунок)
+        // ✅ preview обновляем на merged
         pages[editingIndex].preview = merged
 
-        // сброс кэша фильтра для страницы
         filteredPages[editingIndex] = nil
         recomputeFilter(for: editingIndex)
     }
@@ -264,7 +254,7 @@ final class DocumentPreviewViewModel: ObservableObject {
                 originalFullImage: full,
                 quad: p.quad,
                 drawingData: p.drawingData,
-                drawingBaseImage: drawingBaseByPage[idx],
+                drawingBaseImage: p.drawingBase,   // ✅ ВАЖНО
                 filterRaw: selectedFilter.persistKey
             )
         }
@@ -280,17 +270,11 @@ final class DocumentPreviewViewModel: ObservableObject {
                     switch self.kind {
                     case .scan:
                         _ = try DocumentRepository.shared.saveDocument(
-                            kind: .scan,
-                            idTypeRaw: nil,
-                            rememberedFilterRaw: remembered,
-                            pages: inputs
+                            kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
                         )
                     case .id(let idTypeRaw, _):
                         _ = try DocumentRepository.shared.saveDocument(
-                            kind: .id,
-                            idTypeRaw: idTypeRaw,
-                            rememberedFilterRaw: remembered,
-                            pages: inputs
+                            kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
                         )
                     }
 
@@ -298,19 +282,11 @@ final class DocumentPreviewViewModel: ObservableObject {
                     switch self.kind {
                     case .scan:
                         try DocumentRepository.shared.updateDocument(
-                            docID: docID,
-                            kind: .scan,
-                            idTypeRaw: nil,
-                            rememberedFilterRaw: remembered,
-                            pages: inputs
+                            docID: docID, kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
                         )
                     case .id(let idTypeRaw, _):
                         try DocumentRepository.shared.updateDocument(
-                            docID: docID,
-                            kind: .id,
-                            idTypeRaw: idTypeRaw,
-                            rememberedFilterRaw: remembered,
-                            pages: inputs
+                            docID: docID, kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
                         )
                     }
                 }
@@ -322,12 +298,15 @@ final class DocumentPreviewViewModel: ObservableObject {
 
     // MARK: - Crop apply
 
-    /// Важно: FULL не заменяем, меняем только preview + quad (как ты уже зафиксировал)
     func applyCropResult(index: Int, newDisplay: UIImage, newQuad: Quadrilateral?) {
         guard pages.indices.contains(index) else { return }
 
         pages[index].preview = newDisplay
         pages[index].quad = newQuad
+
+        // ✅ рисунок больше невалиден после кропа
+        pages[index].drawingBase = nil
+        pages[index].drawingData = nil
 
         filteredPages[index] = nil
         recomputeFilter(for: index)

@@ -28,11 +28,8 @@ final class DocumentMergeService {
                 // если у страницы есть drawingData (strokes), то обязана быть и "чистая база"
                 // иначе при открытии merged-дока ластик/редактирование могут не работать корректно.
                 let baseForDrawing: UIImage? = {
-                    // 1) если у твоего CapturedFrame уже есть base — берем его
-                    if let b = f.drawingBase { return b }      // <-- если поле так называется
-                    // 2) если вдруг base не было, но strokes есть — fallback на display (хуже, но лучше чем nil)
-                    if f.drawingData != nil { return display }
-                    // 3) если strokes нет — nil ок
+                    if let b = f.drawingBase { return b }      // ✅ правильная база
+                    if f.drawingData != nil { return full }   // ✅ fallback лучше, чем display (display уже с рисунком)
                     return nil
                 }()
 
