@@ -16,7 +16,7 @@ extension DocumentRepository {
             let full = FileStore.shared.loadImage(at: fullURL)
             let quad = p.quadData.flatMap { QuadCodec.decode($0) }
             
-            return CapturedFrame(preview: display, original: full, quad: quad)
+            return CapturedFrame(preview: display, original: full, quad: quad, drawingData: p.drawingData)
         }
     }
     

@@ -11,7 +11,8 @@ struct CapturedFrame: Equatable {
     /// Для ID мы сейчас режем по рамке, quad может быть nil.
     /// Но оставляем поле, чтобы в будущем легко добавить/хранить quad (например для ручной обрезки).
     var quad: Quadrilateral? = nil
-
+    var drawingData: Data? = nil
+    var drawingBase: UIImage? = nil
     var isReady: Bool { preview != nil && original != nil }
 }
 

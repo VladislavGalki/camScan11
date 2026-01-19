@@ -21,23 +21,25 @@ struct DocumentPreviewEntryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.black.ignoresSafeArea())
 
-            case .scan(let pages, let remembered):
+            case .scan(let pages, let remembered, let drawingBaseMap):
                 DocumentPreviewView(
                     inputModel: .scan(
                         pages: pages,
                         previewMode: .existing(docID: documentID),
-                        rememberedFilterKey: remembered
+                        rememberedFilterKey: remembered,
+                        drawingBaseImagesByIndex: drawingBaseMap
                     ),
                     onDone: {
                         router.pop()
                     }
                 )
-            case .id(let result, let remembered):
+            case .id(let result, let remembered, let drawingBaseMap):
                 DocumentPreviewView(
                     inputModel: .id(
                         result: result,
                         previewMode: .existing(docID: documentID),
-                        rememberedFilterKey: remembered
+                        rememberedFilterKey: remembered,
+                        drawingBaseImagesByIndex: drawingBaseMap
                     ),
                     onDone: {
                         router.pop()

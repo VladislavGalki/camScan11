@@ -25,6 +25,11 @@ final class DocumentPreviewViewModel: ObservableObject {
     @Published var ocrText: String = ""
     @Published var isOCRLoading: Bool = false
 
+    // Drawing
+    @Published var drawingBaseByPage: [Int: UIImage] = [:]
+    @Published var drawingStrokesByPage: [Int: [Stroke]] = [:]
+    @Published var showDrawing: Bool = false
+    
     // Crop
     @Published var showCropper: Bool = false
 
@@ -35,6 +40,7 @@ final class DocumentPreviewViewModel: ObservableObject {
         self.kind = input.kind
         self.previewMode = input.previewMode
         self.selectedFilter = PreviewFilter.fromPersistKey(input.rememberedFilterKey) ?? .original
+        self.drawingBaseByPage = input.drawingBaseImagesByIndex
         self.editingIndex = 0
     }
 
@@ -71,6 +77,29 @@ final class DocumentPreviewViewModel: ObservableObject {
     }
 
     var isCompareEnabled: Bool { selectedFilter != .original }
+    
+    var canOpenDrawing: Bool {
+        // рисуем по текущей превьюшке (то, что видит юзер)
+        pages.indices.contains(editingIndex) && pages[editingIndex].preview != nil
+    }
+    
+    var currentInitialStrokes: [Stroke] {
+        guard pages.indices.contains(editingIndex) else { return [] }
+        guard let data = pages[editingIndex].drawingData else { return [] }
+        return StrokeCodec.decode(data)
+    }
+
+    var currentPreviewForDrawing: UIImage? {
+        guard pages.indices.contains(editingIndex) else { return nil }
+        // ✅ если уже рисовали — берём сохранённую чистую базу
+        return drawingBaseByPage[editingIndex] ?? pages[editingIndex].preview
+    }
+    
+    var currentDrawingStrokes: [Stroke] {
+        guard pages.indices.contains(editingIndex) else { return [] }
+        guard let data = pages[editingIndex].drawingData else { return [] }
+        return StrokeCodec.decode(data)
+    }
 
     func pageTitle(for index: Int) -> String {
         "Стр. \(index + 1)"
@@ -114,6 +143,36 @@ final class DocumentPreviewViewModel: ObservableObject {
                 self.filteredPages[index] = out
             }
         }
+    }
+    
+    // MARK: - Drawing
+    func openDrawing() {
+        guard canOpenDrawing else { return }
+        showDrawing = true
+    }
+
+    func applyDrawingResult(_ merged: UIImage, _ strokes: [Stroke]) {
+        guard pages.indices.contains(editingIndex) else { return }
+
+        // ✅ 1) Сначала берём текущую "базу" ДО перезаписи preview
+        // Если база уже была сохранена ранее — используем её, иначе берём текущий preview.
+        let base = drawingBaseByPage[editingIndex] ?? pages[editingIndex].preview
+
+        // ✅ 2) Фиксируем базу (она должна быть БЕЗ рисунка)
+        if drawingBaseByPage[editingIndex] == nil {
+            drawingBaseByPage[editingIndex] = base
+        }
+
+        // ✅ 3) Сохраняем strokes (и в память, и в page.drawingData — для повторного открытия/БД)
+        drawingStrokesByPage[editingIndex] = strokes
+        pages[editingIndex].drawingData = StrokeCodec.encode(strokes)
+
+        // ✅ 4) И только потом обновляем preview на merged (чтобы в превью было видно рисунок)
+        pages[editingIndex].preview = merged
+
+        // сброс кэша фильтра для страницы
+        filteredPages[editingIndex] = nil
+        recomputeFilter(for: editingIndex)
     }
 
     // MARK: - OCR
@@ -197,12 +256,15 @@ final class DocumentPreviewViewModel: ObservableObject {
     // MARK: - Save / Update
 
     func saveOrUpdate() {
-        let inputs: [DocumentRepository.PageInput] = pages.compactMap { p in
+        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { idx, p in
             guard let display = p.preview, let full = p.original else { return nil }
+
             return DocumentRepository.PageInput(
                 displayImage: display,
                 originalFullImage: full,
                 quad: p.quad,
+                drawingData: p.drawingData,
+                drawingBaseImage: drawingBaseByPage[idx],
                 filterRaw: selectedFilter.persistKey
             )
         }

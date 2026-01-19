@@ -40,6 +40,7 @@ struct DocumentPreviewView: View {
         }
         .onAppear { vm.onAppear() }
         .fullScreenCover(isPresented: $vm.showCropper) { cropperSheet }
+        .fullScreenCover(isPresented: $vm.showDrawing) { drawingSheet }
         .sheet(isPresented: $vm.showShareSheet) {
             if vm.shareItems.count > 0 {
                 DocumentExporterSheet(items: vm.shareItems) {
@@ -145,6 +146,22 @@ struct DocumentPreviewView: View {
                 .disabled(vm.isOCRLoading || vm.pages.isEmpty)
 
                 Button {
+                    vm.openDrawing()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "paintbrush")
+                        Text("Кисть")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.12))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(!vm.canOpenDrawing)
+
+                Button {
                     vm.showCropper = true
                 } label: {
                     HStack(spacing: 10) {
@@ -201,6 +218,27 @@ struct DocumentPreviewView: View {
             },
             perform: {}
         )
+    }
+    
+    // MARK: - Drawing
+
+    @ViewBuilder
+    private var drawingSheet: some View {
+        if let base = vm.currentPreviewForDrawing {
+            DrawingEditorView(
+                baseImage: base,
+                initialStrokes: vm.currentInitialStrokes,
+                onCancel: { vm.showDrawing = false },
+                onSave: { merged, strokes in
+                    vm.applyDrawingResult(merged, strokes)
+                    vm.showDrawing = false
+                }
+            )
+        } else {
+            Color.black.ignoresSafeArea()
+                .overlay { ProgressView().tint(.white) }
+                .onAppear { vm.showDrawing = false }
+        }
     }
 
     private func filterChip(_ f: PreviewFilter) -> some View {

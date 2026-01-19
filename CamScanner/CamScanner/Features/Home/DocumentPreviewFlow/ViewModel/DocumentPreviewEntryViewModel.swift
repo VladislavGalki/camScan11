@@ -7,8 +7,8 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
 
     enum State {
         case loading
-        case scan(pages: [CapturedFrame], rememberedFilterKey: String?)
-        case id(result: IdCaptureResult, rememberedFilterKey: String?)
+        case scan(pages: [CapturedFrame], rememberedFilterKey: String?, drawingBaseMap: [Int : UIImage])
+        case id(result: IdCaptureResult, rememberedFilterKey: String?, drawingBaseMap: [Int : UIImage])
         case error(String)
     }
 
@@ -35,16 +35,26 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
                     }
                     return
                 }
+                
+                let drawingBaseMap = self.buildDrawingBaseImages(pages: pages)
 
                 if kind == "id" {
                     let result = try self.buildIdResult(doc: doc, pages: pages)
                     DispatchQueue.main.async {
-                        self.state = .id(result: result, rememberedFilterKey: remembered)
+                        self.state = .id(
+                            result: result,
+                            rememberedFilterKey: remembered,
+                            drawingBaseMap: drawingBaseMap
+                        )
                     }
                 } else {
                     let frames = try self.buildScanFrames(pages: pages)
                     DispatchQueue.main.async {
-                        self.state = .scan(pages: frames, rememberedFilterKey: remembered)
+                        self.state = .scan(
+                            pages: frames,
+                            rememberedFilterKey: remembered,
+                            drawingBaseMap: drawingBaseMap
+                        )
                     }
                 }
 
@@ -54,6 +64,19 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    private func buildDrawingBaseImages(pages: [PageEntity]) -> [Int: UIImage] {
+        var out: [Int: UIImage] = [:]
+
+        for (idx, p) in pages.enumerated() {
+            guard let rel = p.drawingBasePath else { continue }
+            let url = FileStore.shared.url(forRelativePath: rel)
+            if let img = FileStore.shared.loadImage(at: url) {
+                out[idx] = img
+            }
+        }
+        return out
     }
 
     // MARK: - Fetch
@@ -86,7 +109,7 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
 
             let quad = p.quadData.flatMap { QuadCodec.decode($0) }
 
-            return CapturedFrame(preview: display, original: full, quad: quad)
+            return CapturedFrame(preview: display, original: full, quad: quad, drawingData: p.drawingData)
         }
     }
 
@@ -104,6 +127,7 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
             result.front.preview = first.preview
             result.front.original = first.original
             result.front.quad = first.quad
+            result.front.drawingData = first.drawingData
         }
 
         if idType.requiresBackSide, frames.count > 1 {
@@ -111,6 +135,7 @@ final class DocumentPreviewEntryViewModel: ObservableObject {
             back.preview = frames[1].preview
             back.original = frames[1].original
             back.quad = frames[1].quad
+            back.drawingData = frames[1].drawingData
             result.back = back
         } else {
             result.back = nil

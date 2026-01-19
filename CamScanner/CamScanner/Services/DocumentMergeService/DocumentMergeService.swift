@@ -23,10 +23,25 @@ final class DocumentMergeService {
 
             for f in frames {
                 guard let display = f.preview, let full = f.original else { continue }
+
+                // ✅ ВАЖНО:
+                // если у страницы есть drawingData (strokes), то обязана быть и "чистая база"
+                // иначе при открытии merged-дока ластик/редактирование могут не работать корректно.
+                let baseForDrawing: UIImage? = {
+                    // 1) если у твоего CapturedFrame уже есть base — берем его
+                    if let b = f.drawingBase { return b }      // <-- если поле так называется
+                    // 2) если вдруг base не было, но strokes есть — fallback на display (хуже, но лучше чем nil)
+                    if f.drawingData != nil { return display }
+                    // 3) если strokes нет — nil ок
+                    return nil
+                }()
+
                 pageInputs.append(.init(
                     displayImage: display,
                     originalFullImage: full,
                     quad: f.quad,
+                    drawingData: f.drawingData,
+                    drawingBaseImage: baseForDrawing,
                     filterRaw: nil
                 ))
             }

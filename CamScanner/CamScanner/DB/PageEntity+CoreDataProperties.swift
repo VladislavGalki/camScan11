@@ -20,6 +20,8 @@ extension PageEntity {
     @NSManaged public var imagePath: String?
     @NSManaged public var index: Int16
     @NSManaged public var quadData: Data?
+    @NSManaged public var drawingData: Data?
+    @NSManaged public var drawingBasePath: String?
     @NSManaged public var filter: String?
     @NSManaged public var document: DocumentEntity?
     @NSManaged public var originalPath: String?

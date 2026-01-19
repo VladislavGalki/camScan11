@@ -23,6 +23,8 @@ final class DocumentRepository {
         let originalFullImage: UIImage
         /// Quad в координатах ORIGINAL (full image) — если есть
         let quad: Quadrilateral?
+        let drawingData: Data?
+        let drawingBaseImage: UIImage?
         /// Фильтр, применённый на превью/последний выбранный (если хочешь per-page)
         let filterRaw: String?
     }
@@ -76,6 +78,21 @@ final class DocumentRepository {
             page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
 
             page.quadData = p.quad.flatMap { QuadCodec.encode($0) }
+            
+            if let baseImg = p.drawingBaseImage {
+                let baseURL = try FileStore.shared.saveJPEG(
+                    image: baseImg,
+                    docID: docID,
+                    pageID: pageID,
+                    fileName: "\(pageID.uuidString)_drawingBase.jpg"
+                )
+                page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: baseURL)
+            } else {
+                page.drawingBasePath = nil
+            }
+            
+            page.drawingData = p.drawingData
+            
             page.filter = p.filterRaw
             page.document = doc
         }
@@ -146,6 +163,21 @@ final class DocumentRepository {
             page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
 
             page.quadData = p.quad.flatMap { QuadCodec.encode($0) }
+            
+            if let baseImg = p.drawingBaseImage {
+                let baseURL = try FileStore.shared.saveJPEG(
+                    image: baseImg,
+                    docID: docID,
+                    pageID: pageID,
+                    fileName: "\(pageID.uuidString)_drawingBase.jpg"
+                )
+                page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: baseURL)
+            } else {
+                page.drawingBasePath = nil
+            }
+            
+            page.drawingData = p.drawingData
+            
             page.filter = p.filterRaw
 
             page.document = doc
