@@ -6,18 +6,15 @@ struct AppEntryView: View {
     @State private var cameraButtonFrame: CGRect = .zero
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-
-            TabContainerView(selectedTab: $selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            CustomTabBar(
-                selectedTab: $selectedTab,
-                cameraButtonFrame: $cameraButtonFrame,
-                onScanTap: presentScan
-            )
-        }
-        .ignoresSafeArea(edges: .bottom)
+        TabContainerView(selectedTab: $selectedTab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                CustomTabBar(
+                    selectedTab: $selectedTab,
+                    cameraButtonFrame: $cameraButtonFrame,
+                    onScanTap: presentScan
+                )
+            }
     }
 
     private func presentScan() {

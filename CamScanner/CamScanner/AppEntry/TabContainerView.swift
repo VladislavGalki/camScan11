@@ -9,7 +9,7 @@ struct TabContainerView: View {
         case .home: HomeView()
         case .files: FilesPlaceholderView()
         case .tools: ToolsPlaceholderView()
-        case .profile: ProfilePlaceholderView()
+        case .settings: ProfilePlaceholderView()
         }
     }
 }

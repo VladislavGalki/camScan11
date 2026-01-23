@@ -4,23 +4,23 @@ enum AppTab: Hashable, CaseIterable {
     case home
     case files
     case tools
-    case profile
-
+    case settings
+    
     var title: String {
         switch self {
-        case .home: return "Главная"
-        case .files: return "Файлы"
-        case .tools: return "Инструменты"
-        case .profile: return "Я"
+        case .home: return "Home"
+        case .files: return "Files"
+        case .tools: return "Tools"
+        case .settings: return "Settings"
         }
     }
-
-    var icon: String {
+    
+    var icon: AppIcon {
         switch self {
-        case .home: return "house"
-        case .files: return "doc.text"
-        case .tools: return "square.grid.2x2"
-        case .profile: return "person"
+        case .home: return .homeFill
+        case .files: return .filesFill
+        case .tools: return .toolsFill
+        case .settings: return .settingsFill
         }
     }
 }

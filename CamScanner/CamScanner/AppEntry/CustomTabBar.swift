@@ -1,68 +1,83 @@
 import SwiftUI
 
 struct CustomTabBar: View {
-
     @Binding var selectedTab: AppTab
     @Binding var cameraButtonFrame: CGRect
-
+    
+    private let tabScanButtonSize: CGFloat = 78
+    
     let onScanTap: () -> Void
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 30)
-                .fill(Color(.systemBackground))
-                .shadow(radius: 8)
-                .frame(height: 60)
-                .padding(.horizontal, 16)
-
-            HStack {
-                tabButton(.home)
-                tabButton(.files)
-
-                Spacer(minLength: 0)
-
-                tabButton(.tools)
-                tabButton(.profile)
-            }
-            .padding(.horizontal, 24)
-            .frame(height: 60)
-
-            scanButton
-                .offset(y: -28)
+        HStack(spacing: 0) {
+            tabBarButton(.home)
+            tabBarButton(.files)
+            
+            Spacer(minLength: tabScanButtonSize)
+            
+            tabBarButton(.tools)
+            tabBarButton(.settings)
         }
-        .padding(.bottom, 10)
-        .onPreferenceChange(FramePreferenceKey.self) { frame in
-            cameraButtonFrame = frame
+        .overlay {
+            tabScanButton()
+                .onTapGesture {
+                    onScanTap()
+                }
         }
+        .padding(.top, 4)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 12)
+        .background(
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+                .cornerRadius(24, corners: [.topLeft, .topRight])
+                .appBorderModifier(.border(.primary), radius: 24, corners: [.topLeft, .topRight])
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 
-    private func tabButton(_ tab: AppTab) -> some View {
+    private func tabBarButton(_ tab: AppTab) -> some View {
         Button {
             selectedTab = tab
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: tab.icon)
+                Image(appIcon: tab.icon)
+                    .renderingMode(.template)
+                
                 Text(tab.title)
-                    .font(.caption2)
+                    .appTextStyle(.tabBar)
             }
-            .foregroundStyle(selectedTab == tab ? .green : .secondary)
+            .foregroundStyle(selectedTab == tab
+                             ? Color.text(.navigationActive)
+                             : Color.text(.navigationDefault)
+            )
             .frame(maxWidth: .infinity)
+            .frame(height: 54)
         }
     }
-
-    private var scanButton: some View {
-        Button(action: onScanTap) {
-            ZStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 64, height: 64)
-
-                Image(systemName: "camera.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
+    
+    private func tabScanButton() -> some View {
+        Circle()
+            .foregroundStyle(
+                RadialGradient(
+                    stops: [
+                        .init(color: Color.rgba(121, 192, 255, 1), location: 0.0),
+                        .init(color: Color.rgba(0, 136, 255, 1), location: 0.55),
+                        .init(color: Color.rgba(0, 108, 203, 1), location: 1.0),
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: tabScanButtonSize / 2
+                )
+            )
+            .overlay {
+                Image(appIcon: .plus)
+                    .renderingMode(.template)
+                    .resizable()
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
             }
-        }
-        .buttonStyle(.plain)
-        .reportFrame()
+            .appBorderModifier(.border(.primary), width: 3, radius: 100, corners: .allCorners)
+            .frame(width: tabScanButtonSize, height: tabScanButtonSize)
     }
 }
