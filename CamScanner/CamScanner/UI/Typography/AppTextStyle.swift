@@ -46,21 +46,21 @@ private extension AppTextStyle {
     var typography: Typography {
         switch self {
         case .screenTitle:
-            return .init(size: 34, lineHeight: 42, weight: .bold, tracking: 0.4, relativeTo: .largeTitle)
+            return Typography(size: 34, lineHeight: 42, weight: .bold, tracking: 0.4, relativeTo: .largeTitle)
         case .sectionTitle:
-            return .init(size: 22, lineHeight: 28, weight: .bold, tracking: -0.26, relativeTo: .title3)
+            return Typography(size: 22, lineHeight: 28, weight: .bold, tracking: -0.26, relativeTo: .title3)
         case .itemTitle:
-            return .init(size: 17, lineHeight: 22, weight: .semibold, tracking: -0.43, relativeTo: .headline)
+            return Typography(size: 17, lineHeight: 22, weight: .semibold, tracking: -0.43, relativeTo: .headline)
         case .bodyPrimary:
-            return .init(size: 17, lineHeight: 22, weight: .regular, tracking: -0.43, relativeTo: .body)
+            return Typography(size: 17, lineHeight: 22, weight: .regular, tracking: -0.43, relativeTo: .body)
         case .bodySecondary:
-            return .init(size: 15, lineHeight: 20, weight: .regular, tracking: -0.23, relativeTo: .subheadline)
+            return Typography(size: 15, lineHeight: 20, weight: .regular, tracking: -0.23, relativeTo: .subheadline)
         case .meta:
-            return .init(size: 12, lineHeight: 16, weight: .medium, tracking: 0.0, relativeTo: .footnote)
+            return Typography(size: 12, lineHeight: 16, weight: .medium, tracking: 0.0, relativeTo: .footnote)
         case .helperText:
-            return .init(size: 11, lineHeight: 14, weight: .regular, tracking: 0.06, relativeTo: .caption2)
+            return Typography(size: 11, lineHeight: 14, weight: .regular, tracking: 0.06, relativeTo: .caption2)
         case .tabBar:
-            return .init(size: 10, lineHeight: 12, weight: .semibold, tracking: -0.1, relativeTo: .caption2)
+            return Typography(size: 10, lineHeight: 12, weight: .semibold, tracking: -0.1, relativeTo: .caption2)
         }
     }
 }
@@ -71,7 +71,6 @@ private struct TextStyleModifier: ViewModifier {
 
     private let base: Typography
 
-    // Dynamic Type scaling (кроме Tab bar)
     @ScaledMetric private var scaledSize: CGFloat
     @ScaledMetric private var scaledLineHeight: CGFloat
     @ScaledMetric private var scaledTracking: CGFloat
@@ -83,7 +82,7 @@ private struct TextStyleModifier: ViewModifier {
         let t = style.typography
         self.base = t
 
-        // Для Tab bar оставляем фикс по макету (не скейлим)
+        // Для Tab bar оставляем фикс (бещ скейла)
         if style == .tabBar {
             self._scaledSize = ScaledMetric(wrappedValue: t.size, relativeTo: .body)
             self._scaledLineHeight = ScaledMetric(wrappedValue: t.lineHeight, relativeTo: .body)
