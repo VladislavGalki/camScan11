@@ -16,22 +16,31 @@ struct HomeView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    RecentView(model: vm.recentModel) {
+                        // click plus button
+                    } onDocumentTapped: { item in
+                        if !item.isLocked {
+                            router.push(HomeRoute.openDocument(id: item.id))
+                        }
+                    }
+                    .padding(.bottom, 26)
+                    
                     ExploreToolsView(model: vm.exploreToolModel) {
                         // all click
                     } onToolTapped: { toolType in
                         // click on type
                     }
+                    .padding(.horizontal, 16)
                 }
             }
             .scrollIndicators(.never)
             .contentMargins(.top, 26, for: .scrollContent)
-            .contentMargins(.horizontal, 16, for: .scrollContent)
             .contentMargins(.bottom, 16, for: .scrollContent)
         }
         .background(
             Color.bg(.main)
         )
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .top)
 
 //        ScrollView {
 //            LazyVStack(spacing: 12) {

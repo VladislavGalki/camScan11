@@ -16,16 +16,16 @@ final class MergeSelectViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     init() {
-        items = store.items
-        thumbnails = store.thumbnails
-
-        store.$items
-            .sink { [weak self] in self?.items = $0 }
-            .store(in: &cancellables)
-
-        store.$thumbnails
-            .sink { [weak self] in self?.thumbnails = $0 }
-            .store(in: &cancellables)
+//        items = store.items
+//        thumbnails = store.thumbnails
+//
+//        store.$items
+//            .sink { [weak self] in self?.items = $0 }
+//            .store(in: &cancellables)
+//
+//        store.$thumbnails
+//            .sink { [weak self] in self?.thumbnails = $0 }
+//            .store(in: &cancellables)
     }
 
     func toggle(_ id: UUID) {

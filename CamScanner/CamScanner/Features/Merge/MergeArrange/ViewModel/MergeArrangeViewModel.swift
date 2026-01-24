@@ -16,32 +16,32 @@ final class MergeArrangeViewModel: ObservableObject {
         self.docIDs = docIDs
 
         // 1) Слушаем items → пересобираем items только из выбранных id (в нужном порядке)
-        store.$items
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] all in
-                guard let self else { return }
-                self.items = self.docIDs.compactMap { id in
-                    all.first(where: { $0.id == id })
-                }
-            }
-            .store(in: &cancellables)
-
-        // 2) Слушаем thumbnails → просто прокидываем
-        store.$thumbnails
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] thumbs in
-                self?.thumbnails = thumbs
-            }
-            .store(in: &cancellables)
-
-        // на старте — попробуем сразу заполнить тем, что уже есть
-        self.items = docIDs.compactMap { id in store.items.first(where: { $0.id == id }) }
-        self.thumbnails = store.thumbnails
+//        store.$items
+//            .receive(on: DispatchQueue.main)
+//            .sink { [weak self] all in
+//                guard let self else { return }
+//                self.items = self.docIDs.compactMap { id in
+//                    all.first(where: { $0.id == id })
+//                }
+//            }
+//            .store(in: &cancellables)
+//
+//        // 2) Слушаем thumbnails → просто прокидываем
+//        store.$thumbnails
+//            .receive(on: DispatchQueue.main)
+//            .sink { [weak self] thumbs in
+//                self?.thumbnails = thumbs
+//            }
+//            .store(in: &cancellables)
+//
+//        // на старте — попробуем сразу заполнить тем, что уже есть
+//        self.items = docIDs.compactMap { id in store.items.first(where: { $0.id == id }) }
+//        self.thumbnails = store.thumbnails
     }
 
     func onAppear() {
         // важно дернуть refresh, чтобы FRC сделал fetch (если вдруг init случился до fetch)
-        store.refresh()
+        //store.refresh()
     }
 
     func move(from source: IndexSet, to destination: Int) {

@@ -2,196 +2,167 @@ import Foundation
 import CoreData
 import UIKit
 
-// ✅ То, что удобно рендерить в SwiftUI (без CoreData объектов в UI)
 struct DocumentListItem: Identifiable, Equatable {
     let id: UUID
     let isLocked: Bool
     let createdAt: Date
-    let kind: String          // "scan" / "id"
-    let idType: String?       // для "id"
+    let kind: String
+    let idType: String?
     let pageCount: Int
     let rememberedFilter: String?
-
-    /// Абсолютный путь (как ты сейчас сохраняешь: url.path)
     let firstPageImagePath: String?
 }
 
-@MainActor
-final class DocumentsStore: NSObject, ObservableObject {
+import Foundation
+import CoreData
+import UIKit
+import Combine
 
-    @Published private(set) var items: [DocumentListItem] = []
-    @Published private(set) var thumbnails: [UUID: UIImage] = [:]  // docID -> thumb
+final class DocumentsStore: NSObject {
+    var documentEntitiesPublisher: AnyPublisher<[DocumentEntity], Never> {
+        documentEntitiesSubject.eraseToAnyPublisher()
+    }
+    
+    var thumbnailsPublisher: AnyPublisher<[UUID: UIImage], Never> {
+        thumbnailsSubject.eraseToAnyPublisher()
+    }
+    
+    // MARK: - Private state
+    
+    private let documentEntitiesSubject = CurrentValueSubject<[DocumentEntity], Never>([])
+    private let thumbnailsSubject = CurrentValueSubject<[UUID: UIImage], Never>([:])
 
+    private var thumbnailsCache: [UUID: UIImage] = [:]
+    
     private let context: NSManagedObjectContext = PersistenceController.shared.container.viewContext
-    private var frc: NSFetchedResultsController<DocumentEntity>!
-
+    private var fetchResultController: NSFetchedResultsController<DocumentEntity>!
+    
     private var thumbInFlight = Set<UUID>()
     private var changedDocIDs = Set<UUID>()
     
+    private var cancellables = Set<AnyCancellable>()
+    
     override init() {
         super.init()
-        setupFRC()
-        performFetch()
+        bootstrap()
+        performFetchDocuments()
     }
-
-    // MARK: - Public
-
-    func refresh() {
-        performFetch()
-    }
-
-    func delete(docID: UUID) throws {
-        let req: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "id == %@", docID as CVarArg)
-        req.fetchLimit = 1
-
-        if let doc = try context.fetch(req).first {
-            // 1) удалить файлы
-            FileStore.shared.deleteDocumentFolder(docID: docID)
-            // 2) удалить CoreData
-            context.delete(doc)
-            try context.save()
-
-            thumbnails[docID] = nil
-            thumbInFlight.remove(docID)
-        }
-    }
-
-    // MARK: - FRC
-
-    private func setupFRC() {
+    
+    private func bootstrap() {
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         request.sortDescriptors = [
             NSSortDescriptor(key: "createdAt", ascending: false)
         ]
-
-        frc = NSFetchedResultsController(
+        
+        request.fetchLimit = 4
+        request.fetchBatchSize = 4
+        request.returnsObjectsAsFaults = true
+        
+        fetchResultController = NSFetchedResultsController(
             fetchRequest: request,
             managedObjectContext: context,
             sectionNameKeyPath: nil,
             cacheName: nil
         )
-        frc.delegate = self
+        
+        fetchResultController.delegate = self
     }
-
-    private func performFetch() {
+    
+    private func performFetchDocuments() {
         do {
-            try frc.performFetch()
-            rebuildItemsFromFRC()
+            try fetchResultController.performFetch()
+            rebuild()
         } catch {
-            print("❌ DocumentsStore fetch error:", error)
-            items = []
+            print("Fetch error:", error)
         }
     }
+    
+    private func rebuild() {
+        let docs = fetchResultController.fetchedObjects ?? []
+        documentEntitiesSubject.send(docs)
 
-    private func rebuildItemsFromFRC() {
-        let docs = frc.fetchedObjects ?? []
-
-        let mapped: [DocumentListItem] = docs.compactMap { doc in
-            guard let id = doc.id else { return nil }
-
-            let pages = (doc.pages as? Set<PageEntity>) ?? []
-            let first = pages.sorted { $0.index < $1.index }.first
-            let firstPath = first?.imagePath
-
-            return DocumentListItem(
-                id: id,
-                isLocked: doc.isLocked,
-                createdAt: doc.createdAt ?? Date(),
-                kind: (doc.kind ?? "scan"),
-                idType: doc.idType,
-                pageCount: Int(doc.pageCount),
-                rememberedFilter: doc.rememberedFilter,
-                firstPageImagePath: firstPath
-            )
-        }
-
-        items = mapped
-
-        // Прогреть миниатюры
-        for it in mapped {
-            loadThumbnailIfNeeded(for: it)
-        }
-
-        // Подчистить кэш миниатюр от удалённых
-        let validIDs = Set(mapped.map { $0.id })
-        thumbnails.keys.filter { !validIDs.contains($0) }.forEach { thumbnails[$0] = nil }
+        let validIDs = Set(docs.compactMap { $0.id })
+        var dict = thumbnailsSubject.value
+        dict.keys.filter { !validIDs.contains($0) }.forEach { dict[$0] = nil }
+        thumbnailsSubject.send(dict)
     }
+}
 
-    private func loadThumbnailIfNeeded(for item: DocumentListItem) {
-        guard thumbnails[item.id] == nil else { return }
-        guard !thumbInFlight.contains(item.id) else { return }
-        guard let relPath = item.firstPageImagePath, !relPath.isEmpty else { return }
+extension DocumentsStore {
+    func loadThumbnailIfNeeded(id: UUID, firstPageImagePath: String?) {
+        // ✅ если уже есть — ничего не делаем
+        if thumbnailsSubject.value[id] != nil { return }
+        if thumbInFlight.contains(id) { return }
 
-        thumbInFlight.insert(item.id)
+        guard let relPath = firstPageImagePath, !relPath.isEmpty else { return }
 
         let url = FileStore.shared.url(forRelativePath: relPath)
-        let exists = FileManager.default.fileExists(atPath: url.path)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
 
-        print("thumb rel:", relPath)
-        print("thumb abs:", url.path)
-        print("thumb exists:", exists)
+        thumbInFlight.insert(id)
 
-        // ✅ если файла нет — не держим вечный лоадер
-        guard exists else {
-            DispatchQueue.main.async { [weak self] in
-                self?.thumbInFlight.remove(item.id)
-                self?.thumbnails[item.id] = nil // можно оставить nil, но лучше показывать placeholder в UI
-            }
-            return
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let img = FileStore.shared.loadImage(at: url)
-            let thumb = img?.downscaled(maxDimension: 240)
+            let thumb = img?.downscaled(maxDimension: 364)
 
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else { return }
-                self.thumbnails[item.id] = thumb
-                self.thumbInFlight.remove(item.id)
+                var dict = self.thumbnailsSubject.value
+                dict[id] = thumb
+                self.thumbnailsSubject.send(dict)
+                self.thumbInFlight.remove(id)
             }
+        }
+    }
+    
+    func delete(docID: UUID) throws {
+        let req: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        req.predicate = NSPredicate(format: "id == %@", docID as CVarArg)
+        req.fetchLimit = 1
+        
+        if let doc = try context.fetch(req).first {
+            FileStore.shared.deleteDocumentFolder(docID: docID)
+            context.delete(doc)
+            try context.save()
+            
+            var dict = thumbnailsSubject.value
+            dict[docID] = nil
+            thumbnailsSubject.send(dict)
+            thumbInFlight.remove(docID)
         }
     }
 }
 
-// MARK: - NSFetchedResultsControllerDelegate
+// MARK: - FRC Delegate
 
-extension DocumentsStore: @preconcurrency NSFetchedResultsControllerDelegate {
-
-    func controller(
-        _ controller: NSFetchedResultsController<NSFetchRequestResult>,
-        didChange anObject: Any,
-        at indexPath: IndexPath?,
-        for type: NSFetchedResultsChangeType,
-        newIndexPath: IndexPath?
-    ) {
-        guard let doc = anObject as? DocumentEntity else { return }
-        guard let id = doc.id else { return }
-
+extension DocumentsStore: NSFetchedResultsControllerDelegate {
+    
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
+                    didChange anObject: Any,
+                    at indexPath: IndexPath?,
+                    for type: NSFetchedResultsChangeType,
+                    newIndexPath: IndexPath?) {
+        guard let doc = anObject as? DocumentEntity, let id = doc.id else { return }
+        
         switch type {
         case .update, .move:
             changedDocIDs.insert(id)
-        case .delete:
-            // на delete мы и так чистим кэш в delete(docID:)
-            break
-        case .insert:
-            // insert можно не трогать
-            break
-        @unknown default:
+        default:
             break
         }
     }
-
+    
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        // ✅ перед rebuild сбрасываем thumbs у изменённых документов
         if !changedDocIDs.isEmpty {
+            var dict = thumbnailsSubject.value
             for id in changedDocIDs {
-                thumbnails[id] = nil
+                dict[id] = nil
                 thumbInFlight.remove(id)
             }
+            thumbnailsSubject.send(dict)
             changedDocIDs.removeAll()
         }
 
-        rebuildItemsFromFRC()
+        rebuild()
     }
 }

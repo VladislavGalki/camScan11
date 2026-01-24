@@ -7,28 +7,8 @@ struct ExploreToolsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Explore Tools")
-                    .appTextStyle(.sectionTitle)
-                    .foregroundStyle(.text(.primary))
-                
-                Spacer(minLength: 0)
-                
-                Button {
-                    onAllToolTapped ()
-                } label: {
-                    HStack(spacing: 2) {
-                        Text("See All")
-                            .appTextStyle(.bodyPrimary)
-                            .foregroundStyle(.text(.accent))
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.text(.accent))
-                    }
-                }
-            }
-            .padding(.bottom, 10)
+            headerView
+                .padding(.bottom, 10)
             
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(model) { item in
@@ -36,6 +16,30 @@ struct ExploreToolsView: View {
                         .onTapGesture {
                             onToolTapped(item.type)
                         }
+                }
+            }
+        }
+    }
+    
+    private var headerView: some View {
+        HStack {
+            Text("Explore Tools")
+                .appTextStyle(.sectionTitle)
+                .foregroundStyle(.text(.primary))
+            
+            Spacer(minLength: 0)
+            
+            Button {
+                onAllToolTapped ()
+            } label: {
+                HStack(spacing: 2) {
+                    Text("See All")
+                        .appTextStyle(.bodyPrimary)
+                        .foregroundStyle(.text(.accent))
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.text(.accent))
                 }
             }
         }

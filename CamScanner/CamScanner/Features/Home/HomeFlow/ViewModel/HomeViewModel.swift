@@ -3,52 +3,76 @@ import CoreData
 import UIKit
 import Combine
 
-@MainActor
 final class HomeViewModel: ObservableObject {
-
-    @Published private(set) var items: [DocumentListItem] = []
+    @Published private(set) var recentModel: [RecentDocumentModel] = []
     @Published private(set) var exploreToolModel: [ExploreToolModel] = []
-    @Published private(set) var thumbnails: [UUID: UIImage] = [:]
 
-    private let store: DocumentsStore
+    private let documentsStore: DocumentsStore = DocumentsStore()
 
+    private var cancellables = Set<AnyCancellable>()
+    
     init() {
-        self.store = DocumentsStore()
-
-        // подписки не нужны — store уже @Published, просто прокидываем
-        self.items = store.items
-        self.thumbnails = store.thumbnails
-
-        // связываем изменения store -> vm
-        // (чтобы View подписывался только на VM)
-        store.$items
-            .sink { [weak self] in self?.items = $0 }
-            .store(in: &cancellables)
-
-        store.$thumbnails
-            .sink { [weak self] in self?.thumbnails = $0 }
+        subscribeToRecentDocuments()
+        bootstap()
+    }
+    
+    private func subscribeToRecentDocuments() {
+        documentsStore.documentEntitiesPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] documentEntities in
+                self?.buildRecentDocumentsLayout(documentEntities)
+            }
             .store(in: &cancellables)
         
-        buildLayout()
+        documentsStore.thumbnailsPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] thumbs in
+                guard let self else { return }
+
+                self.recentModel = self.recentModel.map { item in
+                    var copy = item
+                    copy.thumbnail = thumbs[item.id]
+                    return copy
+                }
+            }
+            .store(in: &cancellables)
     }
+    
+    private func bootstap() {
+        buildLayoutExplore()
+    }
+    
+    private func buildRecentDocumentsLayout(_ documents: [DocumentEntity]) {
+        let mappedDocuments: [RecentDocumentModel] = documents.compactMap { document in
+            guard let id = document.id else { return nil }
 
-    private var cancellables: Set<AnyCancellable> = []
+            let pages = (document.pages as? Set<PageEntity>) ?? []
+            let first = pages.sorted { $0.index < $1.index }.first
+            let firstPath = first?.imagePath
 
-    func delete(docID: UUID) {
-        do {
-            try store.delete(docID: docID)
-        } catch {
-            print("❌ delete error:", error)
+            documentsStore.loadThumbnailIfNeeded(id: id, firstPageImagePath: firstPath)
+
+            let kind = RecentDocumentModel.Kind(document.kind ?? "")
+            let pageCount = Int(document.pageCount) > 1 ? "\(Int(document.pageCount)) pages" : "1 page"
+
+            return RecentDocumentModel(
+                id: id,
+                title: kind.title,
+                kind: kind,
+                idType: document.idType,
+                thumbnail: nil,
+                firstPageImagePath: firstPath,
+                pageCount: pageCount,
+                isLocked: document.isLocked,
+                createdAt: document.createdAt ?? Date(),
+                rememberedFilter: document.rememberedFilter
+            )
         }
-    }
 
-    func refresh() {
-        store.refresh()
+        recentModel = mappedDocuments
     }
-}
-
-extension HomeViewModel {
-    private func buildLayout() {
+    
+    private func buildLayoutExplore() {
         exploreToolModel = [
             ExploreToolModel(type: .recognize, icon: .recognizeImage, title: "Recognize text"),
             ExploreToolModel(type: .addText, icon: .addTextImage, title: "Add text"),
@@ -58,5 +82,15 @@ extension HomeViewModel {
             ExploreToolModel(type: .watermart, icon: .watermarkImage, title: "Watermark"),
             ExploreToolModel(type: .cloudStorage, icon: .cloudImage, title: "Cloud Storage")
         ]
+    }
+}
+
+extension HomeViewModel {
+    func delete(docID: UUID) {
+        do {
+            try documentsStore.delete(docID: docID)
+        } catch {
+            print("Delete error:", error)
+        }
     }
 }
