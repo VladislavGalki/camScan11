@@ -12,7 +12,9 @@ struct RecentDocumentModel: Identifiable, Equatable {
     let kind: Kind              // scan/id
     let idType: String?       // для kind - id
     var thumbnail: UIImage?
+    var secondThumbnail: UIImage?
     let firstPageImagePath: String?
+    let secondPageImagePath: String?
     let pageCount: String
     let isLocked: Bool
     let createdAt: Date

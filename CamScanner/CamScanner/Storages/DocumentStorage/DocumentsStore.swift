@@ -18,26 +18,29 @@ import CoreData
 import UIKit
 import Combine
 
+struct ThumbKey: Hashable {
+    let docID: UUID
+    let pageIndex: Int
+}
+
 final class DocumentsStore: NSObject {
     var documentEntitiesPublisher: AnyPublisher<[DocumentEntity], Never> {
         documentEntitiesSubject.eraseToAnyPublisher()
     }
     
-    var thumbnailsPublisher: AnyPublisher<[UUID: UIImage], Never> {
+    var thumbnailsPublisher: AnyPublisher<[ThumbKey: UIImage], Never> {
         thumbnailsSubject.eraseToAnyPublisher()
     }
     
     // MARK: - Private state
     
     private let documentEntitiesSubject = CurrentValueSubject<[DocumentEntity], Never>([])
-    private let thumbnailsSubject = CurrentValueSubject<[UUID: UIImage], Never>([:])
-
-    private var thumbnailsCache: [UUID: UIImage] = [:]
+    private let thumbnailsSubject = CurrentValueSubject<[ThumbKey: UIImage], Never>([:])
     
     private let context: NSManagedObjectContext = PersistenceController.shared.container.viewContext
     private var fetchResultController: NSFetchedResultsController<DocumentEntity>!
     
-    private var thumbInFlight = Set<UUID>()
+    private var thumbInFlight = Set<ThumbKey>()
     private var changedDocIDs = Set<UUID>()
     
     private var cancellables = Set<AnyCancellable>()
@@ -56,7 +59,6 @@ final class DocumentsStore: NSObject {
         
         request.fetchLimit = 4
         request.fetchBatchSize = 4
-        request.returnsObjectsAsFaults = true
         
         fetchResultController = NSFetchedResultsController(
             fetchRequest: request,
@@ -82,35 +84,45 @@ final class DocumentsStore: NSObject {
         documentEntitiesSubject.send(docs)
 
         let validIDs = Set(docs.compactMap { $0.id })
+
+        // ✅ чистим thumbnails у документов, которых больше нет в recent (fetchLimit)
         var dict = thumbnailsSubject.value
-        dict.keys.filter { !validIDs.contains($0) }.forEach { dict[$0] = nil }
+        dict.keys
+            .filter { !validIDs.contains($0.docID) }
+            .forEach { dict[$0] = nil }
         thumbnailsSubject.send(dict)
+
+        // ✅ НЕ ДАЁМ "залипать" загрузкам миниатюр
+        thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
     }
 }
 
 extension DocumentsStore {
-    func loadThumbnailIfNeeded(id: UUID, firstPageImagePath: String?) {
-        // ✅ если уже есть — ничего не делаем
-        if thumbnailsSubject.value[id] != nil { return }
-        if thumbInFlight.contains(id) { return }
+    func loadThumbnailsIfNeeded(docID: UUID, pagePaths: [String?]) {
+        for (idx, path) in pagePaths.prefix(2).enumerated() {
+            guard let relPath = path, !relPath.isEmpty else { continue }
 
-        guard let relPath = firstPageImagePath, !relPath.isEmpty else { return }
+            let key = ThumbKey(docID: docID, pageIndex: idx)
 
-        let url = FileStore.shared.url(forRelativePath: relPath)
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+            if thumbnailsSubject.value[key] != nil { continue }
+            if thumbInFlight.contains(key) { continue }
 
-        thumbInFlight.insert(id)
+            let url = FileStore.shared.url(forRelativePath: relPath)
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let img = FileStore.shared.loadImage(at: url)
-            let thumb = img?.downscaled(maxDimension: 364)
+            thumbInFlight.insert(key)
 
-            DispatchQueue.main.async {
-                guard let self else { return }
-                var dict = self.thumbnailsSubject.value
-                dict[id] = thumb
-                self.thumbnailsSubject.send(dict)
-                self.thumbInFlight.remove(id)
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let img = FileStore.shared.loadImage(at: url)
+                let thumb = img?.downscaled(maxDimension: 364)
+
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    var dict = self.thumbnailsSubject.value
+                    dict[key] = thumb
+                    self.thumbnailsSubject.send(dict)
+                    self.thumbInFlight.remove(key)
+                }
             }
         }
     }
@@ -119,16 +131,24 @@ extension DocumentsStore {
         let req: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         req.predicate = NSPredicate(format: "id == %@", docID as CVarArg)
         req.fetchLimit = 1
-        
+
         if let doc = try context.fetch(req).first {
+            // 1) удалить файлы
             FileStore.shared.deleteDocumentFolder(docID: docID)
+
+            // 2) удалить CoreData
             context.delete(doc)
             try context.save()
-            
+
+            // 3) очистить кэш миниатюр (все страницы этого документа)
             var dict = thumbnailsSubject.value
-            dict[docID] = nil
+            dict.keys
+                .filter { $0.docID == docID }
+                .forEach { dict[$0] = nil }
             thumbnailsSubject.send(dict)
-            thumbInFlight.remove(docID)
+
+            // 4) убрать "in flight" (все страницы этого документа)
+            thumbInFlight = thumbInFlight.filter { $0.docID != docID }
         }
     }
 }
@@ -145,7 +165,7 @@ extension DocumentsStore: NSFetchedResultsControllerDelegate {
         guard let doc = anObject as? DocumentEntity, let id = doc.id else { return }
         
         switch type {
-        case .update, .move:
+        case .insert, .delete, .update, .move:
             changedDocIDs.insert(id)
         default:
             break
@@ -156,8 +176,11 @@ extension DocumentsStore: NSFetchedResultsControllerDelegate {
         if !changedDocIDs.isEmpty {
             var dict = thumbnailsSubject.value
             for id in changedDocIDs {
-                dict[id] = nil
-                thumbInFlight.remove(id)
+                dict.keys
+                    .filter { $0.docID == id }
+                    .forEach { dict[$0] = nil }
+
+                thumbInFlight = thumbInFlight.filter { $0.docID != id }
             }
             thumbnailsSubject.send(dict)
             changedDocIDs.removeAll()

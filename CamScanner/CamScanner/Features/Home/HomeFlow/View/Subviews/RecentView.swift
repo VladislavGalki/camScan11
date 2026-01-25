@@ -71,6 +71,7 @@ struct RecentView: View {
             .frame(width: itemSize.width, height: itemSize.height)
             .cornerRadius(16, corners: .allCorners)
             .appBorderModifier(.border(.primary), radius: 16)
+            .padding(.bottom, 34)
     }
     
     private func recentItemView(_ item: RecentDocumentModel) -> some View {
@@ -88,13 +89,43 @@ struct RecentView: View {
                 )
                 .frame(width: itemSize.width, height: itemSize.height)
                 .overlay {
-                    if let image = item.thumbnail {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: item.kind == .scan ? .fill : .fit)
-                    } else {
-                        ProgressView()
+                    itemImageView(for: item)
+                    
+//                    if let image = item.thumbnail {
+//                        Image(uiImage: image)
+//                            .resizable()
+//                            .aspectRatio(contentMode: item.kind == .scan ? .fill : .fit)
+//                    } else {
+//                        ProgressView()
+//                    }
+                }
+                .overlay(alignment: .top) {
+                    HStack(spacing: 0) {
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(.star),
+                                variant: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                
+                            }
+                        )
+                        
+                        Spacer(minLength: 0)
+                        
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(.dots),
+                                variant: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                
+                            }
+                        )
                     }
+                    .padding([.top, .horizontal], 8)
                 }
                 .cornerRadius(16, corners: .allCorners)
                 .appBorderModifier(.border(.primary), radius: 16)
@@ -110,6 +141,35 @@ struct RecentView: View {
                     .foregroundStyle(.text(.secondary))
             }
             .padding(.leading, 4)
+        }
+    }
+    
+    @ViewBuilder
+    private func itemImageView(for item: RecentDocumentModel) -> some View {
+        switch item.kind {
+        case .scan:
+            if let image = item.thumbnail {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            }
+        case .id:
+            VStack(spacing: 8) {
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .frame(width: 60, height: 38)
+                        .scaledToFit()
+                }
+                
+                if let secondImage = item.secondThumbnail {
+                    Image(uiImage: secondImage)
+                        .resizable()
+                        .frame(width: 60, height: 38)
+                        .scaledToFit()
+                }
+            }
+            .padding(.vertical, 50)
         }
     }
 }

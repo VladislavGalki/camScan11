@@ -31,7 +31,8 @@ final class HomeViewModel: ObservableObject {
 
                 self.recentModel = self.recentModel.map { item in
                     var copy = item
-                    copy.thumbnail = thumbs[item.id]
+                    copy.thumbnail = thumbs[ThumbKey(docID: item.id, pageIndex: 0)]
+                    copy.secondThumbnail = thumbs[ThumbKey(docID: item.id, pageIndex: 1)]
                     return copy
                 }
             }
@@ -47,10 +48,12 @@ final class HomeViewModel: ObservableObject {
             guard let id = document.id else { return nil }
 
             let pages = (document.pages as? Set<PageEntity>) ?? []
-            let first = pages.sorted { $0.index < $1.index }.first
-            let firstPath = first?.imagePath
+            let sorted = pages.sorted { $0.index < $1.index }
 
-            documentsStore.loadThumbnailIfNeeded(id: id, firstPageImagePath: firstPath)
+            let p0 = sorted.indices.contains(0) ? sorted[0].imagePath : nil
+            let p1 = sorted.indices.contains(1) ? sorted[1].imagePath : nil
+
+            documentsStore.loadThumbnailsIfNeeded(docID: id, pagePaths: [p0, p1])
 
             let kind = RecentDocumentModel.Kind(document.kind ?? "")
             let pageCount = Int(document.pageCount) > 1 ? "\(Int(document.pageCount)) pages" : "1 page"
@@ -61,7 +64,9 @@ final class HomeViewModel: ObservableObject {
                 kind: kind,
                 idType: document.idType,
                 thumbnail: nil,
-                firstPageImagePath: firstPath,
+                secondThumbnail: nil,
+                firstPageImagePath: p0,
+                secondPageImagePath: p1,
                 pageCount: pageCount,
                 isLocked: document.isLocked,
                 createdAt: document.createdAt ?? Date(),
