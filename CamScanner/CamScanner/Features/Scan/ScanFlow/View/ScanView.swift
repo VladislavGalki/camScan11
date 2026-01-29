@@ -1,226 +1,269 @@
 import SwiftUI
 
 struct ScanView: View {
-
-    let onClose: () -> Void
-
-    @StateObject private var settings: ScanSettingsStore
-    @StateObject private var ui: ScanUIStateStore
+    @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
-
-    @State private var panel: ScanTopPanel = .none
+    
     @State private var showPreview = false
+    
+    let onClose: () -> Void
 
     init(onClose: @escaping () -> Void) {
         self.onClose = onClose
-
-        let settingsStore = ScanSettingsStore()
-        let uiStore = ScanUIStateStore()
-        _settings = StateObject(wrappedValue: settingsStore)
-        _ui = StateObject(wrappedValue: uiStore)
-        _vm = StateObject(wrappedValue: ScanViewModel(settings: settingsStore, ui: uiStore))
+        let store = ScanStore()
+        _store = StateObject(wrappedValue: store)
+        _vm = StateObject(wrappedValue: ScanViewModel(settings: store.settings, ui: store.ui))
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScanTopBar(
-                flashIconName: flashIconName,
-                onClose: onClose,
-                onFlashTap: { toggle(.flash) },
-                onQualityTap: { toggle(.quality) },
-                onFiltersTap: {
-                    if ui.getSelectedDocumentType() == .scan {
-                        toggle(.filters)
-                    }
-                },
-                onSettingsTap: { toggle(.settings) },
-                isFiltersHidden: ui.getSelectedDocumentType() == .id
-            )
-
-            ScanTopPanelsContainer(
-                panel: $panel,
-                flashMode: ui.flashMode,
-                quality: ui.quality,
-                filter: ui.filter,
-                onSelectFlash: { mode in
-                    ui.flashMode = mode
-                    vm.applyFlashSideEffects()
-                    panel = .none
-                },
-                onSelectQuality: { q in
-                    ui.quality = q
-                    panel = .none
-                },
-                onSelectFilter: { f in
-                    ui.filter = f
-                    panel = .none
-                }
-            )
-
-            DocumentCameraView(
-                camera: vm.camera,
-                isLiveDetectionEnabled: settings.isLivePreviewEnabled && ui.getSelectedDocumentType() == .scan
-            )
-            .coordinateSpace(name: "cameraSpace")
-            .overlay {
-                if ui.getSelectedDocumentType() == .id {
-                    IdCameraView(ui: ui)
-                }
-            }
-            .overlay {
-                if settings.grid {
-                    GridOverlay()
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if ui.getSelectedDocumentType() == .scan {
-                    Picker("", selection: $ui.captureMode) {
-                        ForEach(CaptureMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 64)
-                    .padding(.bottom, 16)
-                }
-            }
-
-            Spacer()
-
-            VStack(spacing: 14) {
-                DocumentTypeCarouselView(uiState: ui)
-
-                HStack(alignment: .center, spacing: 18) {
-
-                    // слева — заглушка, чтобы шаттер был по центру
-                    Color.clear
-                        .frame(width: 52, height: 52)
-
-                    ShutterButton(isBusy: vm.isCapturing) {
-                        vm.capture()
-                    }
-
-                    // справа — мини превью только для group + scan
-                    GroupMiniPreviewButton(
-                        isVisible: ui.getSelectedDocumentType() == .scan
-                            && ui.captureMode == .group
-                            && !vm.scanResult.isEmpty,
-                        image: vm.scanResult.last?.preview,
-                        count: vm.scanResult.count,
-                        onTap: { showPreview = true }
-                    )
-                    .frame(width: 52, height: 52)
-                }
-            }
-            .padding(.top, 10)
-            .padding(.bottom, 18)
-            .frame(maxWidth: .infinity)
-            .background(Color.black)
+            navigationView
+                .padding(.leading, 16)
+                .padding(.trailing, 26)
+                .padding(.bottom, 16)
+            
+            cameraView
+            
+            Spacer(minLength: 0)
+            
+            bottomContainerView
         }
-        .overlay {
-            if panel == .settings {
-                ScanSettingsOverlayCard(isPresented: Binding(
-                    get: { panel == .settings },
-                    set: { if !$0 { panel = .none } }
-                ))
-                .transition(.opacity)
-            }
-        }
-        .background(Color.black.ignoresSafeArea())
-        .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
-            Button("Ок", role: .cancel) {}
-        } message: {
-            Text("Разреши доступ к камере в Настройках.")
-        }
+        .background(
+            Color.bg(.immersive)
+                .ignoresSafeArea()
+        )
         .onAppear {
             vm.onAppear()
-            vm.applyFlashSideEffects()
-            vm.camera.resumeLivePreview()
         }
         .onDisappear {
             vm.onDisappear()
         }
-        .fullScreenCover(isPresented: $showPreview) {
-            if ui.getSelectedDocumentType() == .scan {
-                DocumentPreviewView(
-                    inputModel: .scan(
-                        pages: vm.scanResult,
-                        previewMode: .newFromCamera,
-                        rememberedFilterKey: nil
-                    ),
-                    onDone: {
-                        if ui.captureMode == .group {
-                            vm.resetGroup()
-                        } else {
-                            vm.resetSingle()
-                        }
-                        showPreview = false
-                        onClose()
-                    },
-                    onRetake: {
-                        if ui.captureMode == .group {
-                            vm.resetGroup()
-                        } else {
-                            vm.resetSingle()
-                        }
-                        showPreview = false
-                    },
-                    onEditPage: { index, croppedFull, quad in
-                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
+    }
+    
+    private var navigationView: some View {
+        HStack(spacing: 0) {
+            AppButton(
+                config: AppButtonConfig(
+                    content: .iconOnly(.close),
+                    variant: .immersive,
+                    size: .m
+                ),
+                action: {
+                    onClose()
+                }
+            )
+            
+            Spacer(minLength: 0)
+            
+            HStack(spacing: 16) {
+                Image(appIcon: navigationFlashIcon)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(.elements(.onImmersive))
+                    .frame(width: 24, height: 24)
+                    .onTapGesture {
+                        store.ui.toggleFlashMode()
                     }
-                )
-            } else {
-                DocumentPreviewView(
-                    inputModel: .id(
-                        result: vm.idResult,
-                        previewMode: .newFromCamera,
-                        rememberedFilterKey: nil
-                    ),
-                    onDone: {
-                        vm.resetIdCaptures()
-                        showPreview = false
-                        onClose()
-                    },
-                    onRetake: {
-                        vm.resetIdCaptures()
-                        showPreview = false
-                    },
-                    onEditPage: { index, croppedFull, quad in
-                        let side: IdCaptureSide = (index == 0 ? .front : .back)
-                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
+                
+                Image(appIcon: store.settings.grid ? .grid : .gridOff)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(.elements(.onImmersive))
+                    .frame(width: 24, height: 24)
+                    .onTapGesture {
+                        store.settings.grid.toggle()
                     }
-                )
             }
+            .opacity(navigationFlashAndGridOpacity)
         }
-        .onChange(of: vm.lastCaptured) { _, newValue in
-            guard newValue != nil else { return }
-            if ui.getSelectedDocumentType() == .id { return }
-            if ui.captureMode == .single {
-                showPreview = true
-            }
-        }
-        .onChange(of: vm.isIdReadyToPreview) { _, ready in
-            guard ready else { return }
-            if ui.getSelectedDocumentType() == .id {
-                showPreview = true
-            }
+        .overlay {
+            AppButton(
+                config: AppButtonConfig(
+                    content: .titleWithIcon(
+                        title: navigationAutoModeTitle,
+                        icon: .backForward,
+                        placement: .leading
+                    ),
+                    variant: .immersive,
+                    size: .m
+                ),
+                action: {
+                    store.settings.autoMode.toggle()
+                }
+            )
+            .opacity(navigationAutoModeOpacity)
         }
     }
-
-    private var flashIconName: String {
-        switch ui.flashMode {
-        case .off: return "bolt.slash"
-        case .on: return "bolt.fill"
-        case .auto: return "bolt.badge.a"
-        case .torch: return "flashlight.on.fill"
+    
+    private var cameraView: some View {
+        DocumentCameraView(
+            camera: vm.camera,
+            isLiveDetectionEnabled: store.settings.isLivePreviewEnabled && store.ui.selectedDocumentType == .documents
+        )
+        .coordinateSpace(name: "cameraSpace")
+        .overlay {
+            cameraTypeOverlayView
         }
     }
-
-    private func toggle(_ target: ScanTopPanel) {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            panel = (panel == target) ? .none : target
+    
+    private var bottomContainerView: some View {
+        VStack(spacing: 0) {
+            DocumentTypeCarouselView(store: store)
+            
+            HStack(spacing: 0) {
+                ShutterButton(isBusy: vm.isCapturing) {
+                    vm.capture()
+                }
+            }
+            .overlay(alignment: .trailing) {
+                GroupMiniPreviewButton(
+                    isVisible: store.ui.selectedDocumentType == .documents
+                    && !vm.scanResult.isEmpty,
+                    image: vm.scanResult.last?.preview,
+                    count: vm.scanResult.count,
+                    onTap: { showPreview = true }
+                )
+                .padding(.trailing, 20)
+            }
+            .padding(.top, 24)
+            .padding(.bottom, 12)
         }
+        .padding(.top, 16)
+        .frame(maxWidth: .infinity)
+        .background(Color.bg(.immersive))
+    }
+    
+    @ViewBuilder
+    private var cameraTypeOverlayView: some View {
+        if store.ui.selectedDocumentType == .idCard
+            || store.ui.selectedDocumentType == .driverLicense {
+            IdCardDriverLicenseView(ui: store.ui)
+        } else if store.ui.selectedDocumentType == .qrCode {
+            QrCodeView(
+                ui: store.ui,
+                qrCodeResult: vm.qrCodeResult
+            ) {
+                vm.qrCodeResult = nil
+            }
+        } else if store.ui.selectedDocumentType == .passport {
+            PassportView(ui: store.ui)
+        }
+    }
+    
+    
+//        VStack(spacing: 0) {
+//            DocumentCameraView(
+//                camera: vm.camera,
+//                isLiveDetectionEnabled: settings.isLivePreviewEnabled && ui.selectedDocumentType == .documents
+//            )
+//            .coordinateSpace(name: "cameraSpace")
+//            .overlay {
+////                if ui.getSelectedDocumentType() == .id {
+////                    IdCameraView(ui: ui)
+////                }
+//            }
+//            .overlay {
+////                if settings.grid {
+////                    GridOverlay()
+////                        .ignoresSafeArea()
+////                        .allowsHitTesting(false)
+////                }
+//            }
+//
+//            Spacer()
+//
+    
+    
+
+//        }
+//        .background(Color.black.ignoresSafeArea())
+//        .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
+//            Button("Ок", role: .cancel) {}
+//        } message: {
+//            Text("Разреши доступ к камере в Настройках.")
+//        }
+//        .onAppear {
+//            vm.onAppear()
+//            vm.applyFlashSideEffects()
+//            vm.camera.resumeLivePreview()
+//        }
+//        .onDisappear {
+//            vm.onDisappear()
+//        }
+    
+    
+    
+    
+//        .fullScreenCover(isPresented: $showPreview) {
+//            if ui.getSelectedDocumentType() == .documents {
+//                DocumentPreviewView(
+//                    inputModel: .scan(
+//                        pages: vm.scanResult,
+//                        previewMode: .newFromCamera,
+//                        rememberedFilterKey: nil
+//                    ),
+//                    onDone: {
+//                        if ui.captureMode == .group {
+//                            vm.resetGroup()
+//                        } else {
+//                            vm.resetSingle()
+//                        }
+//                        showPreview = false
+//                        onClose()
+//                    },
+//                    onRetake: {
+//                        if ui.captureMode == .group {
+//                            vm.resetGroup()
+//                        } else {
+//                            vm.resetSingle()
+//                        }
+//                        showPreview = false
+//                    },
+//                    onEditPage: { index, croppedFull, quad in
+//                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
+//                    }
+//                )
+//            } else {
+//                DocumentPreviewView(
+//                    inputModel: .id(
+//                        result: vm.idResult,
+//                        previewMode: .newFromCamera,
+//                        rememberedFilterKey: nil
+//                    ),
+//                    onDone: {
+//                        vm.resetIdCaptures()
+//                        showPreview = false
+//                        onClose()
+//                    },
+//                    onRetake: {
+//                        vm.resetIdCaptures()
+//                        showPreview = false
+//                    },
+//                    onEditPage: { index, croppedFull, quad in
+//                        let side: IdCaptureSide = (index == 0 ? .front : .back)
+//                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
+//                    }
+//                )
+//            }
+//        }
+    
+    private var navigationFlashIcon: AppIcon {
+        switch store.ui.flashMode {
+        case .off: .flashOff
+        case .on: .flash
+        case .auto: .flashAuto
+        }
+    }
+    
+    private var navigationAutoModeTitle: String {
+        store.settings.autoMode ? "Auto" : "Manual"
+    }
+    
+    private var navigationFlashAndGridOpacity: Double {
+        store.ui.selectedDocumentType != .qrCode ? 1.0 : 0.0
+    }
+    
+    private var navigationAutoModeOpacity: Double {
+        store.ui.selectedDocumentType == .documents ? 1.0 : 0.0
     }
 }

@@ -142,6 +142,10 @@ final class AutoShootEngine {
     func notifyDidCapture() {
         softReset(keepCooldown: true)
     }
+    
+    func resetOnModeChange(keepCooldown: Bool = true) {
+        softReset(keepCooldown: keepCooldown)
+    }
 
     // MARK: - Internals
 

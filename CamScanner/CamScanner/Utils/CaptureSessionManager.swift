@@ -1,52 +1,25 @@
-//
-//  CaptureManager.swift
-//  WeScan
-//
-//  Created by Boris Emorine on 2/8/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import AVFoundation
 import CoreMotion
 import Foundation
 import UIKit
 
-/// A set of functions that inform the delegate object of the state of the detection.
+private struct RectangleDetectorResult {
+    let rectangle: Quadrilateral
+    let imageSize: CGSize
+}
+
 protocol CaptureSessionManagerDelegate: NSObjectProtocol {
-
-    /// Called when the capture of a picture has started.
-    ///
-    /// - Parameters:
-    ///   - captureSessionManager: The `CaptureSessionManager` instance that started capturing a picture.
     func didStartCapturingPicture(for captureSessionManager: CaptureSessionManager)
-
-    /// Called when a quadrilateral has been detected.
-    /// - Parameters:
-    ///   - captureSessionManager: The `CaptureSessionManager` instance that has detected a quadrilateral.
-    ///   - quad: The detected quadrilateral in the coordinates of the image.
-    ///   - imageSize: The size of the image the quadrilateral has been detected on.
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager, didDetectQuad quad: Quadrilateral?, _ imageSize: CGSize)
-
-    /// Called when a picture with or without a quadrilateral has been captured.
-    ///
-    /// - Parameters:
-    ///   - captureSessionManager: The `CaptureSessionManager` instance that has captured a picture.
-    ///   - picture: The picture that has been captured.
-    ///   - quad: The quadrilateral that was detected in the picture's coordinates if any.
     func captureSessionManager(
         _ captureSessionManager: CaptureSessionManager,
         didCapturePicture picture: UIImage,
         withQuad quad: Quadrilateral?
     )
-
-    /// Called when an error occurred with the capture session manager.
-    /// - Parameters:
-    ///   - captureSessionManager: The `CaptureSessionManager` that encountered an error.
-    ///   - error: The encountered error.
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager, didFailWithError error: Error)
+    func captureSessionManager(_ captureSessionManager: CaptureSessionManager, didDetectQRCode code: String)
 }
 
-/// The CaptureSessionManager is responsible for setting up and managing the AVCaptureSession and the functions related to capturing.
 final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 
     private let videoPreviewLayer: AVCaptureVideoPreviewLayer
@@ -56,28 +29,24 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
     private var displayedRectangleResult: RectangleDetectorResult?
     private var photoOutput = AVCapturePhotoOutput()
 
-    /// Keep references to chosen device input to set zoom reliably
     private var videoDeviceInput: AVCaptureDeviceInput?
-
-    /// Dedicated queue for starting/stopping the session
     private let sessionQueue = DispatchQueue(label: "capture_session_queue")
+    
+    private let metadataOutput = AVCaptureMetadataOutput()
+    private var isQRDetecting = false
 
-    /// Whether the CaptureSessionManager should be detecting quadrilaterals.
     private var isDetecting = true
 
-    /// The number of times no rectangles have been found in a row.
     private var noRectangleCount = 0
-
-    /// The minimum number of time required by `noRectangleCount` to validate that no rectangles have been found.
     private let noRectangleThreshold = 3
 
-    // MARK: - Throttling Vision (your latest change)
+    // MARK: - Throttling Vision
 
-    private let detectionMinInterval: CFTimeInterval = 0.10 // ~10 FPS
+    private let detectionMinInterval: CFTimeInterval = 0.10
     private var lastDetectionTime: CFTimeInterval = 0
     private var isVisionInFlight = false
 
-    // MARK: - Camera selection (UltraWide + default zoom)
+    // MARK: - Camera selection
 
     private func selectBackCamera() -> AVCaptureDevice? {
         let discovery = AVCaptureDevice.DiscoverySession(
@@ -105,7 +74,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                 device.videoZoomFactor = 1.0
             }
         } catch {
-            print("⚠️ Failed to set default zoom:", error)
+            print("Failed to set default zoom:", error)
         }
     }
 
@@ -136,7 +105,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         let videoOutput = AVCaptureVideoDataOutput()
         videoOutput.alwaysDiscardsLateVideoFrames = true
 
-        // NOTE: unlock/commit in defer to match upstream style
         defer {
             device.unlockForConfiguration()
             captureSession.commitConfiguration()
@@ -145,13 +113,14 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         guard let deviceInput = try? AVCaptureDeviceInput(device: device),
               captureSession.canAddInput(deviceInput),
               captureSession.canAddOutput(photoOutput),
-              captureSession.canAddOutput(videoOutput) else {
+              captureSession.canAddOutput(videoOutput),
+              captureSession.canAddOutput(metadataOutput)
+        else {
             let error = ImageScannerControllerError.inputDevice
             delegate?.captureSessionManager(self, didFailWithError: error)
             return
         }
 
-        // keep input ref for zoom
         self.videoDeviceInput = deviceInput
 
         do {
@@ -167,7 +136,18 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         captureSession.addInput(deviceInput)
         captureSession.addOutput(photoOutput)
         captureSession.addOutput(videoOutput)
-
+        captureSession.addOutput(metadataOutput)
+        
+        metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
+        
+        if metadataOutput.availableMetadataObjectTypes.contains(.qr) {
+            metadataOutput.metadataObjectTypes = [.qr]
+        } else {
+            metadataOutput.metadataObjectTypes = []
+        }
+        
+        metadataOutput.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
+        
         let photoPreset = AVCaptureSession.Preset.photo
 
         if captureSession.canSetSessionPreset(photoPreset) {
@@ -186,7 +166,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
     // MARK: Capture Session Life Cycle
 
-    /// Starts the camera and detecting quadrilaterals.
     internal func start() {
         let authorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
 
@@ -194,11 +173,13 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         case .authorized:
             sessionQueue.async { [weak self] in
                 guard let self else { return }
-                self.captureSession.startRunning()
 
-                // apply zoom right after session starts (small delay helps reliability)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    self?.applyDefaultUltraWideZoomIfNeeded()
+                if !self.captureSession.isRunning {
+                    self.captureSession.startRunning()
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                        self?.applyDefaultUltraWideZoomIfNeeded()
+                    }
                 }
 
                 DispatchQueue.main.async {
@@ -207,21 +188,20 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             }
 
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: AVMediaType.video, completionHandler: { [weak self] granted in
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    if granted {
-                        self.start()
-                    } else {
+                    guard let self else { return }
+                    if granted { self.start() }
+                    else {
                         let error = ImageScannerControllerError.authorization
                         self.delegate?.captureSessionManager(self, didFailWithError: error)
                     }
                 }
-            })
+            }
 
         default:
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
+                guard let self else { return }
                 let error = ImageScannerControllerError.authorization
                 self.delegate?.captureSessionManager(self, didFailWithError: error)
             }
@@ -233,6 +213,23 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             self?.captureSession.stopRunning()
         }
     }
+    
+    internal func resumeDetection() {
+        DispatchQueue.main.async { [weak self] in
+            self?.isDetecting = true
+            self?.rectangleFunnel.currentAutoScanPassCount = 0
+        }
+    }
+
+    internal func pauseDetection() {
+        DispatchQueue.main.async { [weak self] in
+            self?.isDetecting = false
+        }
+    }
+    
+    internal func setQRDetecting(_ enabled: Bool) {
+        isQRDetecting = enabled
+    }
 
     internal func capturePhoto() {
         guard let connection = photoOutput.connection(with: .video), connection.isEnabled, connection.isActive else {
@@ -240,15 +237,17 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             delegate?.captureSessionManager(self, didFailWithError: error)
             return
         }
+        
         CaptureSession.current.setImageOrientation()
+        
         let photoSettings = AVCapturePhotoSettings()
         photoSettings.isHighResolutionPhotoEnabled = true
         photoSettings.isAutoStillImageStabilizationEnabled = true
+        
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
     }
 
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
-
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard isDetecting,
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
@@ -271,33 +270,21 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
     private func processRectangle(rectangle: Quadrilateral?, imageSize: CGSize) {
         if let rectangle {
-
             self.noRectangleCount = 0
             self.rectangleFunnel
                 .add(rectangle, currentlyDisplayedRectangle: self.displayedRectangleResult?.rectangle) { [weak self] result, rectangle in
-
                     guard let self else { return }
-
-                    let shouldAutoScan = (result == .showAndAutoScan)
                     self.displayRectangleResult(rectangleResult: RectangleDetectorResult(rectangle: rectangle, imageSize: imageSize))
-
-                    if shouldAutoScan, CaptureSession.current.isAutoScanEnabled, !CaptureSession.current.isEditing {
-                        capturePhoto()
-                    }
                 }
-
         } else {
-
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.noRectangleCount += 1
 
                 if self.noRectangleCount > self.noRectangleThreshold {
-                    // Reset the currentAutoScanPassCount, so the threshold is restarted the next time a rectangle is found
                     self.rectangleFunnel.currentAutoScanPassCount = 0
-
-                    // Remove the currently displayed rectangle as no rectangles are being found anymore
                     self.displayedRectangleResult = nil
+                    
                     self.delegate?.captureSessionManager(self, didDetectQuad: nil, imageSize)
                 }
             }
@@ -320,8 +307,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 }
 
 extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
-
-    // swiftlint:disable function_parameter_count
     func photoOutput(_ captureOutput: AVCapturePhotoOutput,
                      didFinishProcessingPhoto photoSampleBuffer: CMSampleBuffer?,
                      previewPhoto previewPhotoSampleBuffer: CMSampleBuffer?,
@@ -351,7 +336,6 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
         }
     }
 
-    @available(iOS 11.0, *)
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error {
             delegate?.captureSessionManager(self, didFailWithError: error)
@@ -371,11 +355,8 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
         }
     }
 
-    /// Completes the image capture by processing the image, and passing it to the delegate object.
-    /// This function is necessary because the capture functions for iOS 10 and 11 are decoupled.
     private func completeImageCapture(with imageData: Data) {
         DispatchQueue.global(qos: .background).async { [weak self] in
-            CaptureSession.current.isEditing = true
             guard let image = UIImage(data: imageData) else {
                 let error = ImageScannerControllerError.capture
                 DispatchQueue.main.async {
@@ -410,12 +391,22 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
     }
 }
 
-/// Data structure representing the result of the detection of a quadrilateral.
-private struct RectangleDetectorResult {
-
-    /// The detected quadrilateral.
-    let rectangle: Quadrilateral
-
-    /// The size of the image the quadrilateral was detected on.
-    let imageSize: CGSize
+extension CaptureSessionManager: AVCaptureMetadataOutputObjectsDelegate {
+    func metadataOutput(
+        _ output: AVCaptureMetadataOutput,
+        didOutput metadataObjects: [AVMetadataObject],
+        from connection: AVCaptureConnection
+    ) {
+        guard isQRDetecting else { return }
+        
+        for obj in metadataObjects {
+            guard let qr = obj as? AVMetadataMachineReadableCodeObject,
+                  qr.type == .qr,
+                  let str = qr.stringValue,
+                  !str.isEmpty else { continue }
+            
+            delegate?.captureSessionManager(self, didDetectQRCode: str)
+            break
+        }
+    }
 }

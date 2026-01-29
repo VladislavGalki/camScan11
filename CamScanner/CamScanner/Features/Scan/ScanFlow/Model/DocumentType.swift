@@ -1,13 +1,33 @@
 import Foundation
 
-enum DocumentTypeEnum: String {
-    case scan
-    case id
-}
+enum DocumentTypeEnum: String, CaseIterable, Identifiable {
+    case qrCode
+    case documents
+    case idCard
+    case passport
+    case driverLicense
 
-struct DocumentType: Identifiable, Hashable {
-    let id: UUID = UUID()
-    let type: DocumentTypeEnum
-    let title: String
-    var isSelected: Bool
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .qrCode:        return "QR Code"
+        case .documents:     return "Documents"
+        case .idCard:        return "ID Card"
+        case .passport:      return "Passport"
+        case .driverLicense: return "Driver license"
+        }
+    }
+
+    var requiresBackSide: Bool {
+        switch self {
+        case .idCard, .driverLicense:
+            return true
+        case .passport, .documents, .qrCode:
+            return false
+        }
+    }
+
+    var isScan: Bool { self == .documents }
+    var isID: Bool { self != .documents }
 }

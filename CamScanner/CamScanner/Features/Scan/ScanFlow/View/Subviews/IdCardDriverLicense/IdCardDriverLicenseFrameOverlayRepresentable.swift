@@ -1,27 +1,26 @@
 import SwiftUI
 import UIKit
 
-struct IdFrameOverlayRepresentable: UIViewRepresentable {
-
+struct IdCardDriverLicenseFrameOverlayRepresentable: UIViewRepresentable {
     let layout: IdFrameOverlayView.Layout
-    let cornerRadius: CGFloat
     let title: String
+    let guideImage: UIImage?
     let onRect: (CGRect) -> Void
 
     func makeUIView(context: Context) -> IdFrameOverlayView {
         let v = IdFrameOverlayView()
         v.layout = layout
-        v.cornerRadius = cornerRadius
         v.title = title
-        v.dimAlpha = 0.55
+        v.guideImage = guideImage
+        v.dimAlpha = 0.6
         v.onFrameChanged = { rect in onRect(rect) }
         return v
     }
 
     func updateUIView(_ uiView: IdFrameOverlayView, context: Context) {
         uiView.layout = layout
-        uiView.cornerRadius = cornerRadius
         uiView.title = title
+        uiView.guideImage = guideImage
         uiView.setNeedsLayout()
     }
 }

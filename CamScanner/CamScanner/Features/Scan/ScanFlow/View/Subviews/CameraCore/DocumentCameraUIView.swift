@@ -2,14 +2,9 @@ import AVFoundation
 import UIKit
 
 final class DocumentCameraUIView: UIView {
-
-    // MARK: - Layer
-
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
 
     var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-
-    // MARK: - Overlay
 
     private let quadView = QuadrilateralView()
     
@@ -91,12 +86,8 @@ final class DocumentCameraUIView: UIView {
         quadView.drawQuadrilateral(quad: displayQuad, animated: true)
     }
     
-    /// rectInView — rect рамки в координатах ЭТОГО UIView (т.е. cameraSpace)
     func normalizedRectFromViewRect(_ rectInView: CGRect) -> CGRect {
-        // 1) переводим rect в координаты previewLayer
         let layerRect = videoPreviewLayer.convert(rectInView, from: self.layer)
-
-        // 2) previewLayer -> normalized metadata rect (0..1)
         return videoPreviewLayer.metadataOutputRectConverted(fromLayerRect: layerRect)
     }
 }

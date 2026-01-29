@@ -3,9 +3,23 @@ import Combine
 import UIKit
 
 final class ScanViewModel: ObservableObject {
+    // MARK: - Output (Scan)
+    @Published var isCapturing: Bool = false
+    @Published var showPermissionAlert: Bool = false
 
-    // MARK: - Core
+    @Published var scanResult: [CapturedFrame] = []
+    
+    // MARK: - Output (ID)
+    @Published var idResult: IdCaptureResult
+    @Published var isIdReadyToPreview: Bool = false
+    
+    // MARK: - QrCode
+    @Published var qrCodeResult: String?
+
+    // MARK: - Services
     let camera = ScanCameraService()
+    
+    //MARK: - Enviornmetns
 
     let settings: ScanSettingsStore
     let ui: ScanUIStateStore
@@ -13,7 +27,6 @@ final class ScanViewModel: ObservableObject {
     private let autoShootEngine: AutoShootEngine
     private let postProcessor: CapturePostProcessor
 
-    private var cameraCancellables = Set<AnyCancellable>()
     private var didBindCamera = false
 
     // Scan-mode (детект)
@@ -23,20 +36,9 @@ final class ScanViewModel: ObservableObject {
     // ID-mode (рамка)
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
-
-    // MARK: - Output (Scan)
-    @Published var isCapturing: Bool = false
-    @Published var showPermissionAlert: Bool = false
-
-    @Published var lastCaptured: UIImage? = nil
-    @Published var lastCapturedOriginal: UIImage? = nil
-    @Published var lastAutoQuadInImageSpace: Quadrilateral? = nil
-
-    @Published var scanResult: [CapturedFrame] = []
     
-    // MARK: - Output (ID)
-    @Published var idResult: IdCaptureResult
-    @Published var isIdReadyToPreview: Bool = false
+    private var cameraCancellables = Set<AnyCancellable>()
+    private var selectedDocumentsCancellable = Set<AnyCancellable>()
 
     // MARK: - Init
     init(
@@ -51,25 +53,36 @@ final class ScanViewModel: ObservableObject {
         self.postProcessor = postProcessor
 
         self.idResult = IdCaptureResult(
-            idType: ui.selectedIdType,
-            front: .init(),
-            back: ui.selectedIdType.requiresBackSide ? .init() : nil
+            type: ui.selectedDocumentType,
+            back: ui.selectedDocumentType.requiresBackSide
+            ? CapturedFrame()
+            : nil
         )
+        
+        subscribeForSelectedDocuments()
+        subscribeForCameraService()
     }
 
     // MARK: - Lifecycle
     func onAppear() {
-        bindCameraOnceIfNeeded()
         camera.start()
     }
 
     func onDisappear() {
         camera.stop()
-        camera.setTorch(enabled: false)
+    }
+    
+    private func subscribeForSelectedDocuments() {
+        ui.$selectedDocumentType
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] type in
+                self?.resetSessionState(type)
+                self?.camera.setQRDetecting(type == .qrCode)
+            }
+            .store(in: &selectedDocumentsCancellable)
     }
 
-    // MARK: - Camera bindings
-    private func bindCameraOnceIfNeeded() {
+    private func subscribeForCameraService() {
         guard !didBindCamera else { return }
         didBindCamera = true
 
@@ -80,47 +93,63 @@ final class ScanViewModel: ObservableObject {
             }
             .store(in: &cameraCancellables)
 
-        // Scan auto-shoot engine
         camera.$lastDetectedQuad
             .combineLatest(camera.$lastImageSize)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] quad, size in
-                guard let self else { return }
-
-                self.latestPreviewQuad = quad
-                self.latestPreviewImageSize = size
-
-                let canShoot = (!self.isCapturing && self.lastCaptured == nil)
-                let shouldShoot = self.autoShootEngine.update(
-                    enabled: self.settings.autoShoot,
-                    canShoot: canShoot,
-                    quad: quad,
-                    imageSize: size
-                )
-
-                if shouldShoot {
-                    self.capture()
-                }
+                self?.handleLastDetecteCameraQuad(quad: quad, size: size)
             }
             .store(in: &cameraCancellables)
 
         camera.onCapture = { [weak self] image, _ in
+            self?.handleCameraCapture(image: image)
+        }
+        
+        camera.onQrCodeDetected = { [weak self] qrCode in
+            self?.handleQrCodeDetected(qrCode: qrCode)
+        }
+    }
+    
+    private func handleLastDetecteCameraQuad(quad: Quadrilateral?, size: CGSize) {
+        guard self.ui.selectedDocumentType == .documents else {
+            self.latestPreviewQuad = nil
+            self.latestPreviewImageSize = .zero
+            return
+        }
+
+        self.latestPreviewQuad = quad
+        self.latestPreviewImageSize = size
+
+        let canShoot = !self.isCapturing
+
+        let shouldShoot = self.autoShootEngine.update(
+            enabled: self.settings.autoMode,
+            canShoot: canShoot,
+            quad: quad,
+            imageSize: size
+        )
+
+        if shouldShoot {
+            self.capture()
+        }
+    }
+    
+    private func handleCameraCapture(image: UIImage) {
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            
             self.isCapturing = false
 
-            let docType = self.ui.getSelectedDocumentType()
-
-            if docType == .id {
+            if self.ui.selectedDocumentType != .documents {
                 self.handleIdCapture(image: image)
                 return
             }
 
-            // ✅ SCAN mode
             let output = self.postProcessor.process(
                 image: image,
                 previewQuad: self.latestPreviewQuad,
                 previewImageSize: self.latestPreviewImageSize,
-                autoCrop: self.settings.autoCrop,
+                autoMode: self.settings.autoMode && self.ui.selectedDocumentType == .documents,
                 quality: self.ui.quality
             )
 
@@ -129,30 +158,22 @@ final class ScanViewModel: ObservableObject {
                 original: output.original,
                 quad: output.autoQuadInImageSpace
             )
-
-            // legacy поля — оставим пока
-            self.lastCapturedOriginal = output.original
-            self.lastAutoQuadInImageSpace = output.autoQuadInImageSpace
-
-            switch self.ui.captureMode {
-            case .single:
-                self.lastCaptured = output.preview
-                self.scanResult = [captured]
-
-            case .group:
-                self.scanResult.append(captured)
-            }
-
+            
+            self.scanResult.append(captured)
             self.autoShootEngine.notifyDidCapture()
+        }
+    }
+    
+    private func handleQrCodeDetected(qrCode: String) {
+        if qrCodeResult != qrCode {
+            qrCodeResult = qrCode
         }
     }
 
     // MARK: - ID capture pipeline (front/back)
     private func handleIdCapture(image: UIImage) {
-        guard ui.isIdIntroVisible == false else { return }
-
-        if idResult.idType != ui.selectedIdType {
-            resetIdFlowForNewType(ui.selectedIdType)
+        if idResult.type != ui.selectedDocumentType {
+            resetIdFlowForNewType(ui.selectedDocumentType)
         }
 
         guard let frameRect = latestIdFrameRectInPreview,
@@ -169,17 +190,13 @@ final class ScanViewModel: ObservableObject {
             quality: ui.quality
         )
 
-        // ✅ ВАЖНО:
-        // original = FULL
-        // preview = CROPPED
-        // quad = рамка в координатах FULL
         let captured = CapturedFrame(
             preview: output.preview,
             original: output.original,
             quad: output.autoQuadInImageSpace
         )
 
-        if ui.selectedIdType.requiresBackSide {
+        if ui.selectedDocumentType.requiresBackSide {
             if idResult.back == nil { idResult.back = .init() }
 
             switch ui.idCaptureSide {
@@ -201,11 +218,11 @@ final class ScanViewModel: ObservableObject {
         latestIdPreviewSize = nil
     }
 
-    private func resetIdFlowForNewType(_ type: IdDocumentTypeEnum) {
+    private func resetIdFlowForNewType(_ type: DocumentTypeEnum) {
         idResult = IdCaptureResult(
-            idType: type,
+            type: type,
             front: .init(),
-            back: type.requiresBackSide ? .init() : nil
+            back: type.requiresBackSide ? CapturedFrame() : nil
         )
         isIdReadyToPreview = false
         ui.idCaptureSide = .front
@@ -214,30 +231,16 @@ final class ScanViewModel: ObservableObject {
     // MARK: - Scan Manual edit apply (как в ID)
     func applyManualEditForScan(index: Int, croppedOriginal: UIImage, quad: Quadrilateral) {
         let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
+        guard scanResult.indices.contains(index) else { return }
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            guard self.scanResult.indices.contains(index) else { return }
-
-            // ✅ original НЕ трогаем (FULL), обновляем только preview + quad
-            self.scanResult[index].preview = preview
-            self.scanResult[index].quad = quad
-
-            // ✅ если это single — синхронизируем legacy превью
-            if self.ui.captureMode == .single, index == 0 {
-                self.lastCaptured = preview
-                self.lastAutoQuadInImageSpace = quad
-                // lastCapturedOriginal оставляем прежний (FULL)
-            }
-        }
+        scanResult[index].preview = preview
+        scanResult[index].quad = quad
     }
 
     // MARK: - ID Manual edit apply
     func applyManualEditForId(side: IdCaptureSide, croppedOriginal: UIImage, quad: Quadrilateral) {
         let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
-
-        // ✅ original оставляем FULL (чтобы повторное редактирование было 1:1)
-        // поэтому тут НЕ заменяем original, а обновляем preview + quad
+        
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             
@@ -245,7 +248,6 @@ final class ScanViewModel: ObservableObject {
             case .front:
                 idResult.front.preview = preview
                 idResult.front.quad = quad
-                // original оставляем прежний (full)
             case .back:
                 if idResult.back == nil { idResult.back = .init() }
                 idResult.back?.preview = preview
@@ -254,17 +256,12 @@ final class ScanViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Flash / torch
-    func applyFlashSideEffects() {
-        camera.setTorch(enabled: ui.flashMode == .torch)
-    }
-
     // MARK: - Capture
     func capture() {
         guard !isCapturing else { return }
         isCapturing = true
 
-        if ui.getSelectedDocumentType() == .id {
+        if ui.selectedDocumentType != .documents {
             let raw = ui.idFrameRectInCameraSpace
 
             if let previewSize = camera.previewBoundsSize() {
@@ -287,24 +284,18 @@ final class ScanViewModel: ObservableObject {
         camera.capture()
     }
 
-    func resetSingle() {
-        lastCaptured = nil
-        lastCapturedOriginal = nil
-        lastAutoQuadInImageSpace = nil
+    func resetSessionState(_ type: DocumentTypeEnum) {
         scanResult.removeAll()
-
+        latestPreviewQuad = nil
+        latestPreviewImageSize = .zero
         latestIdFrameRectInPreview = nil
         latestIdPreviewSize = nil
-
-        isIdReadyToPreview = false
-    }
-
-    func resetGroup() {
-        scanResult.removeAll()
-        resetSingle()
+        qrCodeResult = nil
+        autoShootEngine.resetOnModeChange()
+        resetIdFlowForNewType(type)
     }
 
     func resetIdCaptures() {
-        resetIdFlowForNewType(ui.selectedIdType)
+        resetIdFlowForNewType(ui.selectedDocumentType)
     }
 }

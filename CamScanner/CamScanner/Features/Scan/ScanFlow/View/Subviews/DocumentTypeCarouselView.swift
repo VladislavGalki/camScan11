@@ -1,60 +1,102 @@
 import SwiftUI
 
 struct DocumentTypeCarouselView: View {
-    @ObservedObject var uiState: ScanUIStateStore
-
-    // id текущего “центрального” элемента
-    @State private var centeredID: DocumentType.ID?
+    @ObservedObject var store: ScanStore
+    
+    @State private var centeredID: DocumentTypeEnum.ID?
+    @State private var itemWidths: [DocumentTypeEnum.ID: CGFloat] = [:]
 
     var body: some View {
         GeometryReader { geo in
-            let peek: CGFloat = 100          // сколько видно соседнего элемента с каждой стороны
-            let gap: CGFloat = 16         // расстояние между элементами
-            let pageWidth = geo.size.width - 2*peek
-            let sideInset = (geo.size.width - pageWidth) / 2
+            let containerW = geo.size.width
+            let firstID = DocumentTypeEnum.allCases.first?.id
+            let lastID  = DocumentTypeEnum.allCases.last?.id
+
+            let firstW = firstID.flatMap { itemWidths[$0] } ?? 0
+            let lastW  = lastID.flatMap { itemWidths[$0] } ?? 0
+
+            let leadingInset  = max(0, (containerW - firstW) / 2)
+            let trailingInset = max(0, (containerW - lastW) / 2)
 
             ScrollView(.horizontal) {
-                LazyHStack(spacing: gap) {
-                    ForEach(uiState.selectedDocumentType) { item in
-                        Text(item.title)
-                            .font(.system(size: 15, weight: item.isSelected ? .semibold : .regular))
-                            .foregroundStyle(item.isSelected ? Color.green : Color.white.opacity(0.8))
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 14)
-                            .frame(width: pageWidth)
-                            .background(
-                                Capsule()
-                                    .fill(item.isSelected ? Color.white.opacity(0.08) : Color.clear)
+                LazyHStack(spacing: 0) {
+                    ForEach(DocumentTypeEnum.allCases) { type in
+                        let isSelected = (store.ui.selectedDocumentType == type)
+
+                        Text(type.title)
+                            .appTextStyle(.bodySecondary)
+                            .foregroundStyle(
+                                isSelected
+                                ? .text(.onImmersive)
+                                : .text(.onImmersiveMuted)
                             )
-                            .contentShape(Rectangle())
+                            .padding(.vertical, 11)
+                            .padding(.horizontal, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 100, style: .continuous)
+                                    .foregroundStyle(
+                                        isSelected
+                                        ? Color.bg(.controlImmersive)
+                                        : Color.clear
+                                    )
+                            )
+                            .background(
+                                GeometryReader { p in
+                                    Color.clear
+                                        .preference(
+                                            key: ItemWidthKey.self,
+                                            value: [type.id: p.size.width]
+                                        )
+                                }
+                            )
+                            .id(type.id)
                             .onTapGesture {
-                                withAnimation { centeredID = item.id }
+                                withAnimation(.easeInOut) {
+                                    centeredID = type.id
+                                }
                             }
-                            .id(item.id)
                     }
                 }
                 .scrollTargetLayout()
-                .padding(.horizontal, sideInset)
             }
             .scrollIndicators(.never)
+            .contentMargins(.leading, leadingInset, for: .scrollContent)
+            .contentMargins(.trailing, trailingInset, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $centeredID, anchor: .center)
-            .onAppear {
-                if let selected = uiState.selectedDocumentType.first(where: { $0.isSelected }) {
-                    withAnimation {
-                        centeredID = selected.id
-                    }
+            .onPreferenceChange(ItemWidthKey.self) { dict in
+                itemWidths.merge(dict) { _, new in new }
+            }
+            .onChange(of: itemWidths.count) { _, _ in
+                guard centeredID == nil else { return }
+                if itemWidths.count == DocumentTypeEnum.allCases.count {
+                    centeredID = store.ui.selectedDocumentType.id
                 }
             }
             .onChange(of: centeredID) { _, newID in
-                guard let newID,
-                      let item = uiState.selectedDocumentType.first(where: { $0.id == newID }) else { return }
+                guard
+                    let newID,
+                    let type = DocumentTypeEnum.allCases.first(where: { $0.id == newID })
+                else { return }
 
-                if !item.isSelected {
-                    uiState.toggleDocumentType(item)
+                if store.ui.selectedDocumentType != type {
+                    store.ui.selectedDocumentType = type
+                    store.ui.idCaptureSide = .front
                 }
             }
+            .onAppear {
+                centeredID = store.ui.selectedDocumentType.id
+            }
         }
-        .frame(height: 44)
+        .frame(height: 42)
+    }
+}
+
+
+
+private struct ItemWidthKey: PreferenceKey {
+    static var defaultValue: [DocumentTypeEnum.ID: CGFloat] = [:]
+    static func reduce(value: inout [DocumentTypeEnum.ID: CGFloat], nextValue: () -> [DocumentTypeEnum.ID: CGFloat]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }

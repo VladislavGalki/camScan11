@@ -21,6 +21,8 @@ public enum AppIcon: String, CaseIterable {
     case flash = "flash"
     case gridOff = "grid_off"
     case flashOff = "flash_off"
+    case flashAuto = "flash_auto"
+    case link = "link"
 
     // MARK: - Fill
     case homeFill = "home_fill"
@@ -39,6 +41,7 @@ public enum AppIcon: String, CaseIterable {
     case signatureImage = "signature_image"
     case watermarkImage = "watermark_image"
     case cloudImage = "cloud_image"
+    case passportImage = "passport_image"
 }
 
 public extension Image {

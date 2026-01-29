@@ -8,6 +8,7 @@ struct GroupMiniPreviewButton: View {
     let count: Int
     let onTap: () -> Void
 
+    @ViewBuilder
     var body: some View {
         Group {
             if isVisible, let image {
@@ -34,8 +35,6 @@ struct GroupMiniPreviewButton: View {
                     }
                 }
                 .buttonStyle(.plain)
-            } else {
-                Color.clear
             }
         }
     }

@@ -47,12 +47,14 @@ struct DocumentPreviewInputModel {
         if result.requiresBackSide, let back = result.back {
             pages.append(back)
         }
+        
+        return .id(result: .init(type: .documents), previewMode: previewMode)
 
-        return .init(
-            kind: .id(idTypeRaw: result.idType.id, title: result.idType.title),
-            pages: pages,
-            previewMode: previewMode,
-            rememberedFilterKey: rememberedFilterKey
-        )
+//        return .init(
+//            kind: .id(idTypeRaw: result.idType.id, title: result.idType.title),
+//            pages: pages,
+//            previewMode: previewMode,
+//            rememberedFilterKey: rememberedFilterKey
+//        )
     }
 }

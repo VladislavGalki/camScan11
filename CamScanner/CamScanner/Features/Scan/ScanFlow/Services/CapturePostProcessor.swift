@@ -13,7 +13,7 @@ final class CapturePostProcessor {
         image: UIImage,
         previewQuad: Quadrilateral?,
         previewImageSize: CGSize,
-        autoCrop: Bool,
+        autoMode: Bool,
         quality: QualityPreset
     ) -> CapturePostProcessOutput {
 
@@ -21,15 +21,15 @@ final class CapturePostProcessor {
         var previewImage = image
         var usedQuad: Quadrilateral? = nil
 
-        if autoCrop,
+        if autoMode,
            let previewQuad,
            previewImageSize.width > 0,
            previewImageSize.height > 0 {
 
-            let angle = SmartCropper.rotationAngle(for: previewImage.imageOrientation)
-            let quadInImageSpace = previewQuad.scale(previewImageSize, previewImage.size, withRotationAngle: angle)
+            let angle = SmartCropper.rotationAngle(for: original.imageOrientation)
+            let quadInImageSpace = previewQuad.scale(previewImageSize, original.size, withRotationAngle: angle)
 
-            if let cropped = SmartCropper.cropAndDeskew(image: previewImage, quad: quadInImageSpace) {
+            if let cropped = SmartCropper.cropAndDeskew(image: original, quad: quadInImageSpace) {
                 previewImage = cropped
                 usedQuad = quadInImageSpace
             } else {

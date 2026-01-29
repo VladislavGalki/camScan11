@@ -1,13 +1,9 @@
 import AVFoundation
 import UIKit
 
-/// UIKit-контроллер ручной обрезки (WeScan-style), но с API под SwiftUI
 final class DocumentCropViewController: UIViewController {
-
-    // MARK: - Public callbacks
     var onCropped: ((UIImage, Quadrilateral) -> Void)?
 
-    // MARK: - State
     private var image: UIImage
     private var autoQuadInImageSpace: Quadrilateral?
     private var quad: Quadrilateral
@@ -20,7 +16,6 @@ final class DocumentCropViewController: UIViewController {
 
     private(set) var isProcessing: Bool = false
 
-    // MARK: - UI
     private lazy var imageView: UIImageView = {
         let v = UIImageView()
         v.clipsToBounds = true
@@ -39,7 +34,6 @@ final class DocumentCropViewController: UIViewController {
         return v
     }()
 
-    // MARK: - Init
     init(image: UIImage, autoQuad: Quadrilateral?) {
         self.image = image
         self.autoQuadInImageSpace = autoQuad
@@ -49,7 +43,6 @@ final class DocumentCropViewController: UIViewController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    // MARK: - Life cycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
@@ -83,7 +76,6 @@ final class DocumentCropViewController: UIViewController {
         displayQuad()
     }
 
-    // MARK: - Public API
     func setAllQuad() {
         quad = Self.defaultQuad(allOfImage: image)
         displayQuad()
@@ -97,20 +89,17 @@ final class DocumentCropViewController: UIViewController {
     func rotateLeft() { rotate90(direction: .left) }
     func rotateRight() { rotate90(direction: .right) }
 
-    /// ✅ Теперь возвращаем (croppedImage + quadInImageSpace) чтобы можно было сохранить ручные углы
     func commitCrop() {
         guard let (cropped, quadInImageSpace) = cropCurrentReturningQuad() else { return }
         onCropped?(cropped, quadInImageSpace)
     }
 
-    // MARK: - Rotation (PIXEL-ROTATION)
     enum RotationDirection { case left, right }
 
     private func rotate90(direction: RotationDirection) {
         guard !isProcessing else { return }
         isProcessing = true
 
-        // важно: берём текущие quad’ы в координатах ИСХОДНОГО изображения
         let oldImage = image
         let oldQuad = currentQuadInImageSpace() ?? quad
         let oldAuto = autoQuadInImageSpace
@@ -145,7 +134,6 @@ final class DocumentCropViewController: UIViewController {
         }
     }
 
-    /// Поворот пикселей на 90° (UIImage с ориентацией .up и корректным size)
     private func rotatedPixels90(_ image: UIImage, direction: RotationDirection) -> UIImage? {
         let oldSize = image.size
         let newSize = CGSize(width: oldSize.height, height: oldSize.width)
@@ -169,8 +157,6 @@ final class DocumentCropViewController: UIViewController {
         }
     }
 
-    // MARK: - Crop
-    /// ✅ Возвращаем и cropped, и quadInImageSpace (после ручных правок)
     private func cropCurrentReturningQuad() -> (UIImage, Quadrilateral)? {
         guard let drawnQuad = quadView.quad,
               let ciImage = CIImage(image: image) else { return nil }
@@ -178,7 +164,6 @@ final class DocumentCropViewController: UIViewController {
         let cgOrientation = CGImagePropertyOrientation(image.imageOrientation)
         let orientedImage = ciImage.oriented(forExifOrientation: Int32(cgOrientation.rawValue))
 
-        // drawnQuad (quadView space) -> image space
         let scaledQuad = drawnQuad.scale(quadView.bounds.size, image.size).reorganized()
         quad = scaledQuad
 
@@ -196,13 +181,11 @@ final class DocumentCropViewController: UIViewController {
         return (cropped, scaledQuad)
     }
 
-    /// ✅ Получить текущий quad в image space без кропа (нужно для rotate)
     private func currentQuadInImageSpace() -> Quadrilateral? {
         guard let drawnQuad = quadView.quad else { return nil }
         return drawnQuad.scale(quadView.bounds.size, image.size).reorganized()
     }
 
-    // MARK: - Quad overlay
     private func displayQuad() {
         let imageSize = image.size
         let size = CGSize(width: quadViewWidthConstraint.constant, height: quadViewHeightConstraint.constant)
@@ -220,7 +203,6 @@ final class DocumentCropViewController: UIViewController {
         quadViewHeightConstraint.constant = frame.size.height
     }
 
-    // MARK: - Zoom gesture
     private func rebuildZoomController() {
         if let panGesture { view.removeGestureRecognizer(panGesture) }
 
@@ -233,7 +215,6 @@ final class DocumentCropViewController: UIViewController {
         panGesture = g
     }
 
-    // MARK: - Helpers
     private static func defaultQuad(allOfImage image: UIImage, withOffset offset: CGFloat = 75) -> Quadrilateral {
         let tl = CGPoint(x: offset, y: offset)
         let tr = CGPoint(x: image.size.width - offset, y: offset)
@@ -243,7 +224,6 @@ final class DocumentCropViewController: UIViewController {
     }
 }
 
-// MARK: - Quad rotate helpers
 private extension Quadrilateral {
 
     func reorganized() -> Quadrilateral {

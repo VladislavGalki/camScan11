@@ -25,7 +25,6 @@ final class ZoomGestureController {
             return
         }
 
-        // Gesture ended -> reset state
         guard pan.state != .ended else {
             previousPanPosition = nil
             closestCorner = nil
@@ -51,7 +50,6 @@ final class ZoomGestureController {
         previousPanPosition = position
         closestCorner = corner
 
-        // Zoom preview under the finger
         let scale = image.size.width / quadView.bounds.size.width
         let scaledPoint = CGPoint(x: draggedCenter.x * scale, y: draggedCenter.y * scale)
 

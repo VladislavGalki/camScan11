@@ -1,13 +1,5 @@
 import Foundation
 
-enum ScanTopPanel: Equatable {
-    case none
-    case flash
-    case quality
-    case filters
-    case settings
-}
-
 enum CaptureMode: String, CaseIterable, Identifiable {
     case single = "Один"
     case group = "Группа"
@@ -18,7 +10,6 @@ enum FlashMode: String, CaseIterable, Identifiable {
     case off = "Выкл."
     case on = "Вкл."
     case auto = "Авто"
-    case torch = "Постоянная"
 
     var id: String { rawValue }
 }
@@ -62,14 +53,6 @@ enum ScanFilter: String, CaseIterable, Identifiable {
 }
 
 struct ScanSettingsKeys {
-    static let autoShoot = "scan.autoShoot"
+    static let autoMode = "scan.autoMode"
     static let grid = "scan.grid"
-    static let textOrientationRotate = "scan.textRotate"
-    static let volumeShutter = "scan.volumeShutter"
-    static let autoCrop = "scan.autoCrop"
-
-    static let flashMode = "scan.flashMode"
-    static let quality = "scan.quality"
-    static let filter = "scan.filter"
-    static let captureMode = "scan.captureMode"
 }
