@@ -62,7 +62,7 @@ struct RecentView: View {
                 AppButton(
                     config: AppButtonConfig(
                         content: .iconOnly(.plus),
-                        variant: .secondary,
+                        style: .secondary,
                         size: .l
                     ),
                     action: {}
@@ -104,7 +104,7 @@ struct RecentView: View {
                         AppButton(
                             config: AppButtonConfig(
                                 content: .iconOnly(.star),
-                                variant: .secondary,
+                                style: .secondary,
                                 size: .s
                             ),
                             action: {
@@ -117,7 +117,7 @@ struct RecentView: View {
                         AppButton(
                             config: AppButtonConfig(
                                 content: .iconOnly(.dots),
-                                variant: .secondary,
+                                style: .secondary,
                                 size: .s
                             ),
                             action: {

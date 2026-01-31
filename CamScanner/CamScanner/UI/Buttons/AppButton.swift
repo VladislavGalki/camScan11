@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Config
 
 struct AppButtonConfig: Hashable {
-    enum Variant: Hashable {
+    enum Style: Hashable {
         case primary
         case secondary
         case immersive
@@ -23,19 +23,19 @@ struct AppButtonConfig: Hashable {
         }
     }
     
-    var variant: Variant
+    var style: Style
     var size: Size
     var content: Content
     var isFullWidth: Bool = false
     
     init(
         content: Content,
-        variant: Variant,
+        style: Style,
         size: Size,
         isFullWidth: Bool = false
     ) {
         self.content = content
-        self.variant = variant
+        self.style = style
         self.size = size
         self.isFullWidth = isFullWidth
     }
@@ -77,7 +77,7 @@ struct AppButton: View {
         }
         .buttonStyle(
             AppButtonStyle(
-                variant: config.variant,
+                variant: config.style,
                 size: config.size,
                 isFullWidth: config.isFullWidth,
                 contentKind: config.content.kind,
@@ -114,7 +114,7 @@ struct AppButton: View {
 // MARK: - ButtonStyle
 
 struct AppButtonStyle: ButtonStyle {
-    let variant: AppButtonConfig.Variant
+    let variant: AppButtonConfig.Style
     let size: AppButtonConfig.Size
     let isFullWidth: Bool
     let contentKind: ButtonContentKind

@@ -197,7 +197,9 @@ final class ScanViewModel: ObservableObject {
         )
 
         if ui.selectedDocumentType.requiresBackSide {
-            if idResult.back == nil { idResult.back = .init() }
+            if idResult.back == nil {
+                idResult.back = .init()
+            }
 
             switch ui.idCaptureSide {
             case .front:

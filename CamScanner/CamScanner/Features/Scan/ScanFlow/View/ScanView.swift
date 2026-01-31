@@ -45,7 +45,7 @@ struct ScanView: View {
             AppButton(
                 config: AppButtonConfig(
                     content: .iconOnly(.close),
-                    variant: .immersive,
+                    style: .immersive,
                     size: .m
                 ),
                 action: {
@@ -84,7 +84,7 @@ struct ScanView: View {
                         icon: .backForward,
                         placement: .leading
                     ),
-                    variant: .immersive,
+                    style: .immersive,
                     size: .m
                 ),
                 action: {
@@ -111,17 +111,22 @@ struct ScanView: View {
             DocumentTypeCarouselView(store: store)
             
             HStack(spacing: 0) {
-                ShutterButton(isBusy: vm.isCapturing) {
+                CaptureShutterButton(
+                    shoudStartTimer: false,
+                    buttonDisabled: captureShutterButtonDisabled
+                ) {
                     vm.capture()
                 }
             }
+            .frame(maxWidth: .infinity)
             .overlay(alignment: .trailing) {
-                GroupMiniPreviewButton(
-                    isVisible: store.ui.selectedDocumentType == .documents
-                    && !vm.scanResult.isEmpty,
-                    image: vm.scanResult.last?.preview,
-                    count: vm.scanResult.count,
-                    onTap: { showPreview = true }
+                MiniPreviewDocumentView(
+                    store: store,
+                    image: miniPreviewImageForSelectedDocument,
+                    count: miniPreviewCountForSelectedDocument,
+                    onPreviewClick: {
+                        showPreview = true
+                    }
                 )
                 .padding(.trailing, 20)
             }
@@ -129,7 +134,6 @@ struct ScanView: View {
             .padding(.bottom, 12)
         }
         .padding(.top, 16)
-        .frame(maxWidth: .infinity)
         .background(Color.bg(.immersive))
     }
     
@@ -150,50 +154,7 @@ struct ScanView: View {
         }
     }
     
-    
-//        VStack(spacing: 0) {
-//            DocumentCameraView(
-//                camera: vm.camera,
-//                isLiveDetectionEnabled: settings.isLivePreviewEnabled && ui.selectedDocumentType == .documents
-//            )
-//            .coordinateSpace(name: "cameraSpace")
-//            .overlay {
-////                if ui.getSelectedDocumentType() == .id {
-////                    IdCameraView(ui: ui)
-////                }
-//            }
-//            .overlay {
-////                if settings.grid {
-////                    GridOverlay()
-////                        .ignoresSafeArea()
-////                        .allowsHitTesting(false)
-////                }
-//            }
-//
-//            Spacer()
-//
-    
-    
-
 //        }
-//        .background(Color.black.ignoresSafeArea())
-//        .alert("Нет доступа к камере", isPresented: $vm.showPermissionAlert) {
-//            Button("Ок", role: .cancel) {}
-//        } message: {
-//            Text("Разреши доступ к камере в Настройках.")
-//        }
-//        .onAppear {
-//            vm.onAppear()
-//            vm.applyFlashSideEffects()
-//            vm.camera.resumeLivePreview()
-//        }
-//        .onDisappear {
-//            vm.onDisappear()
-//        }
-    
-    
-    
-    
 //        .fullScreenCover(isPresented: $showPreview) {
 //            if ui.getSelectedDocumentType() == .documents {
 //                DocumentPreviewView(
@@ -265,5 +226,59 @@ struct ScanView: View {
     
     private var navigationAutoModeOpacity: Double {
         store.ui.selectedDocumentType == .documents ? 1.0 : 0.0
+    }
+    
+    private var captureShutterButtonDisabled: Bool {
+        switch store.ui.selectedDocumentType {
+        case .documents:
+            return false
+        case .idCard, .driverLicense:
+            return vm.idResult.front.preview != nil && vm.idResult.back?.preview != nil
+        case .passport:
+            return vm.idResult.front.preview != nil
+        case .qrCode:
+            return true
+        }
+    }
+    
+    private var miniPreviewImageForSelectedDocument: UIImage? {
+        switch store.ui.selectedDocumentType {
+        case .documents:
+            return vm.scanResult.last?.preview
+        case .idCard, .driverLicense:
+            if let backImage = vm.idResult.back?.preview {
+                return backImage
+            } else if let frontImage = vm.idResult.front.preview {
+                return frontImage
+            } else {
+                return nil
+            }
+        case .passport:
+            if let frontImage = vm.idResult.front.preview {
+                return frontImage
+            } else {
+                return nil
+            }
+        case .qrCode:
+            return nil
+        }
+    }
+    
+    private var miniPreviewCountForSelectedDocument: Int {
+        switch store.ui.selectedDocumentType {
+        case .documents:
+            return vm.scanResult.count
+        case .idCard, .driverLicense:
+            if vm.idResult.back?.preview != nil {
+                return 2
+            } else if vm.idResult.front.preview != nil {
+                return 1
+            }
+            return 0
+        case .passport:
+            return 1
+        case .qrCode:
+            return 0
+        }
     }
 }

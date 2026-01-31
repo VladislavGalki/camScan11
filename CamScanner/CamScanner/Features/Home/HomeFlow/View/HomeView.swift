@@ -148,7 +148,7 @@ struct HomeView: View {
                         AppButton(
                             config: AppButtonConfig(
                                 content: .iconOnly(.search),
-                                variant: .secondary,
+                                style: .secondary,
                                 size: .m
                             ),
                             action: {}
@@ -160,7 +160,7 @@ struct HomeView: View {
                                     title: "Get PRO",
                                     icon: .starFill
                                 ),
-                                variant: .primary,
+                                style: .primary,
                                 size: .m
                             ),
                             action: {}

@@ -1,26 +1,26 @@
 import SwiftUI
 
-struct ShutterButton: View {
-    let isBusy: Bool
+struct CaptureShutterButton: View {
+    let shoudStartTimer: Bool
+    let buttonDisabled: Bool
     let action: () -> Void
-
+    
+    private let size: CGFloat = 80
+    
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .stroke(Color.cyan, lineWidth: 4)
-                    .frame(width: 78, height: 78)
-
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 62, height: 62)
-
-                if isBusy {
-                    ProgressView().tint(.black)
-                }
-            }
+        ZStack {
+            Circle()
+                .foregroundStyle(.bg(.controlImmersive))
+                .appBorderModifier(.border(.primaryImmersive), width: 1, radius: 100, corners: .allCorners)
+            
+            Circle()
+                .foregroundStyle(.bg(.surface).opacity(buttonDisabled ? 0.3 : 1))
+                .padding(8)
         }
-        .buttonStyle(.plain)
-        .disabled(isBusy)
+        .frame(width: size, height: size)
+        .onTapGesture {
+            guard !buttonDisabled else { return }
+            action()
+        }
     }
 }

@@ -41,7 +41,7 @@ struct QrCodeView: View {
                 AppButton(
                     config: AppButtonConfig(
                         content: .title("Open link"),
-                        variant: .secondary,
+                        style: .secondary,
                         size: .s
                     ),
                     action: {
@@ -53,7 +53,7 @@ struct QrCodeView: View {
                 AppButton(
                     config: AppButtonConfig(
                         content: .iconOnly(.close),
-                        variant: .secondary,
+                        style: .secondary,
                         size: .s
                     ),
                     action: {
