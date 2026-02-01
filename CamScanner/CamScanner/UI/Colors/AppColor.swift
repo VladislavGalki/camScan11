@@ -18,6 +18,7 @@ enum AppColor: Hashable {
         case immersive
         case controlImmersive
         case hint
+        case hintLight
         case detectionFrame
     }
 
@@ -53,6 +54,7 @@ enum AppColor: Hashable {
         case primary
         case primaryImmersive
         case hint
+        case hintNeutral
         case detectionFrame
     }
 }
@@ -81,6 +83,7 @@ private extension AppColor {
         case .background(.immersive):       return .sRGB01(0, 0, 0, 1)                               // Bg/immersive
         case .background(.controlImmersive):return .sRGB01(0.09019608, 0.09019608, 0.09019608, 1)   // Bg/control-immersive
         case .background(.hint):            return .sRGB01(0, 0.53333336, 1, 0.6)                    // Bg/hint
+        case .background(.hintLight):       return .sRGB01(1, 1, 1, 0.2)
         case .background(.detectionFrame):  return .sRGB01(0, 0.53333336, 1, 0.1)                    // Bg/detection frame
 
         // Text
@@ -113,6 +116,7 @@ private extension AppColor {
         case .border(.primary):          return .sRGB01(0.93725491, 0.93725491, 0.93725491, 1)        // Borders/primary
         case .border(.primaryImmersive): return .sRGB01(0.17647059, 0.17647059, 0.17647059, 1)        // Borders/primary-immersive
         case .border(.hint):             return .sRGB01(0, 0.53333336, 1, 0.2)                         // Borders/hint
+        case .border(.hintNeutral):      return .sRGB01(1, 1, 1, 0.1)
         case .border(.detectionFrame):   return .sRGB01(0, 0.53333336, 1, 1)                           // Borders/detection frame
         }
     }

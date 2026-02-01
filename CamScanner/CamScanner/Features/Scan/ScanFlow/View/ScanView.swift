@@ -28,6 +28,16 @@ struct ScanView: View {
             
             bottomContainerView
         }
+        .overlay {
+            if vm.shouldShowQuickPreview, let cropperModel = vm.idDocumentCropperModel {
+                QuickDocumentCropperView(
+                    store: store,
+                    cropperModel: cropperModel,
+                    onRetake: {},
+                    onConfirm: { _ in }
+                )
+            }
+        }
         .background(
             Color.bg(.immersive)
                 .ignoresSafeArea()
@@ -226,6 +236,10 @@ struct ScanView: View {
     
     private var navigationAutoModeOpacity: Double {
         store.ui.selectedDocumentType == .documents ? 1.0 : 0.0
+    }
+    
+    private var shouldHideNavigationAndBottombBar: Double {
+        vm.shouldShowQuickPreview ? 0 : 1
     }
     
     private var captureShutterButtonDisabled: Bool {

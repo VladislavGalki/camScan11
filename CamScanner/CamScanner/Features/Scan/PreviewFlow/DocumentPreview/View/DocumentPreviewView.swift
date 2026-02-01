@@ -262,18 +262,20 @@ struct DocumentPreviewView: View {
     private var cropperSheet: some View {
         if let original = vm.currentOriginal {
             DocumentCropperView(
-                originalImage: original,
-                autoQuad: vm.currentQuad,
+                cropperModel: DocumentCropperModel(image: original, autoQuad: vm.currentQuad),
                 onCancel: { vm.showCropper = false },
-                onDone: { croppedFull, newQuad in
+                onDone: { cropperModel in
                     // 1) обновляем локально в превью
                     vm.applyCropResult(
                         index: vm.editingIndex,
-                        newDisplay: croppedFull,
-                        newQuad: newQuad
+                        cropperModel: cropperModel
                     )
+                    
                     // 2) наверх (камера-сессия) — опционально
-                    onEditPage?(vm.editingIndex, croppedFull, newQuad)
+                    onEditPage?(
+                        vm.editingIndex,
+                        cropperModel.image,
+                        cropperModel.autoQuad ?? Quadrilateral(topLeft: .zero, topRight: .zero, bottomRight: .zero, bottomLeft: .zero))
 
                     vm.showCropper = false
                 }

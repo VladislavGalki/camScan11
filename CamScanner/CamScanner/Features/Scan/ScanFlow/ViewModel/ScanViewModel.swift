@@ -3,15 +3,15 @@ import Combine
 import UIKit
 
 final class ScanViewModel: ObservableObject {
-    // MARK: - Output (Scan)
+    // MARK: - Scan
     @Published var isCapturing: Bool = false
     @Published var showPermissionAlert: Bool = false
 
     @Published var scanResult: [CapturedFrame] = []
     
-    // MARK: - Output (ID)
+    // MARK: - ID
     @Published var idResult: IdCaptureResult
-    @Published var isIdReadyToPreview: Bool = false
+    @Published var shouldShowQuickPreview: Bool = false
     
     // MARK: - QrCode
     @Published var qrCodeResult: String?
@@ -27,13 +27,12 @@ final class ScanViewModel: ObservableObject {
     private let autoShootEngine: AutoShootEngine
     private let postProcessor: CapturePostProcessor
 
-    private var didBindCamera = false
-
-    // Scan-mode (детект)
+    // Scan детект
     private var latestPreviewQuad: Quadrilateral?
     private var latestPreviewImageSize: CGSize = .zero
 
-    // ID-mode (рамка)
+    // ID рамка
+    var idDocumentCropperModel: DocumentCropperModel?
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
     
@@ -83,9 +82,6 @@ final class ScanViewModel: ObservableObject {
     }
 
     private func subscribeForCameraService() {
-        guard !didBindCamera else { return }
-        didBindCamera = true
-
         camera.$authorizationDenied
             .receive(on: DispatchQueue.main)
             .sink { [weak self] denied in
@@ -172,10 +168,6 @@ final class ScanViewModel: ObservableObject {
 
     // MARK: - ID capture pipeline (front/back)
     private func handleIdCapture(image: UIImage) {
-        if idResult.type != ui.selectedDocumentType {
-            resetIdFlowForNewType(ui.selectedDocumentType)
-        }
-
         guard let frameRect = latestIdFrameRectInPreview,
               let previewSize = latestIdPreviewSize,
               previewSize.width > 0, previewSize.height > 0,
@@ -198,26 +190,35 @@ final class ScanViewModel: ObservableObject {
 
         if ui.selectedDocumentType.requiresBackSide {
             if idResult.back == nil {
-                idResult.back = .init()
+                idResult.back = CapturedFrame()
             }
 
             switch ui.idCaptureSide {
             case .front:
                 idResult.front = captured
-                ui.idCaptureSide = .back
-
+                startQuickCrop(side: .front, frame: captured)
+                return
             case .back:
                 idResult.back = captured
+                startQuickCrop(side: .back, frame: captured)
+                return
             }
         } else {
             idResult.front = captured
             idResult.back = nil
+            startQuickCrop(side: .front, frame: captured)
+            return
         }
+    }
+    
+    private func startQuickCrop(side: IdCaptureSide, frame: CapturedFrame) {
+        if let image = frame.original, let quad = frame.quad {
+            idDocumentCropperModel = DocumentCropperModel(image: image, autoQuad: quad)
+            shouldShowQuickPreview = true
 
-        isIdReadyToPreview = idResult.isReadyForPreview
-
-        latestIdFrameRectInPreview = nil
-        latestIdPreviewSize = nil
+            latestIdFrameRectInPreview = nil
+            latestIdPreviewSize = nil
+        }
     }
 
     private func resetIdFlowForNewType(_ type: DocumentTypeEnum) {
@@ -226,7 +227,6 @@ final class ScanViewModel: ObservableObject {
             front: .init(),
             back: type.requiresBackSide ? CapturedFrame() : nil
         )
-        isIdReadyToPreview = false
         ui.idCaptureSide = .front
     }
     

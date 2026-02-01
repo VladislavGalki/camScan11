@@ -2,24 +2,21 @@ import SwiftUI
 import UIKit
 
 struct DocumentCropperView: View {
-
-    let originalImage: UIImage
-    let autoQuad: Quadrilateral?
+    let cropperModel: DocumentCropperModel
 
     let onCancel: () -> Void
-    let onDone: (UIImage, Quadrilateral) -> Void   // ✅
+    let onDone: (DocumentCropperModel) -> Void   // ✅
 
     @State private var action: CropperAction? = nil
 
     var body: some View {
         ZStack {
-            CropperControllerRepresentable(
-                image: originalImage,
-                autoQuad: autoQuad,
+            DocumentCropperControllerRepresentable(
+                cropperModel: cropperModel,
                 action: $action,
-                onCropped: { cropped, quad in
+                onCropped: { cropperModel in
                     DispatchQueue.main.async {
-                        onDone(cropped, quad)
+                        onDone(cropperModel)
                     }
                 }
             )
@@ -97,52 +94,5 @@ struct DocumentCropperView: View {
                 .background(Color.white.opacity(0.95))
             }
         }
-    }
-}
-
-private enum CropperAction: Equatable {
-    case rotateLeft
-    case rotateRight
-    case setAll
-    case setAuto
-    case commit
-}
-
-private struct CropperControllerRepresentable: UIViewControllerRepresentable {
-
-    let image: UIImage
-    let autoQuad: Quadrilateral?
-
-    @Binding var action: CropperAction?
-    let onCropped: (UIImage, Quadrilateral) -> Void
-
-    func makeUIViewController(context: Context) -> DocumentCropViewController {
-        let vc = DocumentCropViewController(image: image, autoQuad: autoQuad)
-        vc.onCropped = { cropped, quad in
-            onCropped(cropped, quad)
-        }
-        context.coordinator.vc = vc
-        return vc
-    }
-
-    func updateUIViewController(_ uiViewController: DocumentCropViewController, context: Context) {
-        guard let action else { return }
-        DispatchQueue.main.async {
-            self.action = nil
-        }
-
-        switch action {
-        case .rotateLeft: uiViewController.rotateLeft()
-        case .rotateRight: uiViewController.rotateRight()
-        case .setAll: uiViewController.setAllQuad()
-        case .setAuto: uiViewController.setAutoQuad()
-        case .commit: uiViewController.commitCrop()
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator {
-        weak var vc: DocumentCropViewController?
     }
 }

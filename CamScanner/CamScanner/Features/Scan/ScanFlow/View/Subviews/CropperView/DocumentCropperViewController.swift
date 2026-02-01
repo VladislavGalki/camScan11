@@ -1,13 +1,15 @@
 import AVFoundation
 import UIKit
 
-final class DocumentCropViewController: UIViewController {
-    var onCropped: ((UIImage, Quadrilateral) -> Void)?
+final class DocumentCropperViewController: UIViewController {
+    var onCropped: ((DocumentCropperModel) -> Void)?
 
     private var image: UIImage
     private var autoQuadInImageSpace: Quadrilateral?
     private var quad: Quadrilateral
-
+    
+    private lazy var magnifier = CropMagnifierView(frame: CGRect(x: 20, y: 100, width: 100, height: 100))
+    
     private var zoomGestureController: ZoomGestureController!
     private var panGesture: UILongPressGestureRecognizer?
 
@@ -34,10 +36,10 @@ final class DocumentCropViewController: UIViewController {
         return v
     }()
 
-    init(image: UIImage, autoQuad: Quadrilateral?) {
-        self.image = image
-        self.autoQuadInImageSpace = autoQuad
-        self.quad = autoQuad ?? Self.defaultQuad(allOfImage: image)
+    init(cropperModel: DocumentCropperModel) {
+        self.image = cropperModel.image
+        self.autoQuadInImageSpace = cropperModel.autoQuad
+        self.quad = cropperModel.autoQuad ?? Self.defaultQuad(allOfImage: cropperModel.image)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -49,6 +51,9 @@ final class DocumentCropViewController: UIViewController {
 
         view.addSubview(imageView)
         view.addSubview(quadView)
+        view.addSubview(magnifier)
+        
+        magnifier.isHidden = true
 
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -91,7 +96,7 @@ final class DocumentCropViewController: UIViewController {
 
     func commitCrop() {
         guard let (cropped, quadInImageSpace) = cropCurrentReturningQuad() else { return }
-        onCropped?(cropped, quadInImageSpace)
+        onCropped?(DocumentCropperModel(image: cropped, autoQuad: quadInImageSpace))
     }
 
     enum RotationDirection { case left, right }
@@ -206,8 +211,12 @@ final class DocumentCropViewController: UIViewController {
     private func rebuildZoomController() {
         if let panGesture { view.removeGestureRecognizer(panGesture) }
 
-        zoomGestureController = ZoomGestureController(image: image, quadView: quadView)
-
+        zoomGestureController = ZoomGestureController(
+            image: image,
+            quadView: quadView,
+            magnifier: magnifier
+        )
+        
         let g = UILongPressGestureRecognizer(target: zoomGestureController,
                                              action: #selector(zoomGestureController.handle(pan:)))
         g.minimumPressDuration = 0
@@ -225,14 +234,13 @@ final class DocumentCropViewController: UIViewController {
 }
 
 private extension Quadrilateral {
-
     func reorganized() -> Quadrilateral {
         var q = self
         q.reorganize()
         return q
     }
 
-    func rotated90(direction: DocumentCropViewController.RotationDirection,
+    func rotated90(direction: DocumentCropperViewController.RotationDirection,
                    inImageOfSize size: CGSize) -> Quadrilateral {
 
         func rotRight(_ p: CGPoint) -> CGPoint {

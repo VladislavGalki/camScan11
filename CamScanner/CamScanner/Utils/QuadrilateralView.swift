@@ -1,16 +1,7 @@
-//
-//  RectangleView.swift
-//  WeScan
-//
-//  Created by Boris Emorine on 2/8/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import AVFoundation
 import Foundation
 import UIKit
 
-/// Simple enum to keep track of the position of the corners of a quadrilateral.
 enum CornerPosition {
     case topLeft
     case topRight
@@ -18,21 +9,26 @@ enum CornerPosition {
     case bottomLeft
 }
 
-/// The `QuadrilateralView` is a simple `UIView` subclass that can draw a quadrilateral, and optionally edit it.
 final class QuadrilateralView: UIView {
+    private let dimLayer: CAShapeLayer = {
+        let l = CAShapeLayer()
+        l.fillRule = .evenOdd
+        l.fillColor = UIColor(white: 0.0, alpha: 0.6).cgColor
+        l.isHidden = true
+        return l
+    }()
 
     private let quadLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
-        layer.strokeColor = UIColor.white.cgColor
-        layer.lineWidth = 1.0
+        layer.strokeColor = UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 1).cgColor
+        layer.fillColor = UIColor.red.cgColor
+        layer.lineWidth = 2.0
         layer.opacity = 1.0
         layer.isHidden = true
 
         return layer
     }()
 
-    /// We want the corner views to be displayed under the outline of the quadrilateral.
-    /// Because of that, we need the quadrilateral to be drawn on a UIView above them.
     private let quadView: UIView = {
         let view = UIView()
         view.backgroundColor = UIColor.clear
@@ -40,7 +36,6 @@ final class QuadrilateralView: UIView {
         return view
     }()
 
-    /// The quadrilateral drawn on the view.
     private(set) var quad: Quadrilateral?
 
     public var editable = false {
@@ -55,14 +50,9 @@ final class QuadrilateralView: UIView {
         }
     }
 
-    /// Set stroke color of image rect and corner.
     public var strokeColor: CGColor? {
         didSet {
             quadLayer.strokeColor = strokeColor
-            topLeftCornerView.strokeColor = strokeColor
-            topRightCornerView.strokeColor = strokeColor
-            bottomRightCornerView.strokeColor = strokeColor
-            bottomLeftCornerView.strokeColor = strokeColor
         }
     }
 
@@ -114,6 +104,7 @@ final class QuadrilateralView: UIView {
         addSubview(quadView)
         setupCornerViews()
         setupConstraints()
+        quadView.layer.addSublayer(dimLayer)
         quadView.layer.addSublayer(quadLayer)
     }
 
@@ -137,22 +128,16 @@ final class QuadrilateralView: UIView {
 
     override public func layoutSubviews() {
         super.layoutSubviews()
-        guard quadLayer.frame != bounds else {
-            return
-        }
 
+        dimLayer.frame = bounds
         quadLayer.frame = bounds
+
         if let quad {
             drawQuadrilateral(quad: quad, animated: false)
         }
     }
 
     // MARK: - Drawings
-
-    /// Draws the passed in quadrilateral.
-    ///
-    /// - Parameters:
-    ///   - quad: The quadrilateral to draw on the view. It should be in the coordinates of the current `QuadrilateralView` instance.
     func drawQuadrilateral(quad: Quadrilateral, animated: Bool) {
         self.quad = quad
         drawQuad(quad, animated: animated)
@@ -163,22 +148,33 @@ final class QuadrilateralView: UIView {
     }
 
     private func drawQuad(_ quad: Quadrilateral, animated: Bool) {
-        var path = quad.path
+        if animated {
+            let anim = CABasicAnimation(keyPath: "path")
+            anim.duration = 0.2
+            quadLayer.add(anim, forKey: "path")
+        }
+
+        quadLayer.path = quad.path.cgPath
+        quadLayer.strokeColor = UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 1).cgColor
+        quadLayer.fillColor = UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 0.1).cgColor
+        quadLayer.lineWidth = 2.0
+        quadLayer.isHidden = false
 
         if editable {
-            path = path.reversing()
-            let rectPath = UIBezierPath(rect: bounds)
-            path.append(rectPath)
-        }
+            let full = UIBezierPath(rect: bounds)
+            let hole = UIBezierPath(cgPath: quad.path.cgPath)
+            full.append(hole)
+            full.usesEvenOddFillRule = true
 
-        if animated == true {
-            let pathAnimation = CABasicAnimation(keyPath: "path")
-            pathAnimation.duration = 0.2
-            quadLayer.add(pathAnimation, forKey: "path")
+            dimLayer.path = full.cgPath
+            dimLayer.fillRule = .evenOdd
+            dimLayer.fillColor = UIColor(white: 0.0, alpha: 0.6).cgColor
+            dimLayer.isHidden = false
+        } else {
+            dimLayer.path = nil
+            dimLayer.fillColor = UIColor(white: 0.0, alpha: 0.6).cgColor
+            dimLayer.isHidden = true
         }
-
-        quadLayer.path = path.cgPath
-        quadLayer.isHidden = false
     }
 
     private func layoutCornerViews(forQuad quad: Quadrilateral) {
@@ -196,46 +192,34 @@ final class QuadrilateralView: UIView {
     // MARK: - Actions
 
     func moveCorner(cornerView: EditScanCornerView, atPoint point: CGPoint) {
-        guard let quad else {
-            return
-        }
+        guard let quad else { return }
 
         let validPoint = self.validPoint(point, forCornerViewOfSize: cornerView.bounds.size, inView: self)
-
         cornerView.center = validPoint
+
         let updatedQuad = update(quad, withPosition: validPoint, forCorner: cornerView.position)
-
         self.quad = updatedQuad
-        drawQuad(updatedQuad, animated: false)
-    }
 
-    func highlightCornerAtPosition(position: CornerPosition, with image: UIImage) {
-        guard editable else {
-            return
+        // ==== Обновляем stroke квадрата ====
+        quadLayer.path = updatedQuad.path.cgPath
+        quadLayer.strokeColor = strokeColor ?? UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 1).cgColor
+        quadLayer.fillColor = UIColor.clear.cgColor
+        quadLayer.isHidden = false
+
+        // ==== Обновляем dim вокруг квадрата ====
+        if editable {
+            let full = UIBezierPath(rect: bounds)
+            let hole = UIBezierPath(cgPath: updatedQuad.path.cgPath)
+            full.append(hole)
+            full.usesEvenOddFillRule = true
+            dimLayer.path = full.cgPath
+            dimLayer.fillRule = .evenOdd
+            dimLayer.fillColor = UIColor(white: 0.0, alpha: 0.6).cgColor
+            dimLayer.isHidden = false
         }
-        isHighlighted = true
 
-        let cornerView = cornerViewForCornerPosition(position: position)
-        guard cornerView.isHighlighted == false else {
-            cornerView.highlightWithImage(image)
-            return
-        }
-
-        let origin = CGPoint(x: cornerView.frame.origin.x - (highlightedCornerViewSize.width - cornerViewSize.width) / 2.0,
-                             y: cornerView.frame.origin.y - (highlightedCornerViewSize.height - cornerViewSize.height) / 2.0)
-        cornerView.frame = CGRect(origin: origin, size: highlightedCornerViewSize)
-        cornerView.highlightWithImage(image)
-    }
-
-    func resetHighlightedCornerViews() {
-        isHighlighted = false
-        resetHighlightedCornerViews(cornerViews: [topLeftCornerView, topRightCornerView, bottomLeftCornerView, bottomRightCornerView])
-    }
-
-    private func resetHighlightedCornerViews(cornerViews: [EditScanCornerView]) {
-        cornerViews.forEach { cornerView in
-            resetHighlightedCornerView(cornerView: cornerView)
-        }
+        // ==== Обновляем позиции cornerViews ====
+        layoutCornerViews(forQuad: updatedQuad)
     }
 
     private func resetHighlightedCornerView(cornerView: EditScanCornerView) {
@@ -247,14 +231,7 @@ final class QuadrilateralView: UIView {
     }
 
     // MARK: Validation
-
-    /// Ensures that the given point is valid - meaning that it is within the bounds of the passed in `UIView`.
-    ///
-    /// - Parameters:
-    ///   - point: The point that needs to be validated.
-    ///   - cornerViewSize: The size of the corner view representing the given point.
-    ///   - view: The view which should include the point.
-    /// - Returns: A new point which is within the passed in view.
+    
     private func validPoint(_ point: CGPoint, forCornerViewOfSize cornerViewSize: CGSize, inView view: UIView) -> CGPoint {
         var validPoint = point
 
@@ -314,70 +291,75 @@ final class QuadrilateralView: UIView {
 }
 
 // MARK: - Edit corner view
-
-/// A UIView used by corners of a quadrilateral that is aware of its position.
-///
-/// Upstream WeScan keeps this in `Sources/WeScan/Common/EditScanCornerView.swift`.
-/// We include it here (same module) so `QuadrilateralView` keeps working 1:1.
 final class EditScanCornerView: UIView {
 
     let position: CornerPosition
 
-    /// The image to display when the corner view is highlighted.
-    private var image: UIImage?
-    private(set) var isHighlighted = false
+    private let outerSize: CGFloat = 14
+    private let innerSize: CGFloat = 10
 
-    private lazy var circleLayer: CAShapeLayer = {
-        let layer = CAShapeLayer()
-        layer.fillColor = UIColor.clear.cgColor
-        layer.strokeColor = UIColor.white.cgColor
-        layer.lineWidth = 1.0
-        return layer
+    private lazy var outerCircleLayer: CAShapeLayer = {
+        let l = CAShapeLayer()
+        l.fillColor = UIColor.white.cgColor
+        return l
     }()
 
-    /// Set stroke color of corner layer.
-    public var strokeColor: CGColor? {
-        didSet {
-            circleLayer.strokeColor = strokeColor
-        }
-    }
+    private lazy var innerCircleLayer: CAShapeLayer = {
+        let l = CAShapeLayer()
+        l.fillColor = UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 1).cgColor
+        return l
+    }()
+
+    private(set) var isHighlighted = false
 
     init(frame: CGRect, position: CornerPosition) {
         self.position = position
         super.init(frame: frame)
-        backgroundColor = UIColor.clear
-        clipsToBounds = true
-        layer.addSublayer(circleLayer)
+
+        backgroundColor = .clear
+
+        layer.addSublayer(outerCircleLayer)
+        outerCircleLayer.addSublayer(innerCircleLayer)
     }
 
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    required init?(coder: NSCoder) {
+        fatalError()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        layer.cornerRadius = bounds.width / 2.0
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        let outerRect = CGRect(
+            x: (bounds.width - outerSize) / 2,
+            y: (bounds.height - outerSize) / 2,
+            width: outerSize,
+            height: outerSize
+        )
+
+        outerCircleLayer.frame = outerRect
+        outerCircleLayer.path = UIBezierPath(ovalIn: outerCircleLayer.bounds).cgPath
+
+        let innerRect = CGRect(
+            x: (outerSize - innerSize) / 2,
+            y: (outerSize - innerSize) / 2,
+            width: innerSize,
+            height: innerSize
+        )
+
+        innerCircleLayer.frame = innerRect
+        innerCircleLayer.path = UIBezierPath(ovalIn: innerCircleLayer.bounds).cgPath
+
+        CATransaction.commit()
     }
 
-    override func draw(_ rect: CGRect) {
-        super.draw(rect)
-
-        let bezierPath = UIBezierPath(ovalIn: rect.insetBy(dx: circleLayer.lineWidth, dy: circleLayer.lineWidth))
-        circleLayer.frame = rect
-        circleLayer.path = bezierPath.cgPath
-
-        image?.draw(in: rect)
-    }
-
-    func highlightWithImage(_ image: UIImage) {
+    func highlight() {
         isHighlighted = true
-        self.image = image
-        self.setNeedsDisplay()
     }
 
     func reset() {
         isHighlighted = false
-        image = nil
-        setNeedsDisplay()
     }
 }

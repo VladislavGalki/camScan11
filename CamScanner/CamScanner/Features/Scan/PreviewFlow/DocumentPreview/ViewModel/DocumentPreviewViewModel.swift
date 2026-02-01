@@ -298,11 +298,11 @@ final class DocumentPreviewViewModel: ObservableObject {
 
     // MARK: - Crop apply
 
-    func applyCropResult(index: Int, newDisplay: UIImage, newQuad: Quadrilateral?) {
+    func applyCropResult(index: Int, cropperModel: DocumentCropperModel) {
         guard pages.indices.contains(index) else { return }
 
-        pages[index].preview = newDisplay
-        pages[index].quad = newQuad
+        pages[index].preview = cropperModel.image
+        pages[index].quad = cropperModel.autoQuad
 
         // ✅ рисунок больше невалиден после кропа
         pages[index].drawingBase = nil
