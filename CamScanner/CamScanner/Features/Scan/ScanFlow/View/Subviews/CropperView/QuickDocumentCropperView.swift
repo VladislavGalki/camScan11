@@ -6,6 +6,8 @@ struct QuickDocumentCropperView: View {
     
     let cropperModel: DocumentCropperModel
     
+    @State private var action: CropperAction?
+    
     let onRetake: () -> Void
     let onConfirm: (DocumentCropperModel) -> Void
     
@@ -13,7 +15,7 @@ struct QuickDocumentCropperView: View {
         VStack(spacing: 0) {
             DocumentCropperControllerRepresentable(
                 cropperModel: cropperModel,
-                action: .constant(nil),
+                action: $action,
                 onCropped: { cropperModel in
                     DispatchQueue.main.async {
                         onConfirm(cropperModel)
@@ -50,7 +52,9 @@ struct QuickDocumentCropperView: View {
                             style: .primary,
                             size: .l,
                             isFullWidth: true
-                        ), action: {}
+                        ), action: {
+                            action = .commit
+                        }
                     )
                 }
                 .padding(.horizontal, 16)

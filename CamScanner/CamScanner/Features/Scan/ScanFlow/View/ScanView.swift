@@ -33,8 +33,12 @@ struct ScanView: View {
                 QuickDocumentCropperView(
                     store: store,
                     cropperModel: cropperModel,
-                    onRetake: {},
-                    onConfirm: { _ in }
+                    onRetake: {
+                        vm.retakeQuickCrop()
+                    },
+                    onConfirm: { cropperModel in
+                        vm.applyQuickCropForIdsType(cropperModel)
+                    }
                 )
             }
         }

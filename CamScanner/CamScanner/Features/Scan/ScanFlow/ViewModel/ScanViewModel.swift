@@ -220,6 +220,22 @@ final class ScanViewModel: ObservableObject {
             latestIdPreviewSize = nil
         }
     }
+    
+    func retakeQuickCrop() {
+        switch ui.idCaptureSide {
+        case .front:
+            idResult.front = CapturedFrame()
+            ui.idCaptureSide = .front
+        case .back:
+            if idResult.back == nil {
+                idResult.back = CapturedFrame()
+            }
+            idResult.back = CapturedFrame()
+            ui.idCaptureSide = .back
+        }
+        
+        shouldShowQuickPreview = false
+    }
 
     private func resetIdFlowForNewType(_ type: DocumentTypeEnum) {
         idResult = IdCaptureResult(
@@ -230,7 +246,7 @@ final class ScanViewModel: ObservableObject {
         ui.idCaptureSide = .front
     }
     
-    // MARK: - Scan Manual edit apply (как в ID)
+    // MARK: - Scan Manual edit apply
     func applyManualEditForScan(index: Int, croppedOriginal: UIImage, quad: Quadrilateral) {
         let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
         guard scanResult.indices.contains(index) else { return }
@@ -239,23 +255,44 @@ final class ScanViewModel: ObservableObject {
         scanResult[index].quad = quad
     }
 
-    // MARK: - ID Manual edit apply
-    func applyManualEditForId(side: IdCaptureSide, croppedOriginal: UIImage, quad: Quadrilateral) {
-        let preview = croppedOriginal.downscaled(maxDimension: ui.quality.maxDimension)
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            
-            switch side {
-            case .front:
-                idResult.front.preview = preview
-                idResult.front.quad = quad
-            case .back:
-                if idResult.back == nil { idResult.back = .init() }
-                idResult.back?.preview = preview
-                idResult.back?.quad = quad
+    // MARK: - ID quick crop apply
+    
+    func applyQuickCropForIdsType(_ cropperModel: DocumentCropperModel) {
+        let preview = cropperModel.image.downscaled(maxDimension: ui.quality.maxDimension)
+
+        switch ui.idCaptureSide {
+        case .front:
+            idResult.front.preview = preview
+            idResult.front.quad = cropperModel.autoQuad
+            ui.idCaptureSide = ui.selectedDocumentType.requiresBackSide ? .back : .front
+        case .back:
+            if idResult.back == nil {
+                idResult.back = CapturedFrame()
             }
+            idResult.back?.preview = preview
+            idResult.back?.quad = cropperModel.autoQuad
+            ui.idCaptureSide = .front
         }
+        
+        shouldShowQuickPreview = false
+    }
+    
+    func cancelQuickCrop() {
+        // трактуем как “переснять текущую сторону”
+        // просто очищаем captured для этой стороны
+        switch ui.idCaptureSide {
+        case .front:
+            idResult.front = CapturedFrame()
+            ui.idCaptureSide = .front
+        case .back:
+            if idResult.back == nil {
+                idResult.back = CapturedFrame()
+            }
+            idResult.back = CapturedFrame()
+            ui.idCaptureSide = .back
+        }
+        
+        shouldShowQuickPreview = false
     }
 
     // MARK: - Capture
@@ -294,6 +331,7 @@ final class ScanViewModel: ObservableObject {
         latestIdPreviewSize = nil
         qrCodeResult = nil
         autoShootEngine.resetOnModeChange()
+        idDocumentCropperModel = nil
         resetIdFlowForNewType(type)
     }
 
