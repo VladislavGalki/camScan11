@@ -158,18 +158,17 @@ struct RecentView: View {
                 if let image = item.thumbnail {
                     Image(uiImage: image)
                         .resizable()
-                        .frame(width: 60, height: 38)
+                        .frame(width: 85.5, height: 55)
                         .scaledToFit()
                 }
                 
                 if let secondImage = item.secondThumbnail {
                     Image(uiImage: secondImage)
                         .resizable()
-                        .frame(width: 60, height: 38)
+                        .frame(width: 85.5, height: 55)
                         .scaledToFit()
                 }
             }
-            .padding(.vertical, 50)
         }
     }
 }

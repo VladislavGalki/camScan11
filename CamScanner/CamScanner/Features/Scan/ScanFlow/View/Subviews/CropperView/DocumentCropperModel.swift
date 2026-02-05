@@ -1,6 +1,6 @@
 import UIKit
 
-struct DocumentCropperModel {
+struct DocumentCropperModel: Equatable, Hashable {
     let image: UIImage
     let autoQuad: Quadrilateral?
 }

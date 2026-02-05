@@ -4,12 +4,13 @@ struct ScanView: View {
     @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
     
-    @State private var showPreview = false
+    @EnvironmentObject private var router: Router
     
-    let onClose: () -> Void
+    let oncloseClick: () -> Void
 
-    init(onClose: @escaping () -> Void) {
-        self.onClose = onClose
+    init(oncloseClick: @escaping () -> Void) {
+        self.oncloseClick = oncloseClick
+        
         let store = ScanStore()
         _store = StateObject(wrappedValue: store)
         _vm = StateObject(wrappedValue: ScanViewModel(settings: store.settings, ui: store.ui))
@@ -63,7 +64,7 @@ struct ScanView: View {
                     size: .m
                 ),
                 action: {
-                    onClose()
+                    oncloseClick()
                 }
             )
             
@@ -139,7 +140,7 @@ struct ScanView: View {
                     image: miniPreviewImageForSelectedDocument,
                     count: miniPreviewCountForSelectedDocument,
                     onPreviewClick: {
-                        showPreview = true
+                        router.push(ScanRoute.scanPreview)
                     }
                 )
                 .padding(.trailing, 20)
@@ -167,60 +168,6 @@ struct ScanView: View {
             PassportView(ui: store.ui)
         }
     }
-    
-//        }
-//        .fullScreenCover(isPresented: $showPreview) {
-//            if ui.getSelectedDocumentType() == .documents {
-//                DocumentPreviewView(
-//                    inputModel: .scan(
-//                        pages: vm.scanResult,
-//                        previewMode: .newFromCamera,
-//                        rememberedFilterKey: nil
-//                    ),
-//                    onDone: {
-//                        if ui.captureMode == .group {
-//                            vm.resetGroup()
-//                        } else {
-//                            vm.resetSingle()
-//                        }
-//                        showPreview = false
-//                        onClose()
-//                    },
-//                    onRetake: {
-//                        if ui.captureMode == .group {
-//                            vm.resetGroup()
-//                        } else {
-//                            vm.resetSingle()
-//                        }
-//                        showPreview = false
-//                    },
-//                    onEditPage: { index, croppedFull, quad in
-//                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
-//                    }
-//                )
-//            } else {
-//                DocumentPreviewView(
-//                    inputModel: .id(
-//                        result: vm.idResult,
-//                        previewMode: .newFromCamera,
-//                        rememberedFilterKey: nil
-//                    ),
-//                    onDone: {
-//                        vm.resetIdCaptures()
-//                        showPreview = false
-//                        onClose()
-//                    },
-//                    onRetake: {
-//                        vm.resetIdCaptures()
-//                        showPreview = false
-//                    },
-//                    onEditPage: { index, croppedFull, quad in
-//                        let side: IdCaptureSide = (index == 0 ? .front : .back)
-//                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
-//                    }
-//                )
-//            }
-//        }
     
     private var navigationFlashIcon: AppIcon {
         switch store.ui.flashMode {
@@ -300,3 +247,58 @@ struct ScanView: View {
         }
     }
 }
+
+
+//        }
+//        .fullScreenCover(isPresented: $showPreview) {
+//            if ui.getSelectedDocumentType() == .documents {
+//                DocumentPreviewView(
+//                    inputModel: .scan(
+//                        pages: vm.scanResult,
+//                        previewMode: .newFromCamera,
+//                        rememberedFilterKey: nil
+//                    ),
+//                    onDone: {
+//                        if ui.captureMode == .group {
+//                            vm.resetGroup()
+//                        } else {
+//                            vm.resetSingle()
+//                        }
+//                        showPreview = false
+//                        onClose()
+//                    },
+//                    onRetake: {
+//                        if ui.captureMode == .group {
+//                            vm.resetGroup()
+//                        } else {
+//                            vm.resetSingle()
+//                        }
+//                        showPreview = false
+//                    },
+//                    onEditPage: { index, croppedFull, quad in
+//                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
+//                    }
+//                )
+//            } else {
+//                DocumentPreviewView(
+//                    inputModel: .id(
+//                        result: vm.idResult,
+//                        previewMode: .newFromCamera,
+//                        rememberedFilterKey: nil
+//                    ),
+//                    onDone: {
+//                        vm.resetIdCaptures()
+//                        showPreview = false
+//                        onClose()
+//                    },
+//                    onRetake: {
+//                        vm.resetIdCaptures()
+//                        showPreview = false
+//                    },
+//                    onEditPage: { index, croppedFull, quad in
+//                        let side: IdCaptureSide = (index == 0 ? .front : .back)
+//                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
+//                    }
+//                )
+//            }
+//        }

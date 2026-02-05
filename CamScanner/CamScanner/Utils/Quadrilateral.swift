@@ -15,7 +15,7 @@ import Vision
 
 /// A data structure representing a quadrilateral and its position.
 /// This class exists to bypass the fact that CIRectangleFeature is read-only.
-public struct Quadrilateral: Transformable {
+public struct Quadrilateral: Transformable, Hashable {
 
     /// A point that specifies the top left corner of the quadrilateral.
     public var topLeft: CGPoint

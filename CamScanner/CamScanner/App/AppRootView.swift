@@ -20,6 +20,14 @@ struct AppRootView: View {
                     DocumentPreviewEntryView(documentID: id)
                 )
             }
+            
+        // MARK: - Scan
+            
+        case let r as ScanFlowRoute:
+            switch r {
+            case .scan:
+                return AnyView(ScanFlowContainerView())
+            }
 
         // MARK: - Merge
 

@@ -23,7 +23,13 @@ public enum AppIcon: String, CaseIterable {
     case flashOff = "flash_off"
     case flashAuto = "flash_auto"
     case link = "link"
-
+    case share = "share"
+    case page_plus = "page++"
+    case crop = "crop"
+    case rotate = "rotate"
+    case signature = "signature"
+    case trash = "trash"
+    
     // MARK: - Fill
     case homeFill = "home_fill"
     case settingsFill = "settings_fill"
@@ -32,6 +38,9 @@ public enum AppIcon: String, CaseIterable {
     case filesFill = "files_fill"
     case starFill = "star_fill"
     case flashFill = "flash_fill"
+    
+    // MARK: - Outline
+    case addCircle = "add_circle"
     
     // MARK: - Images
     case recognizeImage = "recognize_image"

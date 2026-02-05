@@ -6,6 +6,8 @@ struct AppEntryView: View {
     @State private var cameraButtonFrame: CGRect = .zero
     
     @StateObject private var tabBar = TabBarController()
+    
+    @EnvironmentObject private var router: Router
 
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
@@ -15,16 +17,13 @@ struct AppEntryView: View {
                     CustomTabBar(
                         selectedTab: $selectedTab,
                         cameraButtonFrame: $cameraButtonFrame,
-                        onScanTap: presentScan
+                        onScanTap: {
+                            router.present(ScanFlowRoute.scan)
+                        }
                     )
                     .transition(.move(edge: .bottom))
                 }
             }
             .animation(.easeOut(duration: 0.25), value: tabBar.isTabBarVisible)
-    }
-
-    private func presentScan() {
-        guard let presenter = UIViewController.topMost() else { return }
-        ScanModal.present(from: presenter, sourceFrameGlobal: cameraButtonFrame)
     }
 }
