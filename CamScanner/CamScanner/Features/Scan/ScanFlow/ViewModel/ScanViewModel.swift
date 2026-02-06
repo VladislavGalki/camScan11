@@ -278,8 +278,6 @@ final class ScanViewModel: ObservableObject {
     }
     
     func cancelQuickCrop() {
-        // трактуем как “переснять текущую сторону”
-        // просто очищаем captured для этой стороны
         switch ui.idCaptureSide {
         case .front:
             idResult.front = CapturedFrame()
@@ -322,7 +320,47 @@ final class ScanViewModel: ObservableObject {
 
         camera.capture()
     }
+    
+    // MARK: - Build preview
+    
+    func buildPreviewInputModel() -> ScanPreviewInputModel? {
+        let documentType = ui.selectedDocumentType
+        
+        switch documentType {
+        case .qrCode:
+            return nil
+        case .documents:
+            return ScanPreviewInputModel(
+                documentType: documentType,
+                pages: [documentType : scanResult]
+            )
+        case .idCard:
+            var idFrames: [CapturedFrame] = [idResult.front]
+            if let secondImageFrame = idResult.back {
+                idFrames.append(secondImageFrame)
+            }
+            return ScanPreviewInputModel(
+                documentType: documentType,
+                pages: [documentType : idFrames]
+            )
+        case .passport:
+            return ScanPreviewInputModel(
+                documentType: documentType,
+                pages: [documentType : [idResult.front]]
+            )
+        case .driverLicense:
+            var idFrames: [CapturedFrame] = [idResult.front]
+            if let secondImageFrame = idResult.back {
+                idFrames.append(secondImageFrame)
+            }
+            return ScanPreviewInputModel(
+                documentType: documentType,
+                pages: [documentType : idFrames]
+            )
+        }
+    }
 
+    // MARK: - Clean
     func resetSessionState(_ type: DocumentTypeEnum) {
         scanResult.removeAll()
         latestPreviewQuad = nil

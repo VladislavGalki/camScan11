@@ -234,12 +234,6 @@ final class DocumentCropperViewController: UIViewController {
 }
 
 private extension Quadrilateral {
-    func reorganized() -> Quadrilateral {
-        var q = self
-        q.reorganize()
-        return q
-    }
-
     func rotated90(direction: DocumentCropperViewController.RotationDirection,
                    inImageOfSize size: CGSize) -> Quadrilateral {
 

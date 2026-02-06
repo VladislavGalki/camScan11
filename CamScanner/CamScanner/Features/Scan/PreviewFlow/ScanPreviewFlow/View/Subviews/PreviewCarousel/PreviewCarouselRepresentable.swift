@@ -1,19 +1,28 @@
 import SwiftUI
 
 struct PreviewCarouselRepresentable: UIViewControllerRepresentable {
-    var images: [UIImage]
+    var models: [ScanPreviewModel]
+    
+    @Binding var actionBottomBarAction: ScanPreviewBottomBarAction?
+    
     var onPageChanged: (Int) -> Void
+    var onRotatePage: (Int) -> Void
     var onAddTapped: () -> Void
 
     func makeUIViewController(context: Context) -> PreviewCarouselController {
         PreviewCarouselController(
-            images: images,
+            models: models,
             onPageChanged: onPageChanged,
+            onRotatePage: onRotatePage,
             onAddTapped: onAddTapped
         )
     }
 
     func updateUIViewController(_ vc: PreviewCarouselController, context: Context) {
-        vc.update(images)
+        vc.update(models)
+        
+        if let actionBottomBarAction {
+            vc.handleBottomBarAction(actionBottomBarAction)
+        }
     }
 }

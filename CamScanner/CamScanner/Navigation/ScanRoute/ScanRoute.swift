@@ -1,5 +1,5 @@
 import Foundation
 
 enum ScanRoute: Route {
-    case scanPreview
+    case scanPreview(ScanPreviewInputModel)
 }

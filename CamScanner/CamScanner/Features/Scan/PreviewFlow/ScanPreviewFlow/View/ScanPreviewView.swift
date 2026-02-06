@@ -2,7 +2,14 @@ import SwiftUI
 import UIKit
 
 struct ScanPreviewView: View {
+    @State private var actionBottomBarAction: ScanPreviewBottomBarAction?
+    
+    @StateObject private var viewModel: ScanPreviewViewModel
     @EnvironmentObject private var router: Router
+    
+    init(inputModel: ScanPreviewInputModel) {
+        _viewModel = StateObject(wrappedValue: ScanPreviewViewModel(inputModel: inputModel))
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -68,15 +75,14 @@ struct ScanPreviewView: View {
     
     private var documentCarouselView: some View {
         PreviewCarouselRepresentable(
-            images: [
-                UIImage(systemName: "doc")!,
-                UIImage(systemName: "doc.text")!,
-                UIImage(systemName: "doc.richtext")!,
-                UIImage(systemName: "doc.plaintext")!,
-                UIImage(systemName: "doc.text.image")!,
-                UIImage(systemName: "doc.badge.plus")!
-            ],
+            models: viewModel.scanPreviewModel,
+            actionBottomBarAction: $actionBottomBarAction,
             onPageChanged: { _ in },
+            onRotatePage: { pageIndex in
+                withAnimation {
+                    viewModel.rotatePage(at: pageIndex)
+                }
+            },
             onAddTapped: {
                 router.pop()
             }
@@ -92,6 +98,13 @@ struct ScanPreviewView: View {
             
             tabItemView(icon: .crop, title: "Crop")
             tabItemView(icon: .rotate, title: "Rotate")
+                .onTapGesture {
+                    actionBottomBarAction = .rotate
+                    
+                    DispatchQueue.main.async {
+                        actionBottomBarAction = nil
+                    }
+                }
             tabItemView(icon: .signature, title: "Signature")
             tabItemView(icon: .trash, title: "Delete")
         }

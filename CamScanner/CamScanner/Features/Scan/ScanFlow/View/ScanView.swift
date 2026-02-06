@@ -140,7 +140,9 @@ struct ScanView: View {
                     image: miniPreviewImageForSelectedDocument,
                     count: miniPreviewCountForSelectedDocument,
                     onPreviewClick: {
-                        router.push(ScanRoute.scanPreview)
+                        if let inputModel = vm.buildPreviewInputModel() {
+                            router.push(ScanRoute.scanPreview(inputModel))
+                        }
                     }
                 )
                 .padding(.trailing, 20)

@@ -10,23 +10,27 @@ final class PreviewCarouselController: UIViewController {
 
     // MARK: Data
 
-    private var images: [UIImage]
-    private let onPageChanged: (Int) -> Void
-    private let onAddTapped: () -> Void
-    
     private let pageIndicator = PaddedLabel()
-
+    private var models: [ScanPreviewModel]
     private var collectionView: UICollectionView!
+    
+    private var currentIndex: Int = 0
+    
+    private let onPageChanged: (Int) -> Void
+    private let onRotatePage: (Int) -> Void
+    private let onAddTapped: () -> Void
 
     // MARK: Init
 
     init(
-        images: [UIImage],
+        models: [ScanPreviewModel],
         onPageChanged: @escaping (Int) -> Void,
+        onRotatePage: @escaping (Int) -> Void,
         onAddTapped: @escaping () -> Void
     ) {
-        self.images = images
+        self.models = models
         self.onPageChanged = onPageChanged
+        self.onRotatePage = onRotatePage
         self.onAddTapped = onAddTapped
         super.init(nibName: nil, bundle: nil)
     }
@@ -50,9 +54,31 @@ final class PreviewCarouselController: UIViewController {
 
     // MARK: Public
 
-    func update(_ newImages: [UIImage]) {
-        images = newImages
+    func update(_ newModels: [ScanPreviewModel]) {
+        models = newModels
         collectionView.reloadData()
+    }
+    
+    func handleBottomBarAction(_ action: ScanPreviewBottomBarAction) {
+        switch action {
+        case .rotate:
+            rotateCurrentPage()
+        }
+    }
+    
+    private func rotateCurrentPage() {
+        onRotatePage(currentIndex)
+        
+        
+        guard models.indices.contains(currentIndex) else { return }
+        var model = models[currentIndex]
+
+        model.frames = model.frames.map {
+            RotationService.shared.rotateRight(frame: $0)
+        }
+
+        models[currentIndex] = model
+        collectionView.reloadItems(at: [IndexPath(item: currentIndex, section: 0)])
     }
 }
 
@@ -88,8 +114,8 @@ private extension PreviewCarouselController {
     }
     
     private func updateIndicator(index: Int) {
-        guard images.isEmpty == false else { return }
-        pageIndicator.text = "\(index + 1)/\(images.count)"
+        guard models.isEmpty == false else { return }
+        pageIndicator.text = "\(index + 1)/\(models.count)"
     }
 }
 
@@ -150,16 +176,14 @@ extension PreviewCarouselController: UICollectionViewDataSource {
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        images.count + 1
+        models.count + 1
     }
 
     func collectionView(
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-
-        // Add page cell
-        if indexPath.item == images.count {
+        if indexPath.item == models.count {
             return collectionView.dequeueReusableCell(
                 withReuseIdentifier: PreviewAddPageCell.reuseId,
                 for: indexPath
@@ -173,7 +197,7 @@ extension PreviewCarouselController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
 
-        cell.configure(image: images[indexPath.item])
+        cell.configure(model: models[indexPath.item])
 
         cell.onZoomChanged = { [weak self] zoomed in
             self?.collectionView.isScrollEnabled = !zoomed
@@ -200,7 +224,7 @@ extension PreviewCarouselController: UICollectionViewDelegateFlowLayout {
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {
-        if indexPath.item == images.count {
+        if indexPath.item == models.count {
             onAddTapped()
         }
     }
@@ -229,8 +253,9 @@ extension PreviewCarouselController: UICollectionViewDelegateFlowLayout {
         let fullWidth = cardWidth + spacing
         let offset = scrollView.contentOffset.x + scrollView.contentInset.left
         let rawIndex = Int(round(offset / fullWidth))
-        let clampedIndex = min(rawIndex, images.count - 1)
+        let clampedIndex = min(rawIndex, models.count - 1)
 
+        currentIndex = clampedIndex
         updateIndicator(index: clampedIndex)
     }
 }

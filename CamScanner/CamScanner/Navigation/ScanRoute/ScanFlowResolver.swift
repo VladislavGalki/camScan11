@@ -5,8 +5,8 @@ enum ScanFlowResolver {
         switch route {
         case let r as ScanRoute:
             switch r {
-            case .scanPreview:
-                return AnyView(ScanPreviewView())
+            case let .scanPreview(inputModel):
+                return AnyView(ScanPreviewView(inputModel: inputModel))
         }
         default:
             return AnyView(EmptyView())
