@@ -29,6 +29,8 @@ public enum AppIcon: String, CaseIterable {
     case rotate = "rotate"
     case signature = "signature"
     case trash = "trash"
+    case back = "back"
+    case forward = "forward"
     
     // MARK: - Fill
     case homeFill = "home_fill"

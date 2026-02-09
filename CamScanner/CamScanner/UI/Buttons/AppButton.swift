@@ -26,17 +26,20 @@ struct AppButtonConfig: Hashable {
     var style: Style
     var size: Size
     var content: Content
+    var extraTitleColor: Color? = nil
     var isFullWidth: Bool = false
     
     init(
         content: Content,
         style: Style,
         size: Size,
+        extraTitleColor: Color? = nil,
         isFullWidth: Bool = false
     ) {
         self.content = content
         self.style = style
         self.size = size
+        self.extraTitleColor = extraTitleColor
         self.isFullWidth = isFullWidth
     }
 }
@@ -80,6 +83,7 @@ struct AppButton: View {
                 variant: config.style,
                 size: config.size,
                 isFullWidth: config.isFullWidth,
+                extraTitleColor: config.extraTitleColor,
                 contentKind: config.content.kind,
                 isEnabled: appButtonEnabled
             )
@@ -117,6 +121,7 @@ struct AppButtonStyle: ButtonStyle {
     let variant: AppButtonConfig.Style
     let size: AppButtonConfig.Size
     let isFullWidth: Bool
+    let extraTitleColor: Color?
     let contentKind: ButtonContentKind
     let isEnabled: Bool
     
@@ -130,7 +135,7 @@ struct AppButtonStyle: ButtonStyle {
             .padding(padding)
             .contentShape(Capsule())
             .background(background(isEnabled: isEnabled))
-            .foregroundStyle(foreground(isEnabled: isEnabled))
+            .foregroundStyle(extraTitleColor ?? foreground(isEnabled: isEnabled))
             .clipShape(Capsule())
             .scaleEffect(configuration.isPressed && isEnabled ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -182,21 +187,21 @@ private extension AppButtonConfig.Size {
         case .l:
             return ButtonMetrics(
                 textStyle: .bodyPrimary,
-                horizontalPaddingText: EdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18),
+                horizontalPaddingText: EdgeInsets(top: 13, leading: 18, bottom: 13, trailing: 18),
                 horizontalPaddingTextWithIcon: EdgeInsets(top: 13, leading: 14, bottom: 13, trailing: 18),
                 horizontalPaddingIconOnly: EdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
             )
         case .m:
             return ButtonMetrics(
                 textStyle: .bodySecondary,
-                horizontalPaddingText: EdgeInsets(top: 11, leading: 16, bottom: 11, trailing: 16),
+                horizontalPaddingText: EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16),
                 horizontalPaddingTextWithIcon: EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 16),
                 horizontalPaddingIconOnly: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
             )
         case .s:
             return ButtonMetrics(
                 textStyle: .bodySecondary,
-                horizontalPaddingText: EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8),
+                horizontalPaddingText: EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8),
                 horizontalPaddingTextWithIcon: EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8),
                 horizontalPaddingIconOnly: EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
             )

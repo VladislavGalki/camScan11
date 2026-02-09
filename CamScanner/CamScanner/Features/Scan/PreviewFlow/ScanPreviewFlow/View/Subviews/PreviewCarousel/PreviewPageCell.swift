@@ -68,6 +68,10 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        
+        print("📐 cell bounds:", bounds)
+        print("📐 imageView frame1:", imageView1.frame)
+        print("📐 imageView frame2:", imageView2.frame)
 
         scrollView.frame = contentView.bounds
         zoomContainerView.frame = scrollView.bounds
@@ -101,7 +105,6 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
         // MARK: Documents
         case .documents:
-
             guard let image = previews.first else { return }
 
             imageView1.isHidden = false
@@ -118,6 +121,9 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
             imageView1.image = previews.first
             imageView2.image = previews.count > 1 ? previews[1] : nil
+            
+            logImage(previews.first, tag: "CELL CONFIG IMAGE FIRST")
+            logImage(previews[1], tag: "CELL CONFIG IMAGE SECOND")
 
             let size = CGSize(width: 171, height: 108)
 
@@ -134,8 +140,9 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
         // MARK: Passport
         case .passport:
-
             guard let image = previews.first else { return }
+            
+            logImage(image, tag: "CELL CONFIG IMAGE")
 
             imageView1.isHidden = false
             imageView1.image = image
@@ -186,5 +193,19 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
         }
 
         zoomContainerView.frame = frame
+    }
+    
+    func logImage(_ image: UIImage?, tag: String) {
+        guard let image else {
+            print("❌ \(tag) image nil")
+            return
+        }
+
+        print("""
+        🖼 \(tag)
+           size: \(image.size)
+           scale: \(image.scale)
+           orientation: \(image.imageOrientation.rawValue)
+        """)
     }
 }

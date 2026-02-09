@@ -7,10 +7,13 @@ public enum RotationDirection {
 }
 
 final class RotationService {
+
     static let shared = RotationService()
-    
+
+    private let filterRenderer = FilterRenderer.shared
+
     private init() {}
-    
+
     func rotateRight(frame: CapturedFrame) -> CapturedFrame {
         rotate(frame: frame, direction: .right)
     }
@@ -28,29 +31,38 @@ private extension RotationService {
 
         var newFrame = frame
 
+        // ORIGINAL
         if let original = frame.original {
             newFrame.original = rotateImage(original, direction: direction)
         }
 
-        if let preview = frame.preview {
-            newFrame.preview = rotateImage(preview, direction: direction)
-        }
-
+        // QUAD
         if let quad = frame.quad,
-           let original = frame.original {
+           let oldOriginal = frame.original {
 
             newFrame.quad = quad
-                .rotated90(direction: direction, inImageOfSize: original.size)
+                .rotated90(direction: direction, inImageOfSize: oldOriginal.size)
                 .reorganized()
         }
 
-        if let base = frame.drawingBase {
-            newFrame.drawingBase = rotateImage(base, direction: direction)
+        // DISPLAY BASE вращаем
+        if let display = frame.displayBase ?? frame.previewBase {
+            newFrame.displayBase = rotateImage(display, direction: direction)
+        }
+
+        // Перерендер preview через displayBase
+        if let display = newFrame.displayBase {
+            newFrame.preview = filterRenderer.render(
+                image: display,
+                state: newFrame.currentFilter
+            )
         }
 
         return newFrame
     }
-    
+
+    // MARK: Image Rotation
+
     func rotateImage(
         _ image: UIImage,
         direction: RotationDirection

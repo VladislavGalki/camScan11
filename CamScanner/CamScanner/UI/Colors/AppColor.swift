@@ -7,6 +7,7 @@ enum AppColor: Hashable {
     case text(Text)
     case elements(Elements)
     case border(Border)
+    case divider(Divider)
 
     enum Background: Hashable {
         case main
@@ -35,6 +36,7 @@ enum AppColor: Hashable {
         case onImmersive
         case onImmersiveMuted
         case onHint
+        case distructive
     }
 
     enum Elements: Hashable {
@@ -56,6 +58,10 @@ enum AppColor: Hashable {
         case hint
         case hintNeutral
         case detectionFrame
+    }
+    
+    enum Divider: Hashable {
+        case `default`
     }
 }
 
@@ -99,6 +105,7 @@ private extension AppColor {
         case .text(.onImmersive):       return .sRGB01(1, 1, 1, 1)                                   // Text/on immersive
         case .text(.onImmersiveMuted):  return .sRGB01(0.40392157, 0.40392157, 0.40392157, 1)        // Text/on immersive-muted
         case .text(.onHint):            return .sRGB01(1, 1, 1, 1)                                   // Text/on hint
+        case .text(.distructive):       return .sRGB01(1, 0.220, 0.235, 1)
 
         // Elements
         case .elements(.primary):           return .sRGB01(0, 0, 0, 1)                                // Elements/primary
@@ -118,6 +125,9 @@ private extension AppColor {
         case .border(.hint):             return .sRGB01(0, 0.53333336, 1, 0.2)                         // Borders/hint
         case .border(.hintNeutral):      return .sRGB01(1, 1, 1, 0.1)
         case .border(.detectionFrame):   return .sRGB01(0, 0.53333336, 1, 1)                           // Borders/detection frame
+            
+        // Dividers
+        case .divider(.default):        return .sRGB01(0.937, 0.937, 0.937, 1)
         }
     }
 }
@@ -153,5 +163,10 @@ extension ShapeStyle where Self == Color {
     // Border
     static func border(_ token: AppColor.Border) -> Color {
         .app(.border(token))
+    }
+    
+    // Divider
+    static func divider(_ token: AppColor.Divider) -> Color {
+        .app(.divider(token))
     }
 }

@@ -1,15 +1,15 @@
 import UIKit
 
 final class PreviewCarouselController: UIViewController {
-
+    
     // MARK: Constants
-
+    
     private let cardWidth: CGFloat = 322
     private let maxCardHeight: CGFloat = 456
     private let spacing: CGFloat = 16
-
+    
     // MARK: Data
-
+    
     private let pageIndicator = PaddedLabel()
     private var models: [ScanPreviewModel]
     private var collectionView: UICollectionView!
@@ -19,9 +19,9 @@ final class PreviewCarouselController: UIViewController {
     private let onPageChanged: (Int) -> Void
     private let onRotatePage: (Int) -> Void
     private let onAddTapped: () -> Void
-
+    
     // MARK: Init
-
+    
     init(
         models: [ScanPreviewModel],
         onPageChanged: @escaping (Int) -> Void,
@@ -34,26 +34,26 @@ final class PreviewCarouselController: UIViewController {
         self.onAddTapped = onAddTapped
         super.init(nibName: nil, bundle: nil)
     }
-
+    
     required init?(coder: NSCoder) { fatalError() }
-
+    
     // MARK: Lifecycle
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCollection()
         updateIndicator(index: 0)
     }
-
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
         updateHorizontalInsets()
         updateVerticalInsets()
     }
-
+    
     // MARK: Public
-
+    
     func update(_ newModels: [ScanPreviewModel]) {
         models = newModels
         collectionView.reloadData()
@@ -63,22 +63,29 @@ final class PreviewCarouselController: UIViewController {
         switch action {
         case .rotate:
             rotateCurrentPage()
+        case let .deletePage(index):
+            handlePageDeletion(at: index)
         }
     }
     
     private func rotateCurrentPage() {
         onRotatePage(currentIndex)
-        
-        
-        guard models.indices.contains(currentIndex) else { return }
-        var model = models[currentIndex]
+    }
+    
+    func handlePageDeletion(at index: Int) {
+        let targetIndex = min(index, models.count - 1)
+    
+        guard targetIndex >= 0 else { return }
+        let indexPath = IndexPath(item: targetIndex, section: 0)
 
-        model.frames = model.frames.map {
-            RotationService.shared.rotateRight(frame: $0)
-        }
+        collectionView.scrollToItem(
+            at: indexPath,
+            at: .centeredHorizontally,
+            animated: true
+        )
 
-        models[currentIndex] = model
-        collectionView.reloadItems(at: [IndexPath(item: currentIndex, section: 0)])
+        currentIndex = targetIndex
+        updateIndicator(index: targetIndex)
     }
 }
 
