@@ -14,11 +14,9 @@ final class FilterRenderer {
         image: UIImage,
         state: FilterState
     ) -> UIImage? {
-        logImage(image, tag: "RENDER INPUT")
         guard var ciImage = normalizedCIImage(from: image) else {
             return image
         }
-        print("CI extent BEFORE:", ciImage.extent)
 
         if state.rotationAngle != 0 {
             ciImage = applyRotation(
@@ -51,7 +49,6 @@ final class FilterRenderer {
             orientation: .up
         )
 
-        logImage(result, tag: "RENDER OUTPUT")
         return result
     }
     
@@ -165,20 +162,4 @@ private extension FilterRenderer {
         filter.inputImage = image
         return filter.outputImage ?? image
     }
-}
-
-// MARK: - Debug
-
-func logImage(_ image: UIImage?, tag: String) {
-    guard let image else {
-        print("❌ \(tag) image nil")
-        return
-    }
-
-    print("""
-    🖼 \(tag)
-       size: \(image.size)
-       scale: \(image.scale)
-       orientation: \(image.imageOrientation.rawValue)
-    """)
 }

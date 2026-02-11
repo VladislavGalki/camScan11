@@ -321,42 +321,151 @@ final class ScanViewModel: ObservableObject {
         camera.capture()
     }
     
-    // MARK: - Build preview
+    // MARK: - Build input/output preview
     
     func buildPreviewInputModel() -> ScanPreviewInputModel? {
         let documentType = ui.selectedDocumentType
-        
+
+        func normalized(_ frames: [CapturedFrame]) -> [CapturedFrame] {
+            frames.map {
+                var f = $0
+
+                if f.previewBase == nil {
+                    f.previewBase = f.drawingBase ?? f.preview
+                }
+
+                if f.displayBase == nil {
+                    f.displayBase = f.previewBase
+                }
+
+                if f.filterHistory.states.isEmpty {
+                    f.filterHistory = FilterHistory(
+                        states: [FilterState()],
+                        currentIndex: 0
+                    )
+                }
+
+                return f
+            }
+        }
+
         switch documentType {
         case .qrCode:
             return nil
+
         case .documents:
             return ScanPreviewInputModel(
                 documentType: documentType,
-                pages: [documentType : scanResult]
-            )
-        case .idCard:
-            var idFrames: [CapturedFrame] = [idResult.front]
-            if let secondImageFrame = idResult.back {
-                idFrames.append(secondImageFrame)
-            }
-            return ScanPreviewInputModel(
-                documentType: documentType,
-                pages: [documentType : idFrames]
+                pages: [
+                    documentType : normalized(scanResult)
+                ]
             )
         case .passport:
             return ScanPreviewInputModel(
                 documentType: documentType,
-                pages: [documentType : [idResult.front]]
+                pages: [
+                    documentType : normalized([idResult.front])
+                ]
             )
-        case .driverLicense:
-            var idFrames: [CapturedFrame] = [idResult.front]
-            if let secondImageFrame = idResult.back {
-                idFrames.append(secondImageFrame)
+        case .idCard:
+            var frames: [CapturedFrame] = [idResult.front]
+            
+            if let back = idResult.back {
+                frames.append(back)
             }
+
             return ScanPreviewInputModel(
                 documentType: documentType,
-                pages: [documentType : idFrames]
+                pages: [
+                    documentType : normalized(frames)
+                ]
             )
+        case .driverLicense:
+            var frames: [CapturedFrame] = [idResult.front]
+
+            if let back = idResult.back {
+                frames.append(back)
+            }
+
+            return ScanPreviewInputModel(
+                documentType: documentType,
+                pages: [
+                    documentType : normalized(frames)
+                ]
+            )
+        }
+    }
+    
+    func buildOutputPreview(_ model: ScanPreviewInputModel) {
+        let frames = model.pages[model.documentType] ?? []
+
+        switch model.documentType {
+        case .documents:
+            scanResult = frames
+        case .passport:
+            idResult.front = frames.first ?? CapturedFrame()
+            idResult.back = nil
+        case .idCard, .driverLicense:
+            idResult.front = frames.first ?? CapturedFrame()
+            idResult.back = frames.count > 1 ? frames[1] : nil
+        case .qrCode:
+            break
+        }
+    }
+    
+    // MARK: - Calculated
+    
+    var captureShutterButtonDisabled: Bool {
+        switch ui.selectedDocumentType {
+        case .documents:
+            return false
+        case .idCard, .driverLicense:
+            return idResult.front.hasPreview &&
+                   idResult.back?.hasPreview == true
+        case .passport:
+            return idResult.front.hasPreview
+        case .qrCode:
+            return true
+        }
+    }
+    
+    var shouldDisableMiniPreview: Bool {
+        switch ui.selectedDocumentType {
+        case .documents, .passport, .qrCode:
+            return false
+        case .idCard, .driverLicense:
+            return idResult.back?.displayPreview == nil
+        }
+    }
+    
+    var miniPreviewImageForSelectedDocument: UIImage? {
+        switch ui.selectedDocumentType {
+        case .documents:
+            return scanResult.last?.displayPreview
+        case .idCard, .driverLicense:
+            if let back = idResult.back?.displayPreview {
+                return back
+            }
+            return idResult.front.displayPreview
+        case .passport:
+            return idResult.front.displayPreview
+        case .qrCode:
+            return nil
+        }
+    }
+    
+    var miniPreviewCountForSelectedDocument: Int {
+        switch ui.selectedDocumentType {
+        case .documents:
+            return scanResult.filter { $0.hasPreview }.count
+        case .idCard, .driverLicense:
+            let front = idResult.front.hasPreview ? 1 : 0
+            let back = idResult.back?.hasPreview == true ? 1 : 0
+            return front + back
+        case .passport:
+            return idResult.front.hasPreview ? 1 : 0
+        case .qrCode:
+            return 0
         }
     }
 

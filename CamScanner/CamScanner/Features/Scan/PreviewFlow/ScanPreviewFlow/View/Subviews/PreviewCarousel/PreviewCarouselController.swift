@@ -87,6 +87,13 @@ final class PreviewCarouselController: UIViewController {
         currentIndex = targetIndex
         updateIndicator(index: targetIndex)
     }
+    
+    // MARK: Private
+    
+    private var shouldShowAddCell: Bool {
+        guard let first = models.first else { return false }
+        return first.documentType != .idCard && first.documentType != .driverLicense
+    }
 }
 
 // MARK: - Layout Helpers
@@ -183,18 +190,23 @@ extension PreviewCarouselController: UICollectionViewDataSource {
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        models.count + 1
+        return models.count + (shouldShowAddCell ? 1 : 0)
     }
 
     func collectionView(
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        if indexPath.item == models.count {
+
+        if shouldShowAddCell && indexPath.item == models.count {
             return collectionView.dequeueReusableCell(
                 withReuseIdentifier: PreviewAddPageCell.reuseId,
                 for: indexPath
             )
+        }
+
+        guard indexPath.item < models.count else {
+            return UICollectionViewCell()
         }
 
         guard let cell = collectionView.dequeueReusableCell(

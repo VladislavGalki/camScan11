@@ -18,6 +18,16 @@ struct CapturedFrame: Equatable, Hashable {
 }
 
 extension CapturedFrame {
+    var displayPreview: UIImage? {
+        previewBase ?? preview 
+    }
+
+    var hasPreview: Bool {
+        displayPreview != nil
+    }
+}
+
+extension CapturedFrame {
     var currentFilter: FilterState {
         filterHistory.current
     }

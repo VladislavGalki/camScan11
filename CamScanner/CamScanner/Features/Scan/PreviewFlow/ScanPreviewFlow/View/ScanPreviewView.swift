@@ -9,8 +9,10 @@ struct ScanPreviewView: View {
     @StateObject private var viewModel: ScanPreviewViewModel
     @EnvironmentObject private var router: Router
     
-    init(inputModel: ScanPreviewInputModel) {
-        _viewModel = StateObject(wrappedValue: ScanPreviewViewModel(inputModel: inputModel))
+    init(inputModel: ScanPreviewInputModel, onFinish: @escaping (ScanPreviewInputModel) -> Void) {
+        _viewModel = StateObject(
+            wrappedValue: ScanPreviewViewModel(inputModel: inputModel, onFinish: onFinish)
+        )
     }
     
     var body: some View {
@@ -93,6 +95,7 @@ struct ScanPreviewView: View {
                 viewModel.rotatePage(at: pageIndex)
             },
             onAddTapped: {
+                viewModel.onFinishFlow()
                 router.pop()
             }
         )
@@ -161,10 +164,13 @@ struct ScanPreviewView: View {
     
     private var bottomContainerView: some View {
         HStack(spacing: 0) {
-            tabItemView(icon: .page_plus, title: "Add page")
-                .onTapGesture {
-                    router.pop()
-                }
+            if viewModel.documentType != .idCard && viewModel.documentType != .driverLicense {
+                tabItemView(icon: .page_plus, title: "Add page")
+                    .onTapGesture {
+                        viewModel.onFinishFlow()
+                        router.pop()
+                    }
+            }
             
             tabItemView(icon: .crop, title: "Crop")
             tabItemView(icon: .rotate, title: "Rotate")
@@ -255,7 +261,10 @@ struct ScanPreviewView: View {
                         ),
                         action: {
                             shoudShowDeleteOverlay = false
-                            router.pop()
+                            if let _ = viewModel.deletePage() {
+                                viewModel.onFinishFlow()
+                                router.pop()
+                            }
                         }
                     )
                     

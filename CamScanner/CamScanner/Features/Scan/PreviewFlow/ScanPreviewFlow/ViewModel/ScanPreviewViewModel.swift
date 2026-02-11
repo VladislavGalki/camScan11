@@ -11,14 +11,21 @@ final class ScanPreviewViewModel: ObservableObject {
 
     private let filterRenderer: FilterRenderer
     private let inputModel: ScanPreviewInputModel
+    
+    private let onFinish: (ScanPreviewInputModel) -> Void
 
-    init(inputModel: ScanPreviewInputModel) {
+    init(inputModel: ScanPreviewInputModel, onFinish: @escaping (ScanPreviewInputModel) -> Void) {
         self.inputModel = inputModel
         self.filterRenderer = FilterRenderer.shared
+        self.onFinish = onFinish
         bootstrap()
     }
 
     // MARK: - Public
+    
+    var documentType: DocumentTypeEnum {
+        inputModel.documentType
+    }
 
     var currentFrame: CapturedFrame? {
         guard selectedPageIndex < scanPreviewModel.count else { return nil }
@@ -42,6 +49,10 @@ final class ScanPreviewViewModel: ObservableObject {
     func updateSelectedPageIndex(_ index: Int) {
         selectedPageIndex = index
         rebuildFilterPreviewItems()
+    }
+    
+    func onFinishFlow() {
+        onFinish(buildOutputModel())
     }
 
     // MARK: - Delete
@@ -298,30 +309,40 @@ final class ScanPreviewViewModel: ObservableObject {
         inputModel.pages.forEach { entry in
             let type = entry.key
             let frames = entry.value.filter { $0.preview != nil }
+            
+            let updatedFrames = frames.map { frame -> CapturedFrame in
+                var copy = frame
+                if copy.previewBase == nil {
+                    copy.previewBase =
+                        copy.drawingBase ??
+                        copy.original ??
+                        copy.preview
+                }
+
+                if copy.displayBase == nil {
+                    copy.displayBase = copy.previewBase
+                }
+
+                if let base = copy.displayBase {
+                    copy.preview = filterRenderer.render(
+                        image: base,
+                        state: copy.currentFilter
+                    )
+                }
+
+                return copy
+            }
 
             if type == .documents {
-                frames.forEach { frame in
-                    var copy = frame
-                    copy.previewBase = frame.preview
-                    copy.displayBase = frame.preview
-                    copy.preview = frame.preview
-
+                updatedFrames.forEach { frame in
                     result.append(
                         ScanPreviewModel(
                             documentType: type,
-                            frames: [copy]
+                            frames: [frame]
                         )
                     )
                 }
             } else {
-                let updatedFrames = frames.map { frame -> CapturedFrame in
-                    var copy = frame
-                    copy.previewBase = frame.preview
-                    copy.displayBase = frame.preview
-                    copy.preview = frame.preview
-                    return copy
-                }
-
                 result.append(
                     ScanPreviewModel(
                         documentType: type,
@@ -333,5 +354,19 @@ final class ScanPreviewViewModel: ObservableObject {
 
         scanPreviewModel = result
         updateSelectedPageIndex(selectedPageIndex)
+    }
+    
+    private func buildOutputModel() -> ScanPreviewInputModel {
+        var pages: [DocumentTypeEnum: [CapturedFrame]] = [:]
+        for page in scanPreviewModel {
+            let type = page.documentType
+            let frames = page.frames
+            pages[type, default: []].append(contentsOf: frames)
+        }
+
+        return ScanPreviewInputModel(
+            documentType: inputModel.documentType,
+            pages: pages
+        )
     }
 }

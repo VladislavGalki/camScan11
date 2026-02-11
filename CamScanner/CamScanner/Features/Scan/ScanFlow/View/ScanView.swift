@@ -4,6 +4,8 @@ struct ScanView: View {
     @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
     
+    @State private var navigationViewHeight: CGFloat = .zero
+    
     @EnvironmentObject private var router: Router
     
     let oncloseClick: () -> Void
@@ -22,6 +24,9 @@ struct ScanView: View {
                 .padding(.leading, 16)
                 .padding(.trailing, 26)
                 .padding(.bottom, 16)
+                .reportHeight { height in
+                    navigationViewHeight = height
+                }
             
             cameraView
             
@@ -34,6 +39,7 @@ struct ScanView: View {
                 QuickDocumentCropperView(
                     store: store,
                     cropperModel: cropperModel,
+                    navigationHeight: navigationViewHeight,
                     onRetake: {
                         vm.retakeQuickCrop()
                     },
@@ -128,7 +134,7 @@ struct ScanView: View {
             HStack(spacing: 0) {
                 CaptureShutterButton(
                     shoudStartTimer: false,
-                    buttonDisabled: captureShutterButtonDisabled
+                    buttonDisabled: vm.captureShutterButtonDisabled
                 ) {
                     vm.capture()
                 }
@@ -137,15 +143,20 @@ struct ScanView: View {
             .overlay(alignment: .trailing) {
                 MiniPreviewDocumentView(
                     store: store,
-                    image: miniPreviewImageForSelectedDocument,
-                    count: miniPreviewCountForSelectedDocument,
+                    image: vm.miniPreviewImageForSelectedDocument,
+                    count: vm.miniPreviewCountForSelectedDocument,
                     onPreviewClick: {
                         if let inputModel = vm.buildPreviewInputModel() {
-                            router.push(ScanRoute.scanPreview(inputModel))
+                            router.push(
+                                ScanRoute.scanPreview(inputModel) { outputModel in
+                                    vm.buildOutputPreview(outputModel)
+                                }
+                            )
                         }
                     }
                 )
                 .padding(.trailing, 20)
+                .disabled(vm.shouldDisableMiniPreview)
             }
             .padding(.top, 24)
             .padding(.bottom, 12)
@@ -193,60 +204,6 @@ struct ScanView: View {
     
     private var shouldHideNavigationAndBottombBar: Double {
         vm.shouldShowQuickPreview ? 0 : 1
-    }
-    
-    private var captureShutterButtonDisabled: Bool {
-        switch store.ui.selectedDocumentType {
-        case .documents:
-            return false
-        case .idCard, .driverLicense:
-            return vm.idResult.front.preview != nil && vm.idResult.back?.preview != nil
-        case .passport:
-            return vm.idResult.front.preview != nil
-        case .qrCode:
-            return true
-        }
-    }
-    
-    private var miniPreviewImageForSelectedDocument: UIImage? {
-        switch store.ui.selectedDocumentType {
-        case .documents:
-            return vm.scanResult.last?.preview
-        case .idCard, .driverLicense:
-            if let backImage = vm.idResult.back?.preview {
-                return backImage
-            } else if let frontImage = vm.idResult.front.preview {
-                return frontImage
-            } else {
-                return nil
-            }
-        case .passport:
-            if let frontImage = vm.idResult.front.preview {
-                return frontImage
-            } else {
-                return nil
-            }
-        case .qrCode:
-            return nil
-        }
-    }
-    
-    private var miniPreviewCountForSelectedDocument: Int {
-        switch store.ui.selectedDocumentType {
-        case .documents:
-            return vm.scanResult.count
-        case .idCard, .driverLicense:
-            if vm.idResult.back?.preview != nil {
-                return 2
-            } else if vm.idResult.front.preview != nil {
-                return 1
-            }
-            return 0
-        case .passport:
-            return 1
-        case .qrCode:
-            return 0
-        }
     }
 }
 
