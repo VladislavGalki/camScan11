@@ -68,10 +68,6 @@ final class PreviewPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        
-        print("📐 cell bounds:", bounds)
-        print("📐 imageView frame1:", imageView1.frame)
-        print("📐 imageView frame2:", imageView2.frame)
 
         scrollView.frame = contentView.bounds
         zoomContainerView.frame = scrollView.bounds

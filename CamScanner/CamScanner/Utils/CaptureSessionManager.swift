@@ -365,7 +365,7 @@ extension CaptureSessionManager: AVCapturePhotoCaptureDelegate {
                 }
                 return
             }
-
+            
             var angle: CGFloat = 0.0
 
             switch image.imageOrientation {

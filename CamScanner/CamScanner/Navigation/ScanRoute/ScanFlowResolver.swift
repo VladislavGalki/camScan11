@@ -7,6 +7,8 @@ enum ScanFlowResolver {
             switch r {
             case let .scanPreview(inputModel, onFinish):
                 return AnyView(ScanPreviewView(inputModel: inputModel, onFinish: onFinish))
+            case let.scanCropper(inputModel, onFinish):
+                return AnyView(ScanCropperView(input: inputModel, onFinish: onFinish))
         }
         default:
             return AnyView(EmptyView())

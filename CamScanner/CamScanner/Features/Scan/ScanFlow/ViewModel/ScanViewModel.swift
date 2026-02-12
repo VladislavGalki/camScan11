@@ -181,7 +181,7 @@ final class ScanViewModel: ObservableObject {
             previewSize: previewSize,
             quality: ui.quality
         )
-
+        
         let captured = CapturedFrame(
             preview: output.preview,
             original: output.original,

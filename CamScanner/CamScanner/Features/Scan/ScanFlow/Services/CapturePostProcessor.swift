@@ -16,9 +16,13 @@ final class CapturePostProcessor {
         autoMode: Bool,
         quality: QualityPreset
     ) -> CapturePostProcessOutput {
+        /// rotation считаем ДО normalize
+        let rotationAngle = SmartCropper.rotationAngle(for: image.imageOrientation)
 
-        let original = image
-        var previewImage = image
+        /// normalize изображение
+        let original = image.normalizedUp()
+
+        var previewImage = original
         var usedQuad: Quadrilateral? = nil
 
         if autoMode,
@@ -26,10 +30,31 @@ final class CapturePostProcessor {
            previewImageSize.width > 0,
            previewImageSize.height > 0 {
 
-            let angle = SmartCropper.rotationAngle(for: original.imageOrientation)
-            let quadInImageSpace = previewQuad.scale(previewImageSize, original.size, withRotationAngle: angle)
+            let quadInImageSpace = previewQuad.scale(
+                previewImageSize,
+                original.size,
+                withRotationAngle: rotationAngle
+            )
 
-            if let cropped = SmartCropper.cropAndDeskew(image: original, quad: quadInImageSpace) {
+            let points = [
+                quadInImageSpace.topLeft,
+                quadInImageSpace.topRight,
+                quadInImageSpace.bottomRight,
+                quadInImageSpace.bottomLeft
+            ]
+
+            for (i, p) in points.enumerated() {
+                let inside =
+                    p.x >= 0 && p.y >= 0 &&
+                    p.x <= original.size.width &&
+                    p.y <= original.size.height
+            }
+
+            if let cropped = SmartCropper.cropAndDeskew(
+                image: original,
+                quad: quadInImageSpace
+            ) {
+
                 previewImage = cropped
                 usedQuad = quadInImageSpace
             } else {

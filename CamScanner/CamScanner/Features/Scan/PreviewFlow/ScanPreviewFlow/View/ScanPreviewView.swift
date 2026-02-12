@@ -173,6 +173,18 @@ struct ScanPreviewView: View {
             }
             
             tabItemView(icon: .crop, title: "Crop")
+                .onTapGesture {
+                    router.push(
+                        ScanRoute.scanCropper(
+                            ScanCropperInputModel(
+                                pages: viewModel.scanPreviewModel,
+                                documentType: viewModel.documentType
+                            )
+                        ) { _ in
+                            
+                        }
+                    )
+                }
             tabItemView(icon: .rotate, title: "Rotate")
                 .onTapGesture {
                     actionBottomBarAction = .rotate

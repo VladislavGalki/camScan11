@@ -35,7 +35,6 @@ final class FilterRenderer {
             to: ciImage
         )
 
-        print("CI extent AFTER:", ciImage.extent)
         guard let cgImage = context.createCGImage(
             ciImage,
             from: ciImage.extent
