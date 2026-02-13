@@ -219,17 +219,20 @@ final class DocumentCropperViewController: UIViewController {
         
         let g = UILongPressGestureRecognizer(target: zoomGestureController,
                                              action: #selector(zoomGestureController.handle(pan:)))
+        g.delegate = self
+        g.cancelsTouchesInView = false
         g.minimumPressDuration = 0
         view.addGestureRecognizer(g)
         panGesture = g
     }
 
-    private static func defaultQuad(allOfImage image: UIImage, withOffset offset: CGFloat = 75) -> Quadrilateral {
-        let tl = CGPoint(x: offset, y: offset)
-        let tr = CGPoint(x: image.size.width - offset, y: offset)
-        let br = CGPoint(x: image.size.width - offset, y: image.size.height - offset)
-        let bl = CGPoint(x: offset, y: image.size.height - offset)
-        return Quadrilateral(topLeft: tl, topRight: tr, bottomRight: br, bottomLeft: bl)
+    private static func defaultQuad(allOfImage image: UIImage) -> Quadrilateral {
+        Quadrilateral(
+            topLeft: .zero,
+            topRight: CGPoint(x: image.size.width, y: 0),
+            bottomRight: CGPoint(x: image.size.width, y: image.size.height),
+            bottomLeft: CGPoint(x: 0, y: image.size.height)
+        )
     }
 }
 
@@ -253,5 +256,13 @@ private extension Quadrilateral {
             bottomRight: f(bottomRight),
             bottomLeft: f(bottomLeft)
         )
+    }
+}
+
+extension DocumentCropperViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer == panGesture else { return true }
+        let location = gestureRecognizer.location(in: quadView)
+        return quadView.isPointInsideCorner(location)
     }
 }

@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import UIKit
 
-enum CornerPosition {
+enum CornerPosition: CaseIterable {
     case topLeft
     case topRight
     case bottomRight
@@ -287,6 +287,17 @@ final class QuadrilateralView: UIView {
         case .bottomRight:
             return bottomRightCornerView
         }
+    }
+    
+    func isPointInsideCorner(_ point: CGPoint) -> Bool {
+        let corners = [
+            cornerViewForCornerPosition(position: .topLeft),
+            cornerViewForCornerPosition(position: .topRight),
+            cornerViewForCornerPosition(position: .bottomRight),
+            cornerViewForCornerPosition(position: .bottomLeft)
+        ]
+
+        return corners.contains { $0.frame.insetBy(dx: -20, dy: -20).contains(point) }
     }
 }
 
