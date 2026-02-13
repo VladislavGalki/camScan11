@@ -6,6 +6,8 @@ final class CropperPageCell: UICollectionViewCell {
 
     private weak var parentVC: UIViewController?
     private var cropController: DocumentCropperViewController?
+    
+    var onQuadChanged: ((Quadrilateral) -> Void)?
 
     override func prepareForReuse() {
         super.prepareForReuse()
@@ -21,9 +23,11 @@ final class CropperPageCell: UICollectionViewCell {
 
     func configure(
         model: ScanPreviewModel,
-        parent: UIViewController
+        parent: UIViewController,
+        onQuadChanged: ((Quadrilateral) -> Void)? = nil
     ) {
         parentVC = parent
+        self.onQuadChanged = onQuadChanged
 
         guard let frame = model.frames.first,
               let image = frame.original ?? frame.preview else { return }
@@ -34,6 +38,10 @@ final class CropperPageCell: UICollectionViewCell {
                 autoQuad: frame.quad
             )
         )
+        
+        controller.onQuadChanged = { [weak self] quad in
+            self?.onQuadChanged?(quad)
+        }
 
         cropController = controller
 

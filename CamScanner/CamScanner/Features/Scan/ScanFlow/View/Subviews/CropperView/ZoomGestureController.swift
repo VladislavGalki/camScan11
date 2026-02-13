@@ -2,23 +2,29 @@ import Foundation
 import UIKit
 
 final class ZoomGestureController {
-
     private let image: UIImage
     private let magnifier: CropMagnifierView
     private let quadView: QuadrilateralView
     private var previousPanPosition: CGPoint?
     private var closestCorner: CornerPosition?
+    
+    var onQuadFinalized: ((Quadrilateral) -> Void)?
 
-    init(image: UIImage, quadView: QuadrilateralView, magnifier: CropMagnifierView) {
+    init(
+        image: UIImage,
+        quadView: QuadrilateralView,
+        magnifier: CropMagnifierView
+    ) {
         self.image = image
         self.quadView = quadView
         self.magnifier = magnifier
     }
 
     @objc func handle(pan: UIGestureRecognizer) {
+
         guard let drawnQuad = quadView.quad else { return }
         let position = pan.location(in: quadView)
-        
+
         switch pan.state {
         case .began:
             guard let hitCorner = hitTestCorner(at: position) else { return }
@@ -45,7 +51,6 @@ final class ZoomGestureController {
             UIView.animate(withDuration: 0.15) { [weak self] in
                 self?.magnifier.alpha = 1
             }
-
         case .changed:
             guard let corner = closestCorner,
                   let previous = previousPanPosition else { return }
@@ -68,18 +73,31 @@ final class ZoomGestureController {
                 y: quadView.frame.minY + position.y - 100
             )
 
-            updateMagnifierImage(
-                at: draggedCenter,
-                corner: corner,
-                drawnQuad: drawnQuad
-            )
+            if let updatedQuad = quadView.quad {
+                updateMagnifierImage(
+                    at: draggedCenter,
+                    corner: corner,
+                    drawnQuad: updatedQuad
+                )
+            }
 
             previousPanPosition = position
-        default:
+        case .ended, .cancelled, .failed:
+            if let finalQuad = quadView.quad {
+                onQuadFinalized?(finalQuad)
+            }
+
             previousPanPosition = nil
             closestCorner = nil
-            magnifier.isHidden = true
-            magnifier.center = .zero
+
+            UIView.animate(withDuration: 0.15) { [weak self] in
+                self?.magnifier.alpha = 0
+            } completion: { [weak self] _ in
+                self?.magnifier.isHidden = true
+                self?.magnifier.center = .zero
+            }
+        default:
+            break
         }
     }
     

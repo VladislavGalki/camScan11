@@ -16,15 +16,18 @@ final class CropperCarouselController: UIViewController {
     private var currentIndex: Int = 0
 
     private let onPageChanged: (Int) -> Void
+    private var onQuadChanged: ((Int, Quadrilateral) -> Void)?
 
     // MARK: Init
 
     init(
         models: [ScanPreviewModel],
-        onPageChanged: @escaping (Int) -> Void
+        onPageChanged: @escaping (Int) -> Void,
+        onQuadChanged: @escaping (Int, Quadrilateral) -> Void
     ) {
         self.models = models
         self.onPageChanged = onPageChanged
+        self.onQuadChanged = onQuadChanged
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -138,7 +141,10 @@ extension CropperCarouselController: UICollectionViewDataSource {
 
         cell.configure(
             model: models[indexPath.item],
-            parent: self
+            parent: self,
+            onQuadChanged: { [weak self] quad in
+                self?.onQuadChanged?(indexPath.item, quad)
+            }
         )
         
         return cell

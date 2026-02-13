@@ -2,8 +2,6 @@ import AVFoundation
 import UIKit
 
 final class DocumentCropperViewController: UIViewController {
-    var onCropped: ((DocumentCropperModel) -> Void)?
-
     private var image: UIImage
     private var autoQuadInImageSpace: Quadrilateral?
     private var quad: Quadrilateral
@@ -17,6 +15,9 @@ final class DocumentCropperViewController: UIViewController {
     private var quadViewHeightConstraint = NSLayoutConstraint()
 
     private(set) var isProcessing: Bool = false
+    
+    var onCropped: ((DocumentCropperModel) -> Void)?
+    var onQuadChanged: ((Quadrilateral) -> Void)?
 
     private lazy var imageView: UIImageView = {
         let v = UIImageView()
@@ -217,13 +218,28 @@ final class DocumentCropperViewController: UIViewController {
             magnifier: magnifier
         )
         
-        let g = UILongPressGestureRecognizer(target: zoomGestureController,
-                                             action: #selector(zoomGestureController.handle(pan:)))
-        g.delegate = self
-        g.cancelsTouchesInView = false
-        g.minimumPressDuration = 0
-        view.addGestureRecognizer(g)
-        panGesture = g
+        zoomGestureController.onQuadFinalized = { [weak self] quad in
+            guard let self else { return }
+
+            let quadInImage = quad.scale(
+                self.quadView.bounds.size,
+                self.image.size
+            )
+
+            self.quad = quadInImage
+            self.onQuadChanged?(quadInImage)
+        }
+        
+        let gesture = UILongPressGestureRecognizer(
+            target: zoomGestureController,
+            action: #selector(zoomGestureController.handle(pan:))
+        )
+        
+        gesture.delegate = self
+        gesture.cancelsTouchesInView = false
+        gesture.minimumPressDuration = 0
+        view.addGestureRecognizer(gesture)
+        panGesture = gesture
     }
 
     private static func defaultQuad(allOfImage image: UIImage) -> Quadrilateral {

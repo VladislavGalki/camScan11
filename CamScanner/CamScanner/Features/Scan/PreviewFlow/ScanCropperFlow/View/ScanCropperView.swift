@@ -71,6 +71,9 @@ struct ScanCropperView: View {
             models: viewModel.pages,
             onPageChanged: { index in
                 viewModel.selectPage(index)
+            },
+            onQuadChanged: { index, quad in
+                viewModel.setChangedQuad(index: index, quad: quad)
             }
         )
     }
@@ -78,7 +81,13 @@ struct ScanCropperView: View {
     private var bottomContainerView: some View {
         HStack(spacing: 0) {
             tabItemView(icon: .autoCrop, title: "Auto Crop")
+                .onTapGesture {
+                    viewModel.setAutoQuad()
+                }
             tabItemView(icon: .expand, title: "Expand")
+                .onTapGesture {
+                    viewModel.setFullQuad()
+                }
         }
         .padding(.top, 12)
         .padding(.horizontal, 8)
