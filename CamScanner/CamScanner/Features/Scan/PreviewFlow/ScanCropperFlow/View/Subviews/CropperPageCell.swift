@@ -24,6 +24,7 @@ final class CropperPageCell: UICollectionViewCell {
     func configure(
         model: ScanPreviewModel,
         parent: UIViewController,
+        isEditable: Bool,
         onQuadChanged: ((Quadrilateral) -> Void)? = nil
     ) {
         parentVC = parent
@@ -44,6 +45,8 @@ final class CropperPageCell: UICollectionViewCell {
         }
 
         cropController = controller
+        
+        controller.setEditable(isEditable)
 
         parent.addChild(controller)
 
@@ -58,5 +61,9 @@ final class CropperPageCell: UICollectionViewCell {
         ])
 
         controller.didMove(toParent: parent)
+    }
+    
+    func setEditable(_ editable: Bool) {
+        cropController?.setEditable(editable)
     }
 }

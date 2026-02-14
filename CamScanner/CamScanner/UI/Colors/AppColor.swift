@@ -21,6 +21,7 @@ enum AppColor: Hashable {
         case hint
         case hintLight
         case detectionFrame
+        case overlay
     }
 
     enum Text: Hashable {
@@ -37,6 +38,7 @@ enum AppColor: Hashable {
         case onImmersiveMuted
         case onHint
         case distructive
+        case onOverlay
     }
 
     enum Elements: Hashable {
@@ -90,7 +92,8 @@ private extension AppColor {
         case .background(.controlImmersive):return .sRGB01(0.09019608, 0.09019608, 0.09019608, 1)   // Bg/control-immersive
         case .background(.hint):            return .sRGB01(0, 0.53333336, 1, 0.6)                    // Bg/hint
         case .background(.hintLight):       return .sRGB01(1, 1, 1, 0.2)
-        case .background(.detectionFrame):  return .sRGB01(0, 0.53333336, 1, 0.1)                    // Bg/detection frame
+        case .background(.detectionFrame):  return .sRGB01(0, 0.53333336, 1, 0.1)                    // Bg/detection
+        case .background(.overlay):         return .sRGB01(0, 0, 0, 0.6)                       
 
         // Text
         case .text(.primary):           return .sRGB01(0, 0, 0, 1)                                   // Text/primary
@@ -106,6 +109,7 @@ private extension AppColor {
         case .text(.onImmersiveMuted):  return .sRGB01(0.40392157, 0.40392157, 0.40392157, 1)        // Text/on immersive-muted
         case .text(.onHint):            return .sRGB01(1, 1, 1, 1)                                   // Text/on hint
         case .text(.distructive):       return .sRGB01(1, 0.220, 0.235, 1)
+        case .text(.onOverlay):         return .sRGB01(1, 1, 1, 1)                                   
 
         // Elements
         case .elements(.primary):           return .sRGB01(0, 0, 0, 1)                                // Elements/primary

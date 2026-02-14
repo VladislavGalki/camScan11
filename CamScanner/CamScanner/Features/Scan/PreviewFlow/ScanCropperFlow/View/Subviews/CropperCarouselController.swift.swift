@@ -49,8 +49,20 @@ final class CropperCarouselController: UIViewController {
     // MARK: Public
 
     func update(_ newModels: [ScanPreviewModel]) {
-        models = newModels
-        collectionView.reloadData()
+        if newModels != models {
+            models = newModels
+            collectionView.reloadData()
+        }
+    }
+    
+    // MARK: Private
+    
+    private func updateEditableStates() {
+        for case let cell as CropperPageCell in collectionView.visibleCells {
+            guard let indexPath = collectionView.indexPath(for: cell) else { continue }
+            let editable = indexPath.item == currentIndex
+            cell.setEditable(editable)
+        }
     }
 }
 
@@ -142,6 +154,7 @@ extension CropperCarouselController: UICollectionViewDataSource {
         cell.configure(
             model: models[indexPath.item],
             parent: self,
+            isEditable: indexPath.item == currentIndex,
             onQuadChanged: { [weak self] quad in
                 self?.onQuadChanged?(indexPath.item, quad)
             }
@@ -184,10 +197,10 @@ extension CropperCarouselController {
 
         currentIndex = intIndex
         onPageChanged(intIndex)
+        updateEditableStates()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-
         let fullWidth = cardWidth + spacing
         let offset = scrollView.contentOffset.x + scrollView.contentInset.left
 

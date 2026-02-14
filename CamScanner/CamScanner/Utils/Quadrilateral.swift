@@ -1,11 +1,3 @@
-//
-//  Quadrilateral.swift
-//  WeScan
-//
-//  Created by Boris Emorine on 2/8/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import AVFoundation
 import CoreImage
 import Foundation

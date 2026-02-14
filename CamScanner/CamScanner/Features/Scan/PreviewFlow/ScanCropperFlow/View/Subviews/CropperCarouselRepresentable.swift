@@ -5,6 +5,16 @@ struct CropperCarouselRepresentable: UIViewControllerRepresentable {
     var onPageChanged: (Int) -> Void
     var onQuadChanged: (Int, Quadrilateral) -> Void
     
+    init(
+        models: [ScanPreviewModel],
+        onPageChanged: @escaping (Int) -> Void,
+        onQuadChanged: @escaping (Int, Quadrilateral) -> Void
+    ) {
+        self.models = models
+        self.onPageChanged = onPageChanged
+        self.onQuadChanged = onQuadChanged
+    }
+    
     func makeUIViewController(context: Context) -> CropperCarouselController {
         CropperCarouselController(
             models: models,
@@ -13,10 +23,7 @@ struct CropperCarouselRepresentable: UIViewControllerRepresentable {
         )
     }
 
-    func updateUIViewController(
-        _ controller: CropperCarouselController,
-        context: Context
-    ) {
+    func updateUIViewController(_ controller: CropperCarouselController, context: Context) {
         controller.update(models)
     }
 }

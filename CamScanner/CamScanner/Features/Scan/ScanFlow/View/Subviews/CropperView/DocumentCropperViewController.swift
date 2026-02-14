@@ -36,6 +36,15 @@ final class DocumentCropperViewController: UIViewController {
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
+    
+    private lazy var disabledOverlay: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        v.isUserInteractionEnabled = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.alpha = 0
+        return v
+    }()
 
     init(cropperModel: DocumentCropperModel) {
         self.image = cropperModel.image
@@ -52,6 +61,7 @@ final class DocumentCropperViewController: UIViewController {
 
         view.addSubview(imageView)
         view.addSubview(quadView)
+        view.addSubview(disabledOverlay)
         view.addSubview(magnifier)
         
         magnifier.isHidden = true
@@ -72,6 +82,13 @@ final class DocumentCropperViewController: UIViewController {
             quadViewWidthConstraint,
             quadViewHeightConstraint
         ])
+        
+        NSLayoutConstraint.activate([
+            disabledOverlay.topAnchor.constraint(equalTo: imageView.topAnchor),
+            disabledOverlay.bottomAnchor.constraint(equalTo: imageView.bottomAnchor),
+            disabledOverlay.leadingAnchor.constraint(equalTo: imageView.leadingAnchor),
+            disabledOverlay.trailingAnchor.constraint(equalTo: imageView.trailingAnchor)
+        ])
 
         rebuildZoomController()
     }
@@ -90,6 +107,12 @@ final class DocumentCropperViewController: UIViewController {
     func setAutoQuad() {
         quad = autoQuadInImageSpace ?? Self.defaultQuad(allOfImage: image)
         displayQuad()
+    }
+    
+    func setEditable(_ editable: Bool) {
+        UIView.animate(withDuration: 0.2) { [weak self] in
+            self?.disabledOverlay.alpha = editable ? 0 : 1
+        }
     }
 
     func rotateLeft() { rotate90(direction: .left) }

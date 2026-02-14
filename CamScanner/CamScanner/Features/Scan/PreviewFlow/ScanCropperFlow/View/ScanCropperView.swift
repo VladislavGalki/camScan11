@@ -15,11 +15,18 @@ struct ScanCropperView: View {
     var body: some View {
         VStack(spacing: 0) {
             navigationView
-                .padding(.bottom, 95)
+                .padding(.bottom, 16)
+            
+            pageIndicatorView
+                .padding(.horizontal, 16)
+                .padding(.bottom, 51)
             
             cropperCarouselView
                 .frame(maxHeight: .infinity)
                 .padding(.bottom, 73)
+            
+            historyStateView
+                .padding([.horizontal, .bottom], 16)
             
             bottomContainerView
         }
@@ -56,6 +63,11 @@ struct ScanCropperView: View {
                 }
             )
         }
+        .overlay {
+            Text("Crop")
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.primary))
+        }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
         .background(
@@ -64,6 +76,21 @@ struct ScanCropperView: View {
                 .appBorderModifier(.border(.primary), width: 1, radius: 0, corners: .allCorners)
                 .ignoresSafeArea(edges: .top)
         )
+    }
+    
+    private var pageIndicatorView: some View {
+        HStack(spacing: 0) {
+            Text("\(viewModel.selectedIndex + 1)/\(viewModel.pages.count)")
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.onOverlay))
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 100, style: .continuous)
+                        .foregroundStyle(.bg(.overlay))
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var cropperCarouselView: some View {
@@ -78,13 +105,54 @@ struct ScanCropperView: View {
         )
     }
     
+    private var historyStateView: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 8) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.back),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action: { viewModel.undoQuad() }
+                )
+                .appButtonEnabled(viewModel.canUndoQuad)
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.forward),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action:  { viewModel.redoQuad() }
+                )
+                .appButtonEnabled(viewModel.canRedoQuad)
+            }
+            
+            Spacer(minLength: 0)
+            
+            AppButton(
+                config: AppButtonConfig(
+                    content: .title("Apply to all pages"),
+                    style: .secondary,
+                    size: .s
+                ),
+                action: {
+                    viewModel.applyToAllQuads()
+                }
+            )
+            .opacity(viewModel.shouldShowApplyToAllButton ? 1 : 0)
+        }
+        .opacity(viewModel.canUndoQuad || viewModel.canRedoQuad ? 1 : 0)
+    }
+    
     private var bottomContainerView: some View {
         HStack(spacing: 0) {
-            tabItemView(icon: .autoCrop, title: "Auto Crop")
+            tabItemView(icon: .autoCrop, type: .autoCrop, title: "Auto Crop")
                 .onTapGesture {
                     viewModel.setAutoQuad()
                 }
-            tabItemView(icon: .expand, title: "Expand")
+            tabItemView(icon: .expand, type: .expand, title: "Expand")
                 .onTapGesture {
                     viewModel.setFullQuad()
                 }
@@ -99,15 +167,26 @@ struct ScanCropperView: View {
         )
     }
     
-    private func tabItemView(icon: AppIcon, title: String) -> some View {
+    @ViewBuilder
+    private func tabItemView(icon: AppIcon, type: CropSelectedType, title: String) -> some View {
+        let isSelected = viewModel.cropSelectedType == type
+
         VStack(spacing: 4) {
             Image(appIcon: icon)
                 .renderingMode(.template)
-                .foregroundStyle(.elements(.navigationDefault))
-            
+                .foregroundStyle(
+                    isSelected
+                    ? .elements(.secondary)
+                    : .elements(.disabled)
+                )
+
             Text(title)
                 .appTextStyle(.tabBar)
-                .foregroundStyle(.text(.secondary))
+                .foregroundStyle(
+                    isSelected
+                    ? .text(.secondary)
+                    : .text(.disabled)
+                )
         }
         .frame(maxWidth: .infinity)
         .frame(height: 54)
