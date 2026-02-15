@@ -31,6 +31,9 @@ struct ScanCropperView: View {
             bottomContainerView
         }
         .navigationBarBackButtonHidden(true)
+        .overlay {
+            notificationView
+        }
         .background(
             Color.bg(.main).ignoresSafeArea()
         )
@@ -45,7 +48,9 @@ struct ScanCropperView: View {
                     size: .m
                 ),
                 action: {
-                    router.pop()
+                    withAnimation {
+                        viewModel.notificationState = .discardChanges
+                    }
                 }
             )
             
@@ -138,7 +143,9 @@ struct ScanCropperView: View {
                     size: .s
                 ),
                 action: {
-                    viewModel.applyToAllQuads()
+                    withAnimation {
+                        viewModel.notificationState = .applyToAllPages
+                    }
                 }
             )
             .opacity(viewModel.shouldShowApplyToAllButton ? 1 : 0)
@@ -190,5 +197,118 @@ struct ScanCropperView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 54)
+    }
+    
+    @ViewBuilder
+    private var notificationView: some View {
+        if viewModel.notificationState != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+                
+                switch viewModel.notificationState {
+                case .discardChanges:
+                    discardChangesView
+                case .applyToAllPages:
+                    applyChangesView
+                case .none:
+                    EmptyView()
+                }
+            }
+        }
+    }
+    
+    private var discardChangesView: some View {
+        VStack(spacing: 0) {
+            Text("Discard changes?")
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 8)
+            
+            Text("Your edits haven’t been saved.")
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 24)
+            
+            VStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Keep Editing"),
+                        style: .primary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        withAnimation {
+                            viewModel.notificationState = .none
+                        }
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Discard Changes"),
+                        style: .secondary,
+                        size: .l,
+                        extraTitleColor: .text(.distructive),
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                        router.pop()
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(.bg(.surface))
+        .cornerRadius(24, corners: .allCorners)
+        .frame(maxWidth: 300)
+    }
+    
+    private var applyChangesView: some View {
+        VStack(spacing: 0) {
+            Text("Apply the changes to all pages?")
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 24)
+            
+            HStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Yes"),
+                        style: .primary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        withAnimation {
+                            viewModel.notificationState = .none
+                            viewModel.applyToAllQuads()
+                        }
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Cancel"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        withAnimation {
+                            viewModel.notificationState = .none
+                        }
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(.bg(.surface))
+        .cornerRadius(24, corners: .allCorners)
+        .frame(maxWidth: 300)
     }
 }

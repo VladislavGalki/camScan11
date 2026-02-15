@@ -112,7 +112,13 @@ final class DocumentCropperViewController: UIViewController {
     func setEditable(_ editable: Bool) {
         UIView.animate(withDuration: 0.2) { [weak self] in
             self?.disabledOverlay.alpha = editable ? 0 : 1
+            self?.quadView.alpha = !editable ? 0 : 1
+
         }
+    }
+    
+    func setBackgroundColor(_ color: UIColor) {
+        imageView.backgroundColor = color
     }
 
     func rotateLeft() { rotate90(direction: .left) }

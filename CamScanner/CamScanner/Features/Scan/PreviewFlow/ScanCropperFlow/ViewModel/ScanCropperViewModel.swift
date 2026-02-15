@@ -6,6 +6,7 @@ final class ScanCropperViewModel: ObservableObject {
     // MARK: Published
 
     @Published var pages: [ScanPreviewModel] = []
+    @Published var notificationState: ScanCropperNotificationState = .none
     @Published var cropSelectedType: CropSelectedType = .autoCrop
     @Published var shouldShowApplyToAllButton: Bool = false
     @Published var selectedIndex: Int = 0
@@ -26,10 +27,31 @@ final class ScanCropperViewModel: ObservableObject {
     ) {
         self.input = input
         self.onFinish = onFinish
-        self.pages = input.pages
         
+        bootstrap()
         captureInitialQuads()
         bootstrapQuadHistories()
+    }
+    
+    private func bootstrap() {
+        var result: [ScanPreviewModel] = []
+        
+        input.pages.forEach { entry in
+            let type = entry.documentType
+            let frames = entry.frames.filter { $0.preview != nil }
+
+            frames.forEach { frame in
+                result.append(
+                    ScanPreviewModel(
+                        documentType: type,
+                        frames: [frame]
+                    )
+                )
+
+            }
+        }
+
+        pages = result
     }
     
     private func captureInitialQuads() {

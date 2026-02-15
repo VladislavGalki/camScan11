@@ -47,6 +47,7 @@ final class CropperPageCell: UICollectionViewCell {
         cropController = controller
         
         controller.setEditable(isEditable)
+        controller.setBackgroundColor(UIColor(.bg(.main)))
 
         parent.addChild(controller)
 
