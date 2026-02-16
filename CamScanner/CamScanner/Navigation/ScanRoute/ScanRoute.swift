@@ -8,7 +8,7 @@ enum ScanRoute: Route {
     
     case scanCropper(
         ScanCropperInputModel,
-        onFinish: ([ScanPreviewModel]) -> Void
+        onFinish: (ScanPreviewInputModel) -> Void
     )
 }
 

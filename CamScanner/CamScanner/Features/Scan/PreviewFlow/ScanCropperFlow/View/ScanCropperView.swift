@@ -7,7 +7,7 @@ struct ScanCropperView: View {
     
     init(
         input: ScanCropperInputModel,
-        onFinish: @escaping ([ScanPreviewModel]) -> Void
+        onFinish: @escaping (ScanPreviewInputModel) -> Void
     ) {
         _viewModel = StateObject(wrappedValue: ScanCropperViewModel(input: input, onFinish: onFinish))
     }
@@ -64,7 +64,8 @@ struct ScanCropperView: View {
                     size: .m
                 ),
                 action: {
-                    // save
+                    viewModel.finishFlow()
+                    router.pop()
                 }
             )
         }

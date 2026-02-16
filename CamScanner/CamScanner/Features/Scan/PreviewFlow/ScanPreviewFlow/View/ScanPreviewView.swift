@@ -179,10 +179,10 @@ struct ScanPreviewView: View {
                             ScanCropperInputModel(
                                 pages: viewModel.scanPreviewModel,
                                 documentType: viewModel.documentType
-                            )
-                        ) { _ in
-                            
-                        }
+                            ), onFinish: { outputModel in
+                                viewModel.applyCropOutput(outputModel)
+                            }
+                        )
                     )
                 }
             tabItemView(icon: .rotate, title: "Rotate")

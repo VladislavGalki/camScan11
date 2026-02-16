@@ -13,18 +13,21 @@ final class ScanCropperViewModel: ObservableObject {
 
     // MARK: Private
 
+    private let cropRenderer: CropRenderer
     private let input: ScanCropperInputModel
     private var initialQuads: [UUID : Quadrilateral?] = [:]
     private var quadHistories: [Int: ScanCropperQuadHistory] = [:]
     
-    private let onFinish: ([ScanPreviewModel]) -> Void
+    private let onFinish: (ScanPreviewInputModel) -> Void
 
     // MARK: Init
 
     init(
+        cropRenderer: CropRenderer = CropRenderer.shared,
         input: ScanCropperInputModel,
-        onFinish: @escaping ([ScanPreviewModel]) -> Void
+        onFinish: @escaping (ScanPreviewInputModel) -> Void
     ) {
+        self.cropRenderer = cropRenderer
         self.input = input
         self.onFinish = onFinish
         
@@ -302,6 +305,45 @@ final class ScanCropperViewModel: ObservableObject {
     // MARK: Finish
 
     func finishFlow() {
-        onFinish(pages)
+        applyCrop()
+        onFinish(buildOutputModel())
+    }
+    
+    private func applyCrop() {
+        var updatedPages = pages
+            for pageIndex in updatedPages.indices {
+                updatedPages[pageIndex].frames =
+                updatedPages[pageIndex].frames.map { frame in
+                    var f = frame
+
+                    guard let quad = f.quad, let baseImage = f.original ?? f.preview else { return f }
+                    guard let cropped = cropRenderer.crop(image: baseImage, quad: quad ) else { return f }
+
+                    f.preview = cropped
+                    f.displayBase = cropped
+                    f.previewBase = cropped
+                    f.drawingBase = nil
+                    f.drawingData = nil
+
+                    return f
+                }
+            }
+
+            pages = updatedPages
+    }
+    
+    private func buildOutputModel() -> ScanPreviewInputModel {
+        var pagesDict: [DocumentTypeEnum: [CapturedFrame]] = [:]
+
+        for page in pages {
+            let type = page.documentType
+            let frames = page.frames
+            pagesDict[type, default: []].append(contentsOf: frames)
+        }
+
+        return ScanPreviewInputModel(
+            documentType: input.documentType,
+            pages: pagesDict
+        )
     }
 }

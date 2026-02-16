@@ -10,7 +10,7 @@ final class ScanPreviewViewModel: ObservableObject {
     private var selectedPageIndex: Int = 0
 
     private let filterRenderer: FilterRenderer
-    private let inputModel: ScanPreviewInputModel
+    private var inputModel: ScanPreviewInputModel
     
     private let onFinish: (ScanPreviewInputModel) -> Void
 
@@ -49,6 +49,11 @@ final class ScanPreviewViewModel: ObservableObject {
     func updateSelectedPageIndex(_ index: Int) {
         selectedPageIndex = index
         rebuildFilterPreviewItems()
+    }
+    
+    func applyCropOutput(_ output: ScanPreviewInputModel) {
+        inputModel = output
+        bootstrap()
     }
     
     func onFinishFlow() {
