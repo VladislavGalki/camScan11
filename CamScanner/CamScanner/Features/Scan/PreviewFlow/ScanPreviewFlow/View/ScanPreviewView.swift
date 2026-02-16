@@ -4,7 +4,6 @@ import UIKit
 struct ScanPreviewView: View {
     @State private var actionBottomBarAction: ScanPreviewBottomBarAction?
     @State private var sliderValue: Double = 0.5
-    @State private var shoudShowDeleteOverlay: Bool = false
     
     @StateObject private var viewModel: ScanPreviewViewModel
     @EnvironmentObject private var router: Router
@@ -29,9 +28,7 @@ struct ScanPreviewView: View {
             bottomContainerView
         }
         .overlay {
-            if shoudShowDeleteOverlay {
-                overlayDeleteView
-            }
+            notificationView
         }
         .navigationBarBackButtonHidden(true)
         .background(
@@ -48,7 +45,9 @@ struct ScanPreviewView: View {
                     size: .m
                 ),
                 action: {
-                    router.pop()
+                    withAnimation {
+                        viewModel.notificationState = .back
+                    }
                 }
             )
             
@@ -95,7 +94,7 @@ struct ScanPreviewView: View {
                 viewModel.rotatePage(at: pageIndex)
             },
             onAddTapped: {
-                viewModel.onFinishFlow()
+                viewModel.onFinishFlow(viewModel.buildOutputModel())
                 router.pop()
             }
         )
@@ -167,7 +166,7 @@ struct ScanPreviewView: View {
             if viewModel.documentType != .idCard && viewModel.documentType != .driverLicense {
                 tabItemView(icon: .page_plus, title: "Add page")
                     .onTapGesture {
-                        viewModel.onFinishFlow()
+                        viewModel.onFinishFlow(viewModel.buildOutputModel())
                         router.pop()
                     }
             }
@@ -197,7 +196,7 @@ struct ScanPreviewView: View {
             tabItemView(icon: .trash, title: "Delete")
                 .onTapGesture {
                     withAnimation {
-                        shoudShowDeleteOverlay = true
+                        viewModel.notificationState = .delete
                     }
                 }
         }
@@ -225,80 +224,144 @@ struct ScanPreviewView: View {
         .frame(height: 54)
     }
     
-    private var overlayDeleteView: some View {
-        ZStack {
-            Color.black.opacity(0.24)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                Text("Delete the page?")
-                    .multilineTextAlignment(.center)
-                    .appTextStyle(.itemTitle)
-                    .foregroundStyle(.text(.primary))
-                    .padding(.bottom, 8)
+    @ViewBuilder
+    private var notificationView: some View {
+        if viewModel.notificationState != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
                 
-                Text("You can retake it instead.")
-                    .multilineTextAlignment(.center)
-                    .appTextStyle(.bodyPrimary)
-                    .foregroundStyle(.text(.secondary))
-                    .padding(.bottom, 24)
-                
-                VStack(spacing: 10) {
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .title("Delete"),
-                            style: .secondary,
-                            size: .l,
-                            extraTitleColor: .text(.distructive),
-                            isFullWidth: true
-                        ),
-                        action: {
-                            shoudShowDeleteOverlay = false
-                            if let pageIndex = viewModel.deletePage() {
-                                actionBottomBarAction = .deletePage(pageIndex)
-                                
-                                DispatchQueue.main.async {
-                                    actionBottomBarAction = nil
-                                }
-                            }
-                        }
-                    )
-                    
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .title("Retake"),
-                            style: .secondary,
-                            size: .l,
-                            isFullWidth: true
-                        ),
-                        action: {
-                            shoudShowDeleteOverlay = false
-                            if let _ = viewModel.deletePage() {
-                                viewModel.onFinishFlow()
-                                router.pop()
-                            }
-                        }
-                    )
-                    
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .title("Cancel"),
-                            style: .secondary,
-                            size: .l,
-                            isFullWidth: true
-                        ),
-                        action: {
-                            shoudShowDeleteOverlay = false
-                        }
-                    )
+                switch viewModel.notificationState {
+                case .back:
+                    discardOverlay
+                case .delete:
+                    overlayDeleteView
+                case .none:
+                    EmptyView()
                 }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .foregroundStyle(.bg(.surface))
-            )
-            .frame(maxWidth: 300)
         }
+    }
+    
+    private var discardOverlay: some View {
+        VStack(spacing: 0) {
+            Text("Start Over?")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+            
+            Text("Your current scans will be deleted.")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .padding(.bottom, 24)
+            
+            VStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Start over"),
+                        style: .primary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                        viewModel.onFinishFlow(viewModel.buildOutputClearModel())
+                        router.pop()
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Cancel"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .foregroundStyle(.bg(.surface))
+        )
+        .frame(maxWidth: 300)
+    }
+    
+    private var overlayDeleteView: some View {
+        VStack(spacing: 0) {
+            Text("Delete the page?")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+            
+            Text("You can retake it instead.")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .padding(.bottom, 24)
+            
+            VStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Delete"),
+                        style: .secondary,
+                        size: .l,
+                        extraTitleColor: .text(.distructive),
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                        if let pageIndex = viewModel.deletePage() {
+                            actionBottomBarAction = .deletePage(pageIndex)
+                            
+                            DispatchQueue.main.async {
+                                actionBottomBarAction = nil
+                            }
+                        }
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Retake"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                        if let _ = viewModel.deletePage() {
+                            viewModel.onFinishFlow(viewModel.buildOutputModel())
+                            router.pop()
+                        }
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Cancel"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.notificationState = .none
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .foregroundStyle(.bg(.surface))
+        )
+        .frame(maxWidth: 300)
     }
 }

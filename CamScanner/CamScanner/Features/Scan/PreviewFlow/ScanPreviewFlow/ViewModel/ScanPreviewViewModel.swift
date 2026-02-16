@@ -3,6 +3,7 @@ import UIKit
 
 final class ScanPreviewViewModel: ObservableObject {
 
+    @Published var notificationState: ScanPreviewNotificationState = .none
     @Published var scanPreviewModel: [ScanPreviewModel] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
 
@@ -56,8 +57,26 @@ final class ScanPreviewViewModel: ObservableObject {
         bootstrap()
     }
     
-    func onFinishFlow() {
-        onFinish(buildOutputModel())
+    func buildOutputModel() -> ScanPreviewInputModel {
+        var pages: [DocumentTypeEnum: [CapturedFrame]] = [:]
+        for page in scanPreviewModel {
+            let type = page.documentType
+            let frames = page.frames
+            pages[type, default: []].append(contentsOf: frames)
+        }
+
+        return ScanPreviewInputModel(
+            documentType: inputModel.documentType,
+            pages: pages
+        )
+    }
+    
+    func buildOutputClearModel() -> ScanPreviewInputModel {
+        ScanPreviewInputModel(documentType: documentType, pages: [:])
+    }
+    
+    func onFinishFlow(_ outputModel: ScanPreviewInputModel) {
+        onFinish(outputModel)
     }
 
     // MARK: - Delete
@@ -359,19 +378,5 @@ final class ScanPreviewViewModel: ObservableObject {
 
         scanPreviewModel = result
         updateSelectedPageIndex(selectedPageIndex)
-    }
-    
-    private func buildOutputModel() -> ScanPreviewInputModel {
-        var pages: [DocumentTypeEnum: [CapturedFrame]] = [:]
-        for page in scanPreviewModel {
-            let type = page.documentType
-            let frames = page.frames
-            pages[type, default: []].append(contentsOf: frames)
-        }
-
-        return ScanPreviewInputModel(
-            documentType: inputModel.documentType,
-            pages: pages
-        )
     }
 }
