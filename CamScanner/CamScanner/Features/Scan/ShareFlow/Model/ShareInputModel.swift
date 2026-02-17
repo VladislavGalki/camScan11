@@ -1,6 +1,6 @@
 import Foundation
 
-struct ShareInputModel: Equatable {
+struct ShareInputModel: Equatable, Hashable {
     let documentType: DocumentTypeEnum
-    let pages: [DocumentTypeEnum : [CapturedFrame]]
+    let pages: [ScanPreviewModel]
 }

@@ -62,6 +62,10 @@ public enum AppIcon: String, CaseIterable {
     case txtImage = "txt_image"
     case xlsImage = "xls_image"
     case pptImage = "ppt_image"
+    case appMiniLogoImage = "appMiniLogo_image"
+    case check_image = "check_image"
+    case empty_check_image = "empty_check_image"
+    case rect_separator_image = "rect_separator_image"
 }
 
 public extension Image {

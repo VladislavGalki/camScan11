@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 
 final class ScanPreviewViewModel: ObservableObject {
-
     @Published var notificationState: ScanPreviewNotificationState = .none
     @Published var scanPreviewModel: [ScanPreviewModel] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []

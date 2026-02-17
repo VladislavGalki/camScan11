@@ -90,14 +90,6 @@ struct RecentView: View {
                 .frame(width: itemSize.width, height: itemSize.height)
                 .overlay {
                     itemImageView(for: item)
-                    
-//                    if let image = item.thumbnail {
-//                        Image(uiImage: image)
-//                            .resizable()
-//                            .aspectRatio(contentMode: item.kind == .scan ? .fill : .fit)
-//                    } else {
-//                        ProgressView()
-//                    }
                 }
                 .overlay(alignment: .top) {
                     HStack(spacing: 0) {

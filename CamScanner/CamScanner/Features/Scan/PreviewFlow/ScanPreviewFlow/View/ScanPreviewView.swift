@@ -62,7 +62,12 @@ struct ScanPreviewView: View {
                     ),
                     action: {
                         router.presentSheet(
-                            ScanRoute.share
+                            ScanRoute.share(
+                                ShareInputModel(
+                                    documentType: viewModel.documentType,
+                                    pages: viewModel.scanPreviewModel
+                                )
+                            )
                         )
                     }
                 )
