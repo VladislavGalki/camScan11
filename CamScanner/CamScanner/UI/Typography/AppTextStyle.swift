@@ -11,6 +11,7 @@ enum AppTextStyle: CaseIterable {
     case meta
     case helperText
     case tabBar
+    case topBarTitle
 }
 
 extension Font {
@@ -70,6 +71,9 @@ private extension AppTextStyle {
 
         case .tabBar:
             return .init(size: 10, lineHeight: 12, weight: .semibold, tracking: -0.1)
+            
+        case .topBarTitle:
+            return .init(size: 15, lineHeight: 20, weight: .semibold, tracking: -0.23)
         }
     }
 }

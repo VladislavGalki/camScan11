@@ -60,7 +60,11 @@ struct ScanPreviewView: View {
                         style: .secondary,
                         size: .m
                     ),
-                    action: {}
+                    action: {
+                        router.presentSheet(
+                            ScanRoute.share
+                        )
+                    }
                 )
                 
                 AppButton(

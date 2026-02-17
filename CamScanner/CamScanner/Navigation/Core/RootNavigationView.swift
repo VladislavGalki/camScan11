@@ -12,9 +12,12 @@ struct RootNavigationView<Root: View>: View {
                 .navigationDestination(for: AnyRoute.self) { route in
                     destinationBuilder(route.base)
                 }
-                .fullScreenCover(item: $router.presentedRoute) { route in
-                    destinationBuilder(route.base)
-                }
+        }
+        .fullScreenCover(item: $router.presentedRoute) { route in
+            destinationBuilder(route.base)
+        }
+        .sheet(item: $router.sheetRoute) { route in
+            destinationBuilder(route.base)
         }
         .environmentObject(router)
     }

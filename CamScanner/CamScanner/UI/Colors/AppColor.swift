@@ -16,12 +16,16 @@ enum AppColor: Hashable {
         case accentDisabled
         case accentSubtle
         case control
+        case controlOnMain
         case immersive
         case controlImmersive
         case hint
         case hintLight
         case detectionFrame
         case overlay
+        case success
+        case warning
+        case destructive
     }
 
     enum Text: Hashable {
@@ -55,6 +59,7 @@ enum AppColor: Hashable {
     }
 
     enum Border: Hashable {
+        case accent
         case primary
         case primaryImmersive
         case hint
@@ -88,12 +93,16 @@ private extension AppColor {
         case .background(.accentDisabled):  return .sRGB01(0.61960787, 0.73725492, 1, 1)            // Bg/accent-disabled
         case .background(.accentSubtle):    return .sRGB01(0.92549020, 0.94509804, 1, 1)            // Bg/accent-subtle
         case .background(.control):         return .sRGB01(0.93725491, 0.93725491, 0.93725491, 1)   // Bg/control
+        case .background(.controlOnMain):   return .sRGB01(0.9020, 0.9020, 0.9020, 1)
         case .background(.immersive):       return .sRGB01(0, 0, 0, 1)                               // Bg/immersive
         case .background(.controlImmersive):return .sRGB01(0.09019608, 0.09019608, 0.09019608, 1)   // Bg/control-immersive
         case .background(.hint):            return .sRGB01(0, 0.53333336, 1, 0.6)                    // Bg/hint
         case .background(.hintLight):       return .sRGB01(1, 1, 1, 0.2)
         case .background(.detectionFrame):  return .sRGB01(0, 0.53333336, 1, 0.1)                    // Bg/detection
-        case .background(.overlay):         return .sRGB01(0, 0, 0, 0.6)                       
+        case .background(.overlay):         return .sRGB01(0, 0, 0, 0.6)
+        case .background(.success):         return .sRGB01(0.2039, 0.7804, 0.3490, 1)
+        case .background(.warning):         return .sRGB01(1.0000, 0.5529, 0.1569, 1)
+        case .background(.destructive):     return .sRGB01(1.0000, 0.2196, 0.2353, 1)
 
         // Text
         case .text(.primary):           return .sRGB01(0, 0, 0, 1)                                   // Text/primary
@@ -124,6 +133,7 @@ private extension AppColor {
         case .elements(.onImmersive):       return .sRGB01(1, 1, 1, 1)                                // Elements/on immersive
 
         // Borders
+        case .border(.accent):           return .sRGB01(0, 0.5333, 1, 1)
         case .border(.primary):          return .sRGB01(0.93725491, 0.93725491, 0.93725491, 1)        // Borders/primary
         case .border(.primaryImmersive): return .sRGB01(0.17647059, 0.17647059, 0.17647059, 1)        // Borders/primary-immersive
         case .border(.hint):             return .sRGB01(0, 0.53333336, 1, 0.2)                         // Borders/hint

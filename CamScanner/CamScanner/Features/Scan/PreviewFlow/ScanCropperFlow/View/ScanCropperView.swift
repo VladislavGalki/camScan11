@@ -71,7 +71,7 @@ struct ScanCropperView: View {
         }
         .overlay {
             Text("Crop")
-                .appTextStyle(.bodySecondary)
+                .appTextStyle(.topBarTitle)
                 .foregroundStyle(.text(.primary))
         }
         .padding(.horizontal, 16)

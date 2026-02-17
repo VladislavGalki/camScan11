@@ -56,6 +56,12 @@ public enum AppIcon: String, CaseIterable {
     case watermarkImage = "watermark_image"
     case cloudImage = "cloud_image"
     case passportImage = "passport_image"
+    case pdfImage = "pdf_image"
+    case jpgImage = "jpg_image"
+    case docImage = "doc_image"
+    case txtImage = "txt_image"
+    case xlsImage = "xls_image"
+    case pptImage = "ppt_image"
 }
 
 public extension Image {

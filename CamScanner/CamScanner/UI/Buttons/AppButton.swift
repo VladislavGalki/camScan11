@@ -187,7 +187,7 @@ private extension AppButtonConfig.Size {
         case .l:
             return ButtonMetrics(
                 textStyle: .bodyPrimary,
-                horizontalPaddingText: EdgeInsets(top: 13, leading: 18, bottom: 13, trailing: 18),
+                horizontalPaddingText: EdgeInsets(top: 15, leading: 18, bottom: 15, trailing: 18),
                 horizontalPaddingTextWithIcon: EdgeInsets(top: 13, leading: 14, bottom: 13, trailing: 18),
                 horizontalPaddingIconOnly: EdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
             )

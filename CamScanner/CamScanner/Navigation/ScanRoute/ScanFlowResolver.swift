@@ -9,6 +9,11 @@ enum ScanFlowResolver {
                 return AnyView(ScanPreviewView(inputModel: inputModel, onFinish: onFinish))
             case let.scanCropper(inputModel, onFinish):
                 return AnyView(ScanCropperView(input: inputModel, onFinish: onFinish))
+            case .share:
+                return AnyView(
+                    ShareView(inputModel: ShareInputModel(documentType: .documents, pages: [:]))
+                        .presentationCornerRadius(38)
+                )
         }
         default:
             return AnyView(EmptyView())

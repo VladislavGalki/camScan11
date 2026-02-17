@@ -10,6 +10,8 @@ enum ScanRoute: Route {
         ScanCropperInputModel,
         onFinish: (ScanPreviewInputModel) -> Void
     )
+    
+    case share
 }
 
 extension ScanRoute: Equatable {
@@ -19,6 +21,8 @@ extension ScanRoute: Equatable {
             return lModel == rModel
         case let (.scanCropper(lModel, _), .scanCropper(rModel, _)):
             return lModel == rModel
+        case (.share, .share):
+            return true
         default:
             return false
         }
@@ -34,6 +38,8 @@ extension ScanRoute: Hashable {
         case let .scanCropper(model, _):
             hasher.combine("scanCropper")
             hasher.combine(model)
+        case .share:
+            hasher.combine("share")
         }
     }
 }
