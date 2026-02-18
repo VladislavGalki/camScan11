@@ -7,17 +7,22 @@ final class ShareViewModel: ObservableObject {
     @Published var isNeedSplitDocument = false
     @Published var isNeetCreateZipArchve = false
     @Published var isNeedSetPassword = false
-    @Published var passwordText: String = ""
+    @Published var documentPassword: String?
+    @Published var qoutaLimit: Int = 0
     @Published var countOfFilesToShare: Int = 0
     
     @Published var shareActiveSheet: ShareActiveSheet?
     @Published var shareSheetURLs: [URL] = []
     
+    @Published var isLoading: Bool = false
+    
+    private let shareQuotaService = ShareQuotaService.shared
+    private let exportService = ShareExportService.shared
     private let inputModel: ShareInputModel
 
     init(inputModel: ShareInputModel) {
         self.inputModel = inputModel
-        
+        shareQuotaService.refreshQuotaIfNeeded()
         bootstrap()
     }
     
@@ -34,9 +39,7 @@ final class ShareViewModel: ObservableObject {
             ShareDocumentTypeModel(type: .ppt, image: .pptImage),
         ]
         
-        passwordText = "Only for PDF files"
-        
-        // запрос на колл шейров
+        qoutaLimit = shareQuotaService.remainingShares()
         updateShareCount()
     }
     
@@ -118,35 +121,56 @@ final class ShareViewModel: ObservableObject {
         guard let format = selectedFormatDocument else { return }
         let selected = sharePreviewModel.filter(\.isSelected)
         
-        switch format.type {
-        case .pdf:
+        isLoading = true
+        
+        Task {
             do {
-                let urls = try ShareExportService.shared.exportPDF(
-                    documents: selected,
-                    split: isNeedSplitDocument,
-                    zip: isNeetCreateZipArchve,
-                    password: isNeedSetPassword ? "123456" : nil,
-                    addWatermark: true,
-                    fileName: documentName
-                )
-
-                shareSheetURLs = urls
-                shareActiveSheet = .exportShareSheet
-            } catch {}
-        case .jpg:
-            do {
-                let urls = try ShareExportService.shared.exportJPG(
-                    documents: selected,
-                    zip: isNeetCreateZipArchve,
-                    fileName: documentName
-                )
+                let urls: [URL]
                 
-                shareSheetURLs = urls
-                shareActiveSheet = .exportShareSheet
-            } catch {}
-            
-        default:
-            return
+                switch format.type {
+                case .pdf:
+                    urls = try await Task.detached {
+                        try self.exportService.exportPDF(
+                            documents: selected,
+                            split: self.isNeedSplitDocument,
+                            zip: self.isNeetCreateZipArchve,
+                            password: self.isNeedSetPassword ? self.documentPassword : nil,
+                            addWatermark: true,
+                            fileName: self.documentName
+                        )
+                    }.value
+                case .jpg:
+                    urls = try await Task.detached {
+                        try self.exportService.exportJPG(
+                            documents: selected,
+                            zip: self.isNeetCreateZipArchve,
+                            fileName: self.documentName
+                        )
+                    }.value
+                default:
+                    await MainActor.run {
+                        self.isLoading = false
+                    }
+                    
+                    return
+                }
+                
+                await MainActor.run {
+                    self.shareSheetURLs = urls
+                    self.shareActiveSheet = .exportShareSheet
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
         }
+    }
+    
+    func updateQoutaShareLimit() {
+        do {
+            try shareQuotaService.consumeShare()
+            qoutaLimit -= 1
+        } catch {}
     }
 }

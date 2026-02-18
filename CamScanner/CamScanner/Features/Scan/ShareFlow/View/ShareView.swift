@@ -51,13 +51,21 @@ struct ShareView: View {
                     urls: viewModel.shareSheetURLs
                 ) { success in
                     if success {
-                        print("Shared successfully")
-                    } else {
-                        print("User cancelled")
+                        viewModel.updateQoutaShareLimit()
                     }
                 }
+                .onDisappear {
+                    viewModel.isLoading = false
+                }
             case .setPasswordSheet:
-                EmptyView()
+                PasswordDocumentView(currentPassword: $viewModel.documentPassword)
+                    .onDisappear {
+                        if viewModel.documentPassword == nil {
+                            viewModel.isNeedSetPassword = false
+                        }
+                    }
+                    .presentationCornerRadius(38)
+                    .interactiveDismissDisabled()
             }
         }
     }
@@ -352,7 +360,7 @@ struct ShareView: View {
                             .appTextStyle(.bodyPrimary)
                             .foregroundStyle(.text(.secondary))
                         
-                        Text(viewModel.passwordText)
+                        Text(viewModel.documentPassword ?? "Only for PDF files")
                             .appTextStyle(.helperText)
                             .foregroundStyle(.text(.secondary))
                     }
@@ -362,6 +370,11 @@ struct ShareView: View {
                     Toggle("", isOn: $viewModel.isNeedSetPassword)
                         .labelsHidden()
                         .tint(.bg(.accent))
+                        .onChange(of: viewModel.isNeedSetPassword) { _, newValue in
+                            if newValue {
+                                viewModel.shareActiveSheet = .setPasswordSheet
+                            }
+                        }
                 }
                 .padding(.vertical, 12)
             }
@@ -370,7 +383,7 @@ struct ShareView: View {
     
     private var bottomContainerView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FilesToShareProgressView(remaining: 5)
+            FilesToShareProgressView(remaining: viewModel.qoutaLimit)
                 .padding(.bottom, 12)
             
             AppButton(
@@ -384,6 +397,8 @@ struct ShareView: View {
                     viewModel.share()
                 }
             )
+            .appButtonEnabled(viewModel.qoutaLimit > 0)
+            .appButtonIsLoading(viewModel.isLoading)
         }
         .padding(.top, 16)
         .background(
@@ -397,6 +412,7 @@ struct ShareView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .ignoresSafeArea()
         )
     }
 }

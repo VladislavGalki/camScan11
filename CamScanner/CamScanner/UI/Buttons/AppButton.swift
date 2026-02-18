@@ -62,6 +62,7 @@ public enum ButtonContentKind {
 
 struct AppButton: View {
     @Environment(\.appButtonEnabled) private var appButtonEnabled
+    @Environment(\.appButtonIsLoading) private var appButtonIsLoading
     
     let config: AppButtonConfig
     let action: () -> Void
@@ -73,7 +74,7 @@ struct AppButton: View {
     
     var body: some View {
         Button {
-            guard appButtonEnabled else { return }
+            guard appButtonEnabled && !appButtonIsLoading else { return }
             action()
         } label: {
             label
@@ -85,7 +86,8 @@ struct AppButton: View {
                 isFullWidth: config.isFullWidth,
                 extraTitleColor: config.extraTitleColor,
                 contentKind: config.content.kind,
-                isEnabled: appButtonEnabled
+                isEnabled: appButtonEnabled,
+                isLoading: appButtonIsLoading
             )
         )
     }
@@ -124,21 +126,31 @@ struct AppButtonStyle: ButtonStyle {
     let extraTitleColor: Color?
     let contentKind: ButtonContentKind
     let isEnabled: Bool
+    let isLoading: Bool
     
     func makeBody(configuration: Configuration) -> some View {
         let m = size.metrics
         let padding = m.hPadding(for: contentKind)
         
-        return configuration.label
-            .appTextStyle(m.textStyle)
-            .frame(maxWidth: isFullWidth ? .infinity : nil)
-            .padding(padding)
-            .contentShape(Capsule())
-            .background(background(isEnabled: isEnabled))
-            .foregroundStyle(extraTitleColor ?? foreground(isEnabled: isEnabled))
-            .clipShape(Capsule())
-            .scaleEffect(configuration.isPressed && isEnabled ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        return ZStack {
+            configuration.label
+                .opacity(isLoading ? 0 : 1)
+            
+            if isLoading {
+                ProgressView()
+                    .controlSize(size.progressControlSize)
+                    .tint(foreground(isEnabled: isEnabled))
+            }
+        }
+        .appTextStyle(m.textStyle)
+        .frame(maxWidth: isFullWidth ? .infinity : nil)
+        .padding(padding)
+        .contentShape(Capsule())
+        .background(background(isEnabled: isEnabled))
+        .foregroundStyle(extraTitleColor ?? foreground(isEnabled: isEnabled))
+        .clipShape(Capsule())
+        .scaleEffect(configuration.isPressed && isEnabled && !isLoading ? 0.98 : 1)
+        .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
     
     private func background(isEnabled: Bool) -> Color {
@@ -205,6 +217,14 @@ private extension AppButtonConfig.Size {
                 horizontalPaddingTextWithIcon: EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8),
                 horizontalPaddingIconOnly: EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
             )
+        }
+    }
+    
+    var progressControlSize: ControlSize {
+        switch self {
+        case .l: return .regular
+        case .m: return .small
+        case .s: return .mini
         }
     }
 }

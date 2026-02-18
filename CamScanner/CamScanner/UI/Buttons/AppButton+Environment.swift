@@ -5,7 +5,6 @@ private struct AppButtonEnabledKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// Управляет enabled/disabled состоянием AppButton (не влияет на системные control-ы).
     var appButtonEnabled: Bool {
         get { self[AppButtonEnabledKey.self] }
         set { self[AppButtonEnabledKey.self] = newValue }
@@ -13,8 +12,24 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// Выключает/включает AppButton через environment (не использует .disabled()).
     func appButtonEnabled(_ isEnabled: Bool) -> some View {
         environment(\.appButtonEnabled, isEnabled)
+    }
+}
+
+private struct AppButtonLoaderKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var appButtonIsLoading: Bool {
+        get { self[AppButtonLoaderKey.self] }
+        set { self[AppButtonLoaderKey.self] = newValue }
+    }
+}
+
+extension View {
+    func appButtonIsLoading(_ isLoading: Bool) -> some View {
+        environment(\.appButtonIsLoading, isLoading)
     }
 }
