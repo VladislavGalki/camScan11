@@ -69,15 +69,29 @@ final class PDFRendererService {
     }
     
     private func drawRegular(_ document: SharePreviewModel, _ ctx: CGContext, _ watermark: Bool) {
-        guard let image = document.frames.first?.preview else { return }
-        let rect = contentRect()
+        guard let original = document.frames.first?.preview else {
+            return
+        }
 
-        let fittedRect = aspectFitRect(
-            imageSize: image.size,
-            inRect: rect
+        let image = ImageCompressionService.shared.compress(
+            original,
+            maxDimension: 1240,
+            quality: 0.75
         )
 
-        drawImage(image, in: fittedRect, ctx: ctx)
+        let rect = contentRect()
+
+        let fittedRect =
+            aspectFitRect(
+                imageSize: image.size,
+                inRect: rect
+            )
+
+        drawImage(
+            image,
+            in: fittedRect,
+            ctx: ctx
+        )
 
         if watermark {
             WatermarkRenderer.draw(
@@ -88,59 +102,92 @@ final class PDFRendererService {
     }
     
     private func drawID(_ document: SharePreviewModel, _ ctx: CGContext, _ watermark: Bool) {
-        let images = document.frames.compactMap { $0.preview }
-        guard !images.isEmpty else { return }
+        let originals = document.frames.compactMap(\.preview)
+        guard !originals.isEmpty else { return }
 
-        let imageSize = CGSize(width: 256, height: 162)
-        let spacing: CGFloat = 32
+        let images = originals.map {
+            ImageCompressionService.shared.compress(
+                $0,
+                maxDimension: 842,
+                quality: 0.72
+            )
+        }
+
+        let imageWidth = pageSize.width * 0.75
+        let aspect: CGFloat = 162.0 / 256.0
+        let imageHeight = imageWidth * aspect
+        let spacing: CGFloat = pageSize.height * 0.04
 
         let totalHeight =
-            imageSize.height * CGFloat(images.count) +
-            spacing * CGFloat(images.count - 1)
+            CGFloat(images.count) * imageHeight +
+            CGFloat(images.count - 1) * spacing
 
-        let startY = (pageSize.height - totalHeight) / 2
+        var y =
+            (pageSize.height - totalHeight) / 2
 
-        for (index, image) in images.enumerated() {
-
-            let y =
-                startY +
-                CGFloat(index) * (imageSize.height + spacing)
+        for image in images {
 
             let rect = CGRect(
-                x: (pageSize.width - imageSize.width) / 2,
+                x: (pageSize.width - imageWidth) / 2,
                 y: y,
-                width: imageSize.width,
-                height: imageSize.height
+                width: imageWidth,
+                height: imageHeight
             )
 
             drawImage(image, in: rect, ctx: ctx)
+
+            y += imageHeight + spacing
         }
 
         if watermark {
-            WatermarkRenderer.draw(in: ctx, pageSize: pageSize)
+            WatermarkRenderer.draw(
+                in: ctx,
+                pageSize: pageSize
+            )
         }
     }
     
-    private func drawPassport(_ document: SharePreviewModel,_ ctx: CGContext,_ watermark: Bool) {
-        guard let image = document.frames.first?.preview else { return }
-        let size = CGSize(width: 360, height: 250)
+    private func drawPassport(_ document: SharePreviewModel, _ ctx: CGContext, _ watermark: Bool) {
+        guard let original = document.frames.first?.preview else {
+            return
+        }
+
+        let image = ImageCompressionService.shared.compress(
+            original,
+            maxDimension: 842,
+            quality: 0.72
+        )
+
+        let imageWidth = pageSize.width * 0.8
+
+        let aspect =
+            image.size.height / image.size.width
+
+        let imageHeight =
+            imageWidth * aspect
 
         let rect = CGRect(
-            x: (pageSize.width - size.width) / 2,
-            y: (pageSize.height - size.height) / 2,
-            width: size.width,
-            height: size.height
+            x: (pageSize.width - imageWidth) / 2,
+            y: (pageSize.height - imageHeight) / 2,
+            width: imageWidth,
+            height: imageHeight
         )
 
         drawImage(image, in: rect, ctx: ctx)
 
         if watermark {
-            WatermarkRenderer.draw(in: ctx, pageSize: pageSize)
+            WatermarkRenderer.draw(
+                in: ctx,
+                pageSize: pageSize
+            )
         }
     }
     
-    private func drawImage(_ image: UIImage, in rect: CGRect,ctx: CGContext) {
-        guard let cgImage = image.cgImage else { return }
+    private func drawImage(_ image: UIImage, in rect: CGRect, ctx: CGContext) {
+        guard let cgImage = image.cgImage else {
+            return
+        }
+
         ctx.saveGState()
 
         ctx.translateBy(x: 0, y: pageSize.height)
@@ -154,6 +201,7 @@ final class PDFRendererService {
         )
 
         ctx.draw(cgImage, in: flippedRect)
+
         ctx.restoreGState()
     }
     

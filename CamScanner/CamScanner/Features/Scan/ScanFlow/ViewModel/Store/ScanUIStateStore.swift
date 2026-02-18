@@ -20,24 +20,4 @@ final class ScanUIStateStore: ObservableObject {
             flashMode = .auto
         }
     }
-
-//    func toggleDocumentType(_ documentType: DocumentType) {
-//        for index in selectedDocumentType.indices {
-//            let id = selectedDocumentType[index].id
-//            selectedDocumentType[index].isSelected = documentType.id == id
-//        }
-//
-//        if documentType.type == .id {
-//            isIdIntroVisible = true
-//            selectedIdType = .general
-//            idCaptureSide = .front
-//        }
-//    }
-
-//    private func setupDocumentTypes() {
-//        selectedDocumentType = [
-//            DocumentType(type: .documents, title: "Скан", isSelected: true),
-//            DocumentType(type: .id, title: "Удостоверение", isSelected: false)
-//        ]
-//    }
 }

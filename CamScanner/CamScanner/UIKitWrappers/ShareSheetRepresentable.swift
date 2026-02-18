@@ -10,15 +10,6 @@ struct ShareSheetRepresentable: UIViewControllerRepresentable {
             applicationActivities: nil
         )
 
-        vc.excludedActivityTypes = [
-            .assignToContact,
-            .addToReadingList,
-            .print,
-            .copyToPasteboard,
-            .markupAsPDF,
-            .saveToCameraRoll
-        ]
-
         vc.completionWithItemsHandler = { _, completed, _, _ in
             onComplete(completed)
         }

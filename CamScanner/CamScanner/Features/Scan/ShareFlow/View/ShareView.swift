@@ -397,7 +397,7 @@ struct ShareView: View {
                     viewModel.share()
                 }
             )
-            .appButtonEnabled(viewModel.qoutaLimit > 0)
+            //.appButtonEnabled(viewModel.qoutaLimit > 0)
             .appButtonIsLoading(viewModel.isLoading)
         }
         .padding(.top, 16)
