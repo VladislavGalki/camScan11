@@ -343,17 +343,20 @@ final class ScanPreviewViewModel: ObservableObject {
                         copy.original ??
                         copy.preview
                 }
+                
+                if let base = copy.previewBase {
+                    copy.previewBase = ImageCompressionService.shared.compress(
+                        base,
+                        maxDimension: 2048,
+                        quality: 0.85
+                    )
+                }
 
                 if copy.displayBase == nil {
                     copy.displayBase = copy.previewBase
                 }
 
-                if let base = copy.displayBase {
-                    copy.preview = filterRenderer.render(
-                        image: base,
-                        state: copy.currentFilter
-                    )
-                }
+                copy.preview = copy.displayBase
 
                 return copy
             }
@@ -380,6 +383,37 @@ final class ScanPreviewViewModel: ObservableObject {
         scanPreviewModel = result
         updateSelectedPageIndex(selectedPageIndex)
         configureDocumentFileName()
+        renderPreviewsAsync()
+    }
+    
+    private func renderPreviewsAsync() {
+        let pagesSnapshot = scanPreviewModel
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            var updatedPages = pagesSnapshot
+
+            for pageIndex in updatedPages.indices {
+                for frameIndex in updatedPages[pageIndex].frames.indices {
+                    let frame = updatedPages[pageIndex].frames[frameIndex]
+
+                    guard let base = frame.displayBase else { continue }
+
+                    let rendered = self.filterRenderer.render(
+                        image: base,
+                        state: frame.currentFilter
+                    ) ?? base
+
+                    updatedPages[pageIndex].frames[frameIndex].preview = rendered
+                }
+            }
+
+            let result = updatedPages
+
+            await MainActor.run {
+                self.scanPreviewModel = result
+            }
+        }
     }
     
     private func configureDocumentFileName() {
