@@ -5,6 +5,8 @@ final class ScanPreviewViewModel: ObservableObject {
     @Published var notificationState: ScanPreviewNotificationState = .none
     @Published var scanPreviewModel: [ScanPreviewModel] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
+    
+    private(set) var documentFileName = ""
 
     private var filterPreviewCache: [String : [DocumentFilterType : UIImage]] = [:]
     private var selectedPageIndex: Int = 0
@@ -377,5 +379,19 @@ final class ScanPreviewViewModel: ObservableObject {
 
         scanPreviewModel = result
         updateSelectedPageIndex(selectedPageIndex)
+        configureDocumentFileName()
+    }
+    
+    private func configureDocumentFileName() {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
+        
+        let dateString = formatter.string(from: Date())
+        let typeString = documentType.title
+        
+        documentFileName = "\(dateString) \(typeString)"
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
     }
 }

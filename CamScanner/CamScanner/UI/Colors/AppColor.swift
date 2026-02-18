@@ -56,6 +56,7 @@ enum AppColor: Hashable {
         case navigationDefault
         case navigationActive
         case onImmersive
+        case tetriary
     }
 
     enum Border: Hashable {
@@ -131,6 +132,7 @@ private extension AppColor {
         case .elements(.navigationDefault): return .sRGB01(0.40392157, 0.40392157, 0.40392157, 1)     // Elements/navigation-default
         case .elements(.navigationActive):  return .sRGB01(0, 0.53333336, 1, 1)                        // Elements/navigation-active
         case .elements(.onImmersive):       return .sRGB01(1, 1, 1, 1)                                // Elements/on immersive
+        case .elements(.tetriary):          return .sRGB01(0.639, 0.639, 0.639, 1)
 
         // Borders
         case .border(.accent):           return .sRGB01(0, 0.5333, 1, 1)

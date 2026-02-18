@@ -1,6 +1,7 @@
 import Foundation
 
 final class ShareViewModel: ObservableObject {
+    @Published var documentName: String = ""
     @Published var sharePreviewModel: [SharePreviewModel] = []
     @Published var formatDocumentModel: [ShareDocumentTypeModel] = []
     @Published var isNeedSplitDocument = false
@@ -8,6 +9,9 @@ final class ShareViewModel: ObservableObject {
     @Published var isNeedSetPassword = false
     @Published var passwordText: String = ""
     @Published var countOfFilesToShare: Int = 0
+    
+    @Published var shareActiveSheet: ShareActiveSheet?
+    @Published var shareSheetURLs: [URL] = []
     
     private let inputModel: ShareInputModel
 
@@ -18,6 +22,7 @@ final class ShareViewModel: ObservableObject {
     }
     
     private func bootstrap() {
+        documentName = inputModel.documentName
         sharePreviewModel = covertInputModel()
         
         formatDocumentModel = [
@@ -32,6 +37,7 @@ final class ShareViewModel: ObservableObject {
         passwordText = "Only for PDF files"
         
         // запрос на колл шейров
+        updateShareCount()
     }
     
     private func covertInputModel() -> [SharePreviewModel] {
@@ -62,6 +68,11 @@ final class ShareViewModel: ObservableObject {
         }
 
         return result
+    }
+    
+    private func updateShareCount() {
+        let count = sharePreviewModel.filter { $0.isSelected }.count
+        countOfFilesToShare = count
     }
     
     func selectDocumentToShare(_ model: SharePreviewModel) {
@@ -103,8 +114,39 @@ final class ShareViewModel: ObservableObject {
         formatDocumentModel = updatedModel
     }
     
-    private func updateShareCount() {
-        let count = sharePreviewModel.filter { $0.isSelected }.count
-        countOfFilesToShare = count
+    func share() {
+        guard let format = selectedFormatDocument else { return }
+        let selected = sharePreviewModel.filter(\.isSelected)
+        
+        switch format.type {
+        case .pdf:
+            do {
+                let urls = try ShareExportService.shared.exportPDF(
+                    documents: selected,
+                    split: isNeedSplitDocument,
+                    zip: isNeetCreateZipArchve,
+                    password: isNeedSetPassword ? "123456" : nil,
+                    addWatermark: true,
+                    fileName: documentName
+                )
+
+                shareSheetURLs = urls
+                shareActiveSheet = .exportShareSheet
+            } catch {}
+        case .jpg:
+            do {
+                let urls = try ShareExportService.shared.exportJPG(
+                    documents: selected,
+                    zip: isNeetCreateZipArchve,
+                    fileName: documentName
+                )
+                
+                shareSheetURLs = urls
+                shareActiveSheet = .exportShareSheet
+            } catch {}
+            
+        default:
+            return
+        }
     }
 }

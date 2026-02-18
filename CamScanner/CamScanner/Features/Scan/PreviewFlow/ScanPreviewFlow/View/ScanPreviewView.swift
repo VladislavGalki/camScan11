@@ -34,6 +34,7 @@ struct ScanPreviewView: View {
         .background(
             Color.bg(.main).ignoresSafeArea()
         )
+        .ignoresSafeArea(.keyboard, edges: .all)
     }
     
     private var navigationView: some View {
@@ -64,6 +65,7 @@ struct ScanPreviewView: View {
                         router.presentSheet(
                             ScanRoute.share(
                                 ShareInputModel(
+                                    documentName: viewModel.documentFileName,
                                     documentType: viewModel.documentType,
                                     pages: viewModel.scanPreviewModel
                                 )

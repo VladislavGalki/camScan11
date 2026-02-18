@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3043E9102F4509FC00CAB5E9 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 3043E90F2F4509FC00CAB5E9 /* ZIPFoundation */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		30026BC32EF95D0700CD494A /* CamScanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CamScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3043E9102F4509FC00CAB5E9 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = CamScanner;
 			packageProductDependencies = (
+				3043E90F2F4509FC00CAB5E9 /* ZIPFoundation */,
 			);
 			productName = CamScanner;
 			productReference = 30026BC32EF95D0700CD494A /* CamScanner.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = 30026BBA2EF95D0700CD494A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				3043E90E2F4509FC00CAB5E9 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 30026BC42EF95D0700CD494A /* Products */;
 			projectDirPath = "";
@@ -368,6 +377,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		3043E90E2F4509FC00CAB5E9 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.20;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3043E90F2F4509FC00CAB5E9 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3043E90E2F4509FC00CAB5E9 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 30026BBB2EF95D0700CD494A /* Project object */;
 }

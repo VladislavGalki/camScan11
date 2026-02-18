@@ -52,7 +52,7 @@ private extension AppTextStyle {
             return .init(size: 34, lineHeight: 42, weight: .bold, tracking: 0.4)
 
         case .sectionTitle:
-            return .init(size: 22, lineHeight: 28, weight: .bold, tracking: -0.26)
+            return .init(size: 22, lineHeight: 28, weight: .semibold, tracking: -0.26)
 
         case .itemTitle:
             return .init(size: 17, lineHeight: 22, weight: .semibold, tracking: -0.43)

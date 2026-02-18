@@ -43,6 +43,7 @@ public enum AppIcon: String, CaseIterable {
     case filesFill = "files_fill"
     case starFill = "star_fill"
     case flashFill = "flash_fill"
+    case closeFill = "close_fill"
     
     // MARK: - Outline
     case addCircle = "add_circle"

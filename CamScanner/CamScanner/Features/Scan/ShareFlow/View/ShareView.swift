@@ -41,6 +41,25 @@ struct ShareView: View {
             Color.bg(.main)
                 .ignoresSafeArea()
         )
+        .sheet(item: $viewModel.shareActiveSheet) { sheet in
+            switch sheet {
+            case .renameFileSheet:
+                RenameFileView(documentFileName: $viewModel.documentName)
+                    .presentationCornerRadius(38)
+            case .exportShareSheet:
+                ShareSheetRepresentable(
+                    urls: viewModel.shareSheetURLs
+                ) { success in
+                    if success {
+                        print("Shared successfully")
+                    } else {
+                        print("User cancelled")
+                    }
+                }
+            case .setPasswordSheet:
+                EmptyView()
+            }
+        }
     }
     
     private var navigationView: some View {
@@ -54,12 +73,15 @@ struct ShareView: View {
                 action: { router.dismissSheet() }
             )
             
-            Text("Jun 30, 2026 Doc")
+            Text(viewModel.documentName)
                 .appTextStyle(.topBarTitle)
                 .foregroundStyle(.text(.primary))
                 .underline(true, color: .text(.secondary))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+                .onTapGesture {
+                    viewModel.shareActiveSheet = .renameFileSheet
+                }
             
             Rectangle()
                 .foregroundStyle(.clear)
@@ -359,11 +381,11 @@ struct ShareView: View {
                     isFullWidth: true
                 ),
                 action: {
-                    
+                    viewModel.share()
                 }
             )
         }
-        .padding(.vertical, 16)
+        .padding(.top, 16)
         .background(
             LinearGradient(
                 colors: [
