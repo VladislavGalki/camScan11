@@ -324,7 +324,7 @@ struct ScanPreviewView: View {
                         content: .title("Delete"),
                         style: .secondary,
                         size: .l,
-                        extraTitleColor: .text(.distructive),
+                        extraTitleColor: .text(.destructive),
                         isFullWidth: true
                     ),
                     action: {

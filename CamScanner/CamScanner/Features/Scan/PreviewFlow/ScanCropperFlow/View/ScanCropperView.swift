@@ -253,7 +253,7 @@ struct ScanCropperView: View {
                         content: .title("Discard Changes"),
                         style: .secondary,
                         size: .l,
-                        extraTitleColor: .text(.distructive),
+                        extraTitleColor: .text(.destructive),
                         isFullWidth: true
                     ),
                     action: {

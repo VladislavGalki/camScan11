@@ -36,6 +36,9 @@ public enum AppIcon: String, CaseIterable {
     case autoCrop = "autocrop"
     case eye = "eye"
     case eye_splash = "eye_splash"
+    case files = "files"
+    case settings = "settings"
+    case tools = "tools"
     
     // MARK: - Fill
     case homeFill = "home_fill"

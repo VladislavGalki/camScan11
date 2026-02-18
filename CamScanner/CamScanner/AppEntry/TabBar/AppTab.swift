@@ -17,10 +17,10 @@ enum AppTab: Hashable, CaseIterable {
     
     var icon: AppIcon {
         switch self {
-        case .home: return .homeFill
-        case .files: return .filesFill
-        case .tools: return .toolsFill
-        case .settings: return .settingsFill
+        case .home: return .home
+        case .files: return .files
+        case .tools: return .tools
+        case .settings: return .settings
         }
     }
 }

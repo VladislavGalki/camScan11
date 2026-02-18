@@ -180,7 +180,7 @@ struct PasswordField: View {
             if !password.isEmpty {
                 Image(appIcon: isVisible ? .eye_splash : .eye)
                     .renderingMode(.template)
-                    .foregroundStyle(.elements(.tetriary))
+                    .foregroundStyle(.elements(.tertiary))
                     .onTapGesture {
                         isVisible.toggle()
                         

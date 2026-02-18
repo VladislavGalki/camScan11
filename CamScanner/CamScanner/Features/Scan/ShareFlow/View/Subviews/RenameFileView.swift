@@ -88,7 +88,7 @@ struct RenameFileView: View {
             if !newTextFileName.isEmpty {
                 Image(appIcon: .closeFill)
                     .renderingMode(.template)
-                    .foregroundStyle(.elements(.tetriary))
+                    .foregroundStyle(.elements(.tertiary))
                     .onTapGesture {
                         newTextFileName = ""
                     }

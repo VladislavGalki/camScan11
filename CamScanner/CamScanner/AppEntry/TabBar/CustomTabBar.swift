@@ -37,22 +37,27 @@ struct CustomTabBar: View {
     }
 
     private func tabBarButton(_ tab: AppTab) -> some View {
-        Button {
+        VStack(spacing: 4) {
+            Image(appIcon: tab.icon)
+                .renderingMode(.template)
+                .foregroundStyle(
+                    selectedTab == tab
+                    ? Color.elements(.accent)
+                    : Color.elements(.navigationDefault)
+                )
+            
+            Text(tab.title)
+                .appTextStyle(.tabBar)
+                .foregroundStyle(
+                    selectedTab == tab
+                    ? Color.text(.accent)
+                    : Color.text(.secondary)
+                )
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 54)
+        .onTapGesture {
             selectedTab = tab
-        } label: {
-            VStack(spacing: 4) {
-                Image(appIcon: tab.icon)
-                    .renderingMode(.template)
-                
-                Text(tab.title)
-                    .appTextStyle(.tabBar)
-            }
-            .foregroundStyle(selectedTab == tab
-                             ? Color.text(.navigationActive)
-                             : Color.text(.navigationDefault)
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
         }
     }
     
