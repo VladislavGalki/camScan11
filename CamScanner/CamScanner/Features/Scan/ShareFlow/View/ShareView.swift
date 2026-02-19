@@ -34,7 +34,6 @@ struct ShareView: View {
             }
             .safeAreaInset(edge: .bottom, alignment: .leading, spacing: 0) {
                 bottomContainerView
-                    .padding(.horizontal, 16)
             }
         }
         .background(
@@ -98,15 +97,21 @@ struct ShareView: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 1),
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.5),
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            ProgressiveBlurView()
+                .blur(radius: 20)
+                .padding(.horizontal, -32)
+                .background {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 1),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.5),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .ignoresSafeArea()
         )
     }
     
@@ -397,22 +402,27 @@ struct ShareView: View {
                     viewModel.share()
                 }
             )
-            //.appButtonEnabled(viewModel.qoutaLimit > 0)
+            .appButtonEnabled(viewModel.qoutaLimit > 0)
             .appButtonIsLoading(viewModel.isLoading)
         }
         .padding(.top, 16)
+        .padding(.horizontal, 16)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.4),
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.6),
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.7),
-                    Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            ProgressiveBlurView()
+                .blur(radius: 2)
+                .padding(.horizontal, -32)
+                .background() {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.0),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.7),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .ignoresSafeArea()
         )
     }
 }
