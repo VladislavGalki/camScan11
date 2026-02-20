@@ -415,6 +415,10 @@ final class ScanViewModel: ObservableObject {
     
     // MARK: - Calculated
     
+    var shouldShowDiscardOverlay: Bool {
+        !scanResult.isEmpty || (idResult.front.hasPreview || idResult.back?.hasPreview == true)
+    }
+    
     var captureShutterButtonDisabled: Bool {
         switch ui.selectedDocumentType {
         case .documents:

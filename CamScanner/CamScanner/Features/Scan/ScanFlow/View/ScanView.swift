@@ -4,6 +4,7 @@ struct ScanView: View {
     @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
     
+    @State private var shouldShowDiscardOverlay: Bool = false
     @State private var navigationViewHeight: CGFloat = .zero
     
     @EnvironmentObject private var router: Router
@@ -49,6 +50,11 @@ struct ScanView: View {
                 )
             }
         }
+        .overlay {
+            if shouldShowDiscardOverlay {
+                dismissOverlayView
+            }
+        }
         .background(
             Color.bg(.immersive)
                 .ignoresSafeArea()
@@ -70,7 +76,13 @@ struct ScanView: View {
                     size: .m
                 ),
                 action: {
-                    oncloseClick()
+                    withAnimation {
+                        if vm.shouldShowDiscardOverlay {
+                            shouldShowDiscardOverlay = true
+                        } else {
+                            oncloseClick()
+                        }
+                    }
                 }
             )
             
@@ -179,6 +191,60 @@ struct ScanView: View {
             }
         } else if store.ui.selectedDocumentType == .passport {
             PassportView(ui: store.ui)
+        }
+    }
+    
+    private var dismissOverlayView: some View {
+        ZStack {
+            Color.black.opacity(0.24)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                Text("Discard scans?")
+                    .multilineTextAlignment(.center)
+                    .appTextStyle(.itemTitle)
+                    .foregroundStyle(.text(.primary))
+                    .padding(.bottom, 8)
+                
+                Text("Your scanned files not be saved")
+                    .multilineTextAlignment(.center)
+                    .appTextStyle(.bodyPrimary)
+                    .foregroundStyle(.text(.secondary))
+                    .padding(.bottom, 24)
+                
+                VStack(spacing: 10) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Discard scans"),
+                            style: .secondary,
+                            size: .l,
+                            extraTitleColor: .text(.destructive),
+                            isFullWidth: true
+                        ),
+                        action: { oncloseClick() }
+                    )
+                    
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Cancel"),
+                            style: .secondary,
+                            size: .l,
+                            isFullWidth: true
+                        ),
+                        action: {
+                            withAnimation {
+                                shouldShowDiscardOverlay = false
+                            }
+                        }
+                    )
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .foregroundStyle(.bg(.surface))
+            )
+            .frame(maxWidth: 300)
         }
     }
     
