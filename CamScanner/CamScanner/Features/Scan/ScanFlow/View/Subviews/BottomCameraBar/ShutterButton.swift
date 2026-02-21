@@ -28,6 +28,7 @@ struct CaptureShutterButton: View {
                     .bg(.surface)
                     .opacity(buttonDisabled ? 0.3 : 1)
                 )
+                .opacity(isCountingDown ? 0 : 1)
                 .padding(8)
 
             if isCountingDown {
@@ -41,6 +42,10 @@ struct CaptureShutterButton: View {
                         )
                     )
                     .rotationEffect(.degrees(-90))
+                    .frame(
+                        width: size - 16,
+                        height: size - 16
+                    )
 
                 Text("\(countdownValue)")
                     .appTextStyle(.screenTitle)
@@ -54,7 +59,6 @@ struct CaptureShutterButton: View {
             cancelCountdown()
             action()
         }
-
         .onChange(of: shouldStartAutoShootCountdown) { _, value in
             value ? startCountdown() : cancelCountdown()
         }
