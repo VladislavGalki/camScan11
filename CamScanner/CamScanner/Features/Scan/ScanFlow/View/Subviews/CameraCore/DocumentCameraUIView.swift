@@ -8,6 +8,9 @@ final class DocumentCameraUIView: UIView {
 
     private let quadView = QuadrilateralView()
     
+    private var lastHintState: ScanHintState = .none
+    var onHintChanged: ((ScanHintState) -> Void)?
+    
     var isLiveDetectionEnabled: Bool = true {
         didSet {
             if !isLiveDetectionEnabled {
@@ -55,39 +58,62 @@ final class DocumentCameraUIView: UIView {
     func updateDetectedQuad(_ quad: Quadrilateral?, imageSize: CGSize) {
         guard isLiveDetectionEnabled else {
             quadView.removeQuadrilateral()
+            updateHint(.none)
             return
         }
 
         guard let quad else {
             quadView.removeQuadrilateral()
+            updateHint(.placeDocument)
             return
         }
+
+        updateHint(.holdSteady)
 
         let portraitImageSize = CGSize(width: imageSize.height, height: imageSize.width)
         let scaleTransform = CGAffineTransform.scaleTransform(
             forSize: portraitImageSize,
             aspectFillInSize: quadView.bounds.size
         )
+
         let scaledImageSize = imageSize.applying(scaleTransform)
+
         let rotationTransform = CGAffineTransform(rotationAngle: .pi / 2)
-        let imageBounds = CGRect(origin: .zero, size: scaledImageSize).applying(rotationTransform)
+
+        let imageBounds = CGRect(origin: .zero, size: scaledImageSize)
+            .applying(rotationTransform)
+
         let translationTransform = CGAffineTransform.translateTransform(
             fromCenterOfRect: imageBounds,
             toCenterOfRect: quadView.bounds
         )
 
-        let transforms = [scaleTransform, rotationTransform, translationTransform]
+        let transforms = [
+            scaleTransform,
+            rotationTransform,
+            translationTransform
+        ]
+
         let transformedQuad = quad.applyTransforms(transforms)
 
         let displayQuad = transformedQuad
             .scaled(aroundCenterBy: 1.05)
             .clamped(to: quadView.bounds)
 
-        quadView.drawQuadrilateral(quad: displayQuad, animated: true)
+        quadView.drawQuadrilateral(
+            quad: displayQuad,
+            animated: true
+        )
     }
     
     func normalizedRectFromViewRect(_ rectInView: CGRect) -> CGRect {
         let layerRect = videoPreviewLayer.convert(rectInView, from: self.layer)
         return videoPreviewLayer.metadataOutputRectConverted(fromLayerRect: layerRect)
+    }
+    
+    private func updateHint(_ state: ScanHintState) {
+        guard state != lastHintState else { return }
+        lastHintState = state
+        onHintChanged?(state)
     }
 }

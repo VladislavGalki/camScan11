@@ -4,6 +4,7 @@ struct ScanView: View {
     @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
     
+    @State var hintText: String = ""
     @State private var shouldShowDiscardOverlay: Bool = false
     @State private var navigationViewHeight: CGFloat = .zero
     
@@ -131,9 +132,27 @@ struct ScanView: View {
     private var cameraView: some View {
         DocumentCameraView(
             camera: vm.camera,
-            isLiveDetectionEnabled: store.settings.isLivePreviewEnabled && store.ui.selectedDocumentType == .documents
+            isLiveDetectionEnabled: store.settings.isLivePreviewEnabled && store.ui.selectedDocumentType == .documents,
+            onHintChanged: { state in
+                hintText = state.text
+            }
         )
         .coordinateSpace(name: "cameraSpace")
+        .overlay(alignment: .top) {
+            if !hintText.isEmpty {
+                Text(hintText)
+                    .appTextStyle(.bodySecondary)
+                    .foregroundStyle(.text(.onHint))
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(
+                        Color.bg(.hintLight)
+                            .cornerRadius(8, corners: .allCorners)
+                            .appBorderModifier(.border(.hintNeutral), radius: 8)
+                    )
+                    .padding(.top, 14)
+            }
+        }
         .overlay {
             cameraTypeOverlayView
         }
