@@ -4,8 +4,9 @@ struct ScanView: View {
     @StateObject private var store: ScanStore
     @StateObject private var vm: ScanViewModel
     
-    @State var hintText: String = ""
-    @State private var shouldShowDiscardOverlay: Bool = false
+    @State private var hintText: String = ""
+    @State private var shouldChangeAutoModeAfterDiscard = false
+    @State private var shouldShowDiscardOverlay = false
     @State private var navigationViewHeight: CGFloat = .zero
     
     @EnvironmentObject private var router: Router
@@ -79,6 +80,11 @@ struct ScanView: View {
                 action: {
                     withAnimation {
                         if vm.shouldShowDiscardOverlay {
+                            if store.settings.autoMode {
+                                shouldChangeAutoModeAfterDiscard = true
+                                store.settings.autoMode = false
+                            }
+                            
                             shouldShowDiscardOverlay = true
                         } else {
                             oncloseClick()
@@ -164,7 +170,7 @@ struct ScanView: View {
             
             HStack(spacing: 0) {
                 CaptureShutterButton(
-                    shoudStartTimer: false,
+                    shouldStartAutoShootCountdown: vm.shouldStartAutoShootCountdown,
                     buttonDisabled: vm.captureShutterButtonDisabled
                 ) {
                     vm.capture()
@@ -178,6 +184,8 @@ struct ScanView: View {
                     count: vm.miniPreviewCountForSelectedDocument,
                     onPreviewClick: {
                         if let inputModel = vm.buildPreviewInputModel() {
+                            vm.shouldStartAutoShootCountdown = false
+                            
                             router.push(
                                 ScanRoute.scanPreview(inputModel) { outputModel in
                                     vm.buildOutputPreview(outputModel)
@@ -252,6 +260,11 @@ struct ScanView: View {
                         ),
                         action: {
                             withAnimation {
+                                if shouldChangeAutoModeAfterDiscard {
+                                    shouldChangeAutoModeAfterDiscard = false
+                                    store.settings.autoMode = true
+                                }
+                                
                                 shouldShowDiscardOverlay = false
                             }
                         }

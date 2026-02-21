@@ -16,7 +16,7 @@ final class AutoShootEngine {
     var minAreaKeep: CGFloat  = 0.045
 
     /// "Сколько стабильных кадров нужно" (по сути “счетчик стабильности”)
-    var requiredStableFrames: CGFloat = 5
+    var requiredStableFrames: CGFloat = 3
 
     /// Порог по смещению центра (px в координатах детектора)
     var baseCenterShiftThreshold: CGFloat = 10
@@ -55,87 +55,134 @@ final class AutoShootEngine {
         canShoot: Bool,
         quad: Quadrilateral?,
         imageSize: CGSize
-    ) -> Bool {
+    ) -> AutoShootState {
 
         guard enabled else {
             softReset()
-            return false
+            return AutoShootState(isStable: false)
         }
 
         guard canShoot else {
             softReset()
-            return false
+            return AutoShootState(isStable: false)
         }
 
-        // quad обязателен для автошота
+        // quad обязателен
         guard var quad,
               imageSize.width > 0,
               imageSize.height > 0 else {
 
             applyPenalty(penaltyOnMissing)
-            log("missing quad -> penalty, score=\(fmt(stableScore))/\(fmt(requiredStableFrames))")
-            return false
+
+            log(
+                "missing quad -> penalty, score=\(fmt(stableScore))/\(fmt(requiredStableFrames))"
+            )
+
+            return AutoShootState(isStable: false)
         }
 
         quad.reorganize()
 
-        // --- Area gate (hysteresis) ---
-        let frameArea = max(imageSize.width * imageSize.height, 1)
-        let ratio = quadBoundingBoxArea(quad) / frameArea
+        // MARK: Area gate
+
+        let frameArea =
+            max(imageSize.width * imageSize.height, 1)
+
+        let ratio =
+            quadBoundingBoxArea(quad) / frameArea
 
         if !isAreaQualified {
-            isAreaQualified = (ratio >= minAreaEnter)
+
+            isAreaQualified =
+                ratio >= minAreaEnter
+
         } else {
-            // держим qualified пока ratio >= keep
-            if ratio < minAreaKeep { isAreaQualified = false }
+
+            if ratio < minAreaKeep {
+                isAreaQualified = false
+            }
         }
 
-        log("area ratio = \(fmt(ratio)) | enter=\(fmt(minAreaEnter)) keep=\(fmt(minAreaKeep)) | qualified=\(isAreaQualified)")
+        log(
+            "area ratio = \(fmt(ratio)) | qualified=\(isAreaQualified)"
+        )
 
         guard isAreaQualified else {
+
             applyPenalty(penaltyOnNotQualified)
-            return false
+
+            return AutoShootState(
+                isStable: false
+            )
         }
 
-        // --- EMA update ---
-        let center = quadCenter(quad)
-        let areaR = ratio
+        // MARK: EMA
 
-        if emaCenter == nil { emaCenter = center }
-        if emaAreaRatio == nil { emaAreaRatio = areaR }
+        let center =
+            quadCenter(quad)
 
-        emaCenter = emaPoint(old: emaCenter!, new: center, alpha: emaAlpha)
-        emaAreaRatio = emaValue(old: emaAreaRatio!, new: areaR, alpha: emaAlpha)
+        let areaR =
+            ratio
 
-        let centerShift = distance(center, emaCenter!)
-        let areaDelta = abs(areaR - emaAreaRatio!) / max(emaAreaRatio!, 0.0001)
+        if emaCenter == nil {
+            emaCenter = center
+        }
 
-        // можно сделать threshold чуть “плавающим” от величины документа:
-        // чем больше документ, тем строже к смещению.
-        let dynamicCenterThr = baseCenterShiftThreshold
+        if emaAreaRatio == nil {
+            emaAreaRatio = areaR
+        }
 
-        let isStable = (centerShift <= dynamicCenterThr) && (areaDelta <= areaDeltaThreshold)
+        emaCenter =
+            emaPoint(
+                old: emaCenter!,
+                new: center,
+                alpha: emaAlpha
+            )
 
-        if isStable {
-            stableScore = min(requiredStableFrames, stableScore + 1)
+        emaAreaRatio =
+            emaValue(
+                old: emaAreaRatio!,
+                new: areaR,
+                alpha: emaAlpha
+            )
+
+        let centerShift =
+            distance(center, emaCenter!)
+
+        let areaDelta =
+            abs(areaR - emaAreaRatio!)
+            /
+            max(emaAreaRatio!, 0.0001)
+
+        let dynamicCenterThr =
+            baseCenterShiftThreshold
+
+        let isStableFrame =
+            centerShift <= dynamicCenterThr
+            &&
+            areaDelta <= areaDeltaThreshold
+
+        if isStableFrame {
+
+            stableScore =
+                min(requiredStableFrames, stableScore + 1)
+
         } else {
-            stableScore = max(0, stableScore - penaltyOnUnstable)
+
+            stableScore =
+                max(0, stableScore - penaltyOnUnstable)
         }
 
-        log("stable = \(isStable) | score=\(fmt(stableScore))/\(fmt(requiredStableFrames)) | centerShift=\(fmt(centerShift)) thr=\(fmt(dynamicCenterThr)) | areaΔ=\(fmt(areaDelta))")
+        let isStableNow =
+            stableScore >= requiredStableFrames
 
-        // --- Cooldown + Shot ---
-        let now = CACurrentMediaTime()
-        guard stableScore >= requiredStableFrames else { return false }
-        guard (now - lastAutoShotAt) >= minShotInterval else {
-            log("cooldown active: \(fmt(CGFloat(now - lastAutoShotAt)))s / \(fmt(CGFloat(minShotInterval)))s")
-            return false
-        }
+        log(
+            "stableFrame=\(isStableFrame) | score=\(fmt(stableScore))"
+        )
 
-        lastAutoShotAt = now
-        stableScore = 0
-        log("🔥 AUTO SHOT")
-        return true
+        return AutoShootState(
+            isStable: isStableNow
+        )
     }
 
     /// Вызывай после успешного capture (чтобы не копил старую инерцию)
