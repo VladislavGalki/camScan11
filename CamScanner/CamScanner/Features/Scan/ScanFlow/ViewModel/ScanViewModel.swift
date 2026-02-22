@@ -443,6 +443,17 @@ final class ScanViewModel: ObservableObject {
         }
     }
     
+    var shouldShowBackBottomBarButton: Bool {
+        switch ui.selectedDocumentType {
+        case .documents:
+            return !scanResult.isEmpty
+        case .idCard, .driverLicense, .passport:
+            return idResult.front.hasPreview
+        case .qrCode:
+            return false
+        }
+    }
+    
     var miniPreviewImageForSelectedDocument: UIImage? {
         switch ui.selectedDocumentType {
         case .documents:

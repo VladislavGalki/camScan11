@@ -3,12 +3,14 @@ import UIKit
 
 struct DocumentTypeCarouselView: View {
     @ObservedObject var store: ScanStore
+    let shouldHideNonSelectedItems: Bool
     
     private let items: [DocumentTypeEnum] = Array(DocumentTypeEnum.allCases)
 
     var body: some View {
         DocumentCarouselViewRepresentable(
             modes: items.map { CameraMode(title: $0.title) },
+            shouldHideNonSelectedItems: shouldHideNonSelectedItems,
             selectedIndex: Binding(
                 get: { items.firstIndex(of: store.ui.selectedDocumentType) ?? 0 },
                 set: { newIndex in
@@ -18,11 +20,13 @@ struct DocumentTypeCarouselView: View {
             )
         )
         .frame(height: 42)
+        .allowsHitTesting(!shouldHideNonSelectedItems)
     }
 }
 
 struct DocumentCarouselViewRepresentable: UIViewRepresentable {
     let modes: [CameraMode]
+    let shouldHideNonSelectedItems: Bool
     @Binding var selectedIndex: Int
     
     var onChanged: ((Int) -> Void)? = nil
@@ -30,6 +34,7 @@ struct DocumentCarouselViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> CameraModePickerView {
         let view = CameraModePickerView(modes: modes)
 
+        view.shouldHideNonSelectedItems = shouldHideNonSelectedItems
         view.onModeChanged = { idx in
             if selectedIndex != idx {
                 selectedIndex = idx
@@ -43,6 +48,11 @@ struct DocumentCarouselViewRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: CameraModePickerView, context: Context) {
+        if uiView.shouldHideNonSelectedItems != shouldHideNonSelectedItems {
+            uiView.shouldHideNonSelectedItems = shouldHideNonSelectedItems
+            uiView.reloadVisibleCells()
+        }
+        
         if context.coordinator.lastTitles != modes.map(\.title) {
             uiView.setModes(modes)
             context.coordinator.lastTitles = modes.map(\.title)

@@ -85,6 +85,8 @@ final class CameraModePickerView: UIView {
     private var modes: [CameraMode]
     private var selectedIndex: Int = 0
     
+    var shouldHideNonSelectedItems = false
+    
     var onModeChanged: ((Int) -> Void)?
     
     // MARK: CollectionView
@@ -129,6 +131,20 @@ final class CameraModePickerView: UIView {
         selectedIndex = min(selectedIndex, max(0, modes.count - 1))
         DispatchQueue.main.async { [weak self] in
             self?.centerItem(at: self?.selectedIndex ?? 0, animated: false)
+        }
+    }
+    
+    func reloadVisibleCells() {
+        for case let cell as CameraModeCell in collectionView.visibleCells {
+            guard let indexPath = collectionView.indexPath(for: cell) else { continue }
+
+            let isSelected = indexPath.item == selectedIndex
+
+            UIView.animate(withDuration: 0.2) {
+                cell.alpha = self.shouldHideNonSelectedItems
+                    ? (isSelected ? 1 : 0)
+                    : 1
+            }
         }
     }
     
@@ -247,13 +263,21 @@ extension CameraModePickerView: UICollectionViewDataSource,
         modes.count
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath
+    ) -> UICollectionViewCell {
         
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: CameraModeCell.reuseId,
             for: indexPath
-        ) as! CameraModeCell
+        ) as? CameraModeCell else { return UICollectionViewCell() }
+        
+        let isSelected = indexPath.item == selectedIndex
+
+        cell.alpha = shouldHideNonSelectedItems
+            ? (isSelected ? 1 : 0)
+            : 1
         
         cell.configure(
             title: modes[indexPath.item].title,

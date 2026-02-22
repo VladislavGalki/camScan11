@@ -166,7 +166,10 @@ struct ScanView: View {
     
     private var bottomContainerView: some View {
         VStack(spacing: 0) {
-            DocumentTypeCarouselView(store: store)
+            DocumentTypeCarouselView(
+                store: store,
+                shouldHideNonSelectedItems: vm.shouldShowBackBottomBarButton
+            )
             
             HStack(spacing: 0) {
                 CaptureShutterButton(
@@ -177,6 +180,20 @@ struct ScanView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .overlay(alignment: .leading) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.back),
+                        style: .immersive,
+                        size: .m
+                    ),
+                    action: {
+                        vm.resetSessionState(store.ui.selectedDocumentType)
+                    }
+                )
+                .padding(.leading, 37)
+                .opacity(vm.shouldShowBackBottomBarButton ? 1 : 0)
+            }
             .overlay(alignment: .trailing) {
                 MiniPreviewDocumentView(
                     store: store,
