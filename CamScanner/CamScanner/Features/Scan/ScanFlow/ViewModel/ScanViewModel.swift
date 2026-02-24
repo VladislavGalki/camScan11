@@ -7,12 +7,14 @@ final class ScanViewModel: ObservableObject {
     @Published var shouldStartAutoShootCountdown: Bool = false
     @Published var isCapturing: Bool = false
     @Published var showPermissionAlert: Bool = false
-    
     @Published var scanResult: [CapturedFrame] = []
     
     // MARK: - ID
     @Published var idResult: IdCaptureResult
     @Published var shouldShowQuickPreview: Bool = false
+    
+    // MARK: - Passport
+    @Published var passportResult: [CapturedFrame] = []
     
     // MARK: - QrCode
     @Published var qrCodeResult: String?
@@ -137,27 +139,53 @@ final class ScanViewModel: ObservableObject {
             
             self.isCapturing = false
             
-            if self.ui.selectedDocumentType != .documents {
-                self.handleIdCapture(image: image)
+            if self.ui.selectedDocumentType == .documents {
+                let output = self.postProcessor.process(
+                    image: image,
+                    previewQuad: self.latestPreviewQuad,
+                    previewImageSize: self.latestPreviewImageSize,
+                    autoMode: self.settings.autoMode,
+                    quality: self.ui.quality
+                )
+
+                let captured = CapturedFrame(
+                    preview: output.preview,
+                    original: output.original,
+                    quad: output.autoQuadInImageSpace
+                )
+
+                self.scanResult.append(captured)
+                self.autoShootEngine.notifyDidCapture()
+
                 return
             }
             
-            let output = self.postProcessor.process(
-                image: image,
-                previewQuad: self.latestPreviewQuad,
-                previewImageSize: self.latestPreviewImageSize,
-                autoMode: self.settings.autoMode && self.ui.selectedDocumentType == .documents,
-                quality: self.ui.quality
-            )
+            if self.ui.selectedDocumentType == .passport {
+                guard let frameRect = latestIdFrameRectInPreview,
+                      let previewSize = latestIdPreviewSize,
+                      previewSize.width > 0, previewSize.height > 0,
+                      frameRect.width > 1, frameRect.height > 1 else {
+                    return
+                }
+                
+                let output = postProcessor.processIdByFrame(
+                    image: image,
+                    frameRectInPreview: frameRect,
+                    previewSize: previewSize,
+                    quality: ui.quality
+                )
+                
+                let captured = CapturedFrame(
+                    preview: output.preview,
+                    original: output.original,
+                    quad: output.autoQuadInImageSpace
+                )
+
+                startQuickCropForPassport(frame: captured)
+                return
+            }
             
-            let captured = CapturedFrame(
-                preview: output.preview,
-                original: output.original,
-                quad: output.autoQuadInImageSpace
-            )
-            
-            self.scanResult.append(captured)
-            self.autoShootEngine.notifyDidCapture()
+            self.handleIdCapture(image: image)
         }
     }
     
@@ -222,7 +250,29 @@ final class ScanViewModel: ObservableObject {
         }
     }
     
+    private func startQuickCropForPassport(frame: CapturedFrame) {
+        guard let image = frame.original, let quad = frame.quad else {
+            passportResult.append(frame)
+            return
+        }
+
+        idDocumentCropperModel = DocumentCropperModel(
+            image: image,
+            autoQuad: quad
+        )
+
+        shouldShowQuickPreview = true
+        
+        latestIdFrameRectInPreview = nil
+        latestIdPreviewSize = nil
+    }
+    
     func retakeQuickCrop() {
+        if ui.selectedDocumentType == .passport {
+            shouldShowQuickPreview = false
+            return
+        }
+        
         switch ui.idCaptureSide {
         case .front:
             idResult.front = CapturedFrame()
@@ -261,11 +311,24 @@ final class ScanViewModel: ObservableObject {
     func applyQuickCropForIdsType(_ cropperModel: DocumentCropperModel) {
         let preview = cropperModel.image.downscaled(maxDimension: ui.quality.maxDimension)
         
+        if ui.selectedDocumentType == .passport {
+            var frame = CapturedFrame()
+            frame.preview = preview
+            frame.original = cropperModel.image
+            frame.quad = cropperModel.autoQuad
+            
+            passportResult.append(frame)
+            
+            shouldShowQuickPreview = false
+            return
+        }
+        
         switch ui.idCaptureSide {
         case .front:
             idResult.front.preview = preview
             idResult.front.quad = cropperModel.autoQuad
             ui.idCaptureSide = ui.selectedDocumentType.requiresBackSide ? .back : .front
+            
         case .back:
             if idResult.back == nil {
                 idResult.back = CapturedFrame()
@@ -365,7 +428,7 @@ final class ScanViewModel: ObservableObject {
             return ScanPreviewInputModel(
                 documentType: documentType,
                 pages: [
-                    documentType : normalized([idResult.front])
+                    documentType : normalized(passportResult)
                 ]
             )
         case .idCard:
@@ -404,8 +467,7 @@ final class ScanViewModel: ObservableObject {
         case .documents:
             scanResult = frames
         case .passport:
-            idResult.front = frames.first ?? CapturedFrame()
-            idResult.back = nil
+            passportResult = frames
         case .idCard, .driverLicense:
             idResult.front = frames.first ?? CapturedFrame()
             idResult.back = frames.count > 1 ? frames[1] : nil
@@ -417,18 +479,16 @@ final class ScanViewModel: ObservableObject {
     // MARK: - Calculated
     
     var shouldShowDiscardOverlay: Bool {
-        !scanResult.isEmpty || (idResult.front.hasPreview || idResult.back?.hasPreview == true)
+        !scanResult.isEmpty || !passportResult.isEmpty || idResult.front.hasPreview || idResult.back?.hasPreview == true
     }
     
     var captureShutterButtonDisabled: Bool {
         switch ui.selectedDocumentType {
-        case .documents:
+        case .documents, .passport:
             return false
         case .idCard, .driverLicense:
             return idResult.front.hasPreview &&
             idResult.back?.hasPreview == true
-        case .passport:
-            return idResult.front.hasPreview
         case .qrCode:
             return true
         }
@@ -447,8 +507,10 @@ final class ScanViewModel: ObservableObject {
         switch ui.selectedDocumentType {
         case .documents:
             return !scanResult.isEmpty
-        case .idCard, .driverLicense, .passport:
+        case .idCard, .driverLicense:
             return idResult.front.hasPreview
+        case .passport:
+            return !passportResult.isEmpty
         case .qrCode:
             return false
         }
@@ -464,7 +526,7 @@ final class ScanViewModel: ObservableObject {
             }
             return idResult.front.displayPreview
         case .passport:
-            return idResult.front.displayPreview
+            return passportResult.last?.displayPreview
         case .qrCode:
             return nil
         }
@@ -479,7 +541,7 @@ final class ScanViewModel: ObservableObject {
             let back = idResult.back?.hasPreview == true ? 1 : 0
             return front + back
         case .passport:
-            return idResult.front.hasPreview ? 1 : 0
+            return passportResult.filter { $0.hasPreview }.count
         case .qrCode:
             return 0
         }
@@ -488,6 +550,7 @@ final class ScanViewModel: ObservableObject {
     // MARK: - Clean
     func resetSessionState(_ type: DocumentTypeEnum) {
         scanResult.removeAll()
+        passportResult.removeAll()
         latestPreviewQuad = nil
         latestPreviewImageSize = .zero
         latestIdFrameRectInPreview = nil

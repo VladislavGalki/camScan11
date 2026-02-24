@@ -94,10 +94,11 @@ final class ScanPreviewViewModel: ObservableObject {
                 !$0.key.contains(frame.id.uuidString)
             }
         }
-
-        if selectedPageIndex >= scanPreviewModel.count {
-            selectedPageIndex = max(0, scanPreviewModel.count - 1)
-        }
+        
+        selectedPageIndex = min(
+            selectedPageIndex,
+            max(scanPreviewModel.count - 1, 0)
+        )
 
         rebuildFilterPreviewItems()
         return removedIndex
@@ -361,7 +362,7 @@ final class ScanPreviewViewModel: ObservableObject {
                 return copy
             }
 
-            if type == .documents {
+            if type == .documents || type == .passport {
                 updatedFrames.forEach { frame in
                     result.append(
                         ScanPreviewModel(
