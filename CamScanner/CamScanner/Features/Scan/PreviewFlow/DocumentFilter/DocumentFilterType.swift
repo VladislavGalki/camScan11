@@ -21,3 +21,34 @@ extension DocumentFilterType {
         }
     }
 }
+
+extension DocumentFilterType {
+    var defaultSliderValue: Double {
+        switch self {
+        case .original: return 0.0
+        case .auto: return 0.1
+        case .perfect: return 0.4
+        case .blackWhite: return 0.3
+        case .inverted: return 0.2
+        }
+    }
+
+    var sliderRange: ClosedRange<Double> {
+        switch self {
+        case .original:
+            return 0...1
+
+        case .auto:
+            return -0.5...0.5
+
+        case .perfect:
+            return -0.4...0.6
+
+        case .blackWhite:
+            return -0.5...0.5
+
+        case .inverted:
+            return -0.6...0.6
+        }
+    }
+}

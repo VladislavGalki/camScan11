@@ -3,7 +3,6 @@ import UIKit
 
 struct ScanPreviewView: View {
     @State private var actionBottomBarAction: ScanPreviewBottomBarAction?
-    @State private var sliderValue: Double = 0.5
     
     @StateObject private var viewModel: ScanPreviewViewModel
     @EnvironmentObject private var router: Router
@@ -120,7 +119,16 @@ struct ScanPreviewView: View {
                 }
             )
             
-            AppSlider(value: $sliderValue, range: 0...1)
+            AppSlider(value: $viewModel.sliderValue, range: 0...1)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            viewModel.previewSliderValue(viewModel.sliderValue)
+                        }
+                        .onEnded { _ in
+                            viewModel.commitSliderValue(viewModel.sliderValue)
+                        }
+                )
                 .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity)

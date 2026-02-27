@@ -332,7 +332,7 @@ final class ScanCropperViewModel: ObservableObject {
             pages = updatedPages
     }
     
-    private func buildOutputModel() -> ScanPreviewInputModel {
+    func buildOutputModel() -> ScanPreviewInputModel {
         var pagesDict: [DocumentTypeEnum: [CapturedFrame]] = [:]
 
         for page in pages {

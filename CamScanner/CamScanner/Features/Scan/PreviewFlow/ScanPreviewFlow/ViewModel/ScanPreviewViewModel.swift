@@ -5,6 +5,7 @@ final class ScanPreviewViewModel: ObservableObject {
     @Published var notificationState: ScanPreviewNotificationState = .none
     @Published var scanPreviewModel: [ScanPreviewModel] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
+    @Published var sliderValue: Double = 0.5
     
     private(set) var documentFileName = ""
 
@@ -15,6 +16,8 @@ final class ScanPreviewViewModel: ObservableObject {
     private var inputModel: ScanPreviewInputModel
     
     private let onFinish: (ScanPreviewInputModel) -> Void
+    
+    private var sliderRenderTask: Task<Void, Never>?
 
     init(inputModel: ScanPreviewInputModel, onFinish: @escaping (ScanPreviewInputModel) -> Void) {
         self.inputModel = inputModel
@@ -51,6 +54,7 @@ final class ScanPreviewViewModel: ObservableObject {
     func updateSelectedPageIndex(_ index: Int) {
         selectedPageIndex = index
         rebuildFilterPreviewItems()
+        updateSliderFromCurrentFrame()
     }
     
     func applyCropOutput(_ output: ScanPreviewInputModel) {
@@ -101,6 +105,7 @@ final class ScanPreviewViewModel: ObservableObject {
         )
 
         rebuildFilterPreviewItems()
+        updateSliderFromCurrentFrame()
         return removedIndex
     }
 
@@ -135,6 +140,73 @@ final class ScanPreviewViewModel: ObservableObject {
     }
 
     // MARK: - Filters UI
+    
+    func previewSliderValue(_ slider: Double) {
+        sliderValue = slider
+
+        guard let frame = currentFrame,
+              let base = frame.previewBase else { return }
+
+        var tempState = frame.currentFilter
+        tempState.adjustment = CGFloat(slider)
+
+        sliderRenderTask?.cancel()
+
+        sliderRenderTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            let rendered = self.filterRenderer.render(
+                image: base,
+                state: tempState
+            )
+
+            if Task.isCancelled { return }
+
+            await MainActor.run {
+                guard self.scanPreviewModel.indices.contains(self.selectedPageIndex) else { return }
+
+                var page = self.scanPreviewModel[self.selectedPageIndex]
+                page.frames = page.frames.map {
+                    var f = $0
+                    f.preview = rendered
+                    return f
+                }
+
+                self.scanPreviewModel[self.selectedPageIndex] = page
+            }
+        }
+    }
+    
+    func commitSliderValue(_ slider: Double) {
+        sliderRenderTask?.cancel()
+
+        guard scanPreviewModel.indices.contains(selectedPageIndex) else { return }
+
+        var page = scanPreviewModel[selectedPageIndex]
+
+        page.frames = page.frames.map {
+            var f = $0
+
+            var newState = f.currentFilter
+            newState.adjustment = CGFloat(slider)
+
+            // 👇 сохраняем значение для текущего фильтра
+            f.filterAdjustments[newState.type] = newState.adjustment
+
+            f.applyFilter(newState)
+
+            guard let base = f.previewBase else { return f }
+
+            f.preview = filterRenderer.render(
+                image: base,
+                state: newState
+            )
+
+            return f
+        }
+
+        scanPreviewModel[selectedPageIndex] = page
+    }
 
     func rebuildFilterPreviewItems() {
         let filters = DocumentFilterType.allCases
@@ -171,6 +243,15 @@ final class ScanPreviewViewModel: ObservableObject {
         }
 
         generateFilterPreviewsAsync(frame)
+    }
+    
+    private func updateSliderFromCurrentFrame() {
+        guard let frame = currentFrame else {
+            sliderValue = 0.0
+            return
+        }
+
+        sliderValue = Double(frame.currentFilter.adjustment)
     }
 
     private func generateFilterPreviewsAsync(_ frame: CapturedFrame) {
@@ -229,29 +310,48 @@ final class ScanPreviewViewModel: ObservableObject {
     // MARK: - Apply Filter
 
     func applyFilter(_ type: DocumentFilterType) {
-        guard scanPreviewModel.indices.contains(selectedPageIndex) else { return }
+        guard let frame = currentFrame,
+              let base = frame.previewBase else { return }
 
-        var page = scanPreviewModel[selectedPageIndex]
+        sliderRenderTask?.cancel()
 
-        page.frames = page.frames.map { frame in
-            var f = frame
+        // 👇 берём сохранённое значение если есть
+        guard let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue else { return }
 
-            var newState = f.currentFilter
+        sliderValue = savedAdjustment
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            var newState = frame.currentFilter
             newState.type = type
-            f.applyFilter(newState)
+            newState.adjustment = CGFloat(savedAdjustment)
 
-            guard let base = f.displayBase else { return f }
-
-            f.preview = filterRenderer.render(
+            let rendered = self.filterRenderer.render(
                 image: base,
                 state: newState
             )
 
-            return f
-        }
+            await MainActor.run {
+                guard self.scanPreviewModel.indices.contains(self.selectedPageIndex) else { return }
 
-        scanPreviewModel[selectedPageIndex] = page
-        rebuildFilterPreviewItems()
+                var page = self.scanPreviewModel[self.selectedPageIndex]
+
+                page.frames = page.frames.map {
+                    var f = $0
+                    f.applyFilter(newState)
+                    f.preview = rendered
+
+                    // 👇 сохраняем adjustment для этого фильтра
+                    f.filterAdjustments[type] = newState.adjustment
+
+                    return f
+                }
+
+                self.scanPreviewModel[self.selectedPageIndex] = page
+                self.rebuildFilterPreviewItems()
+            }
+        }
     }
 
     // MARK: - Undo / Redo
@@ -265,17 +365,19 @@ final class ScanPreviewViewModel: ObservableObject {
             var f = frame
             f.undoFilter()
 
-            guard let base = f.displayBase else { return f }
+            guard let base = f.previewBase else { return f }
 
-            f.preview = filterRenderer.render(
+            let rendered = filterRenderer.render(
                 image: base,
                 state: f.currentFilter
             )
 
+            f.preview = rendered
             return f
         }
 
         scanPreviewModel[selectedPageIndex] = page
+        updateSliderFromCurrentFrame()
         rebuildFilterPreviewItems()
     }
 
@@ -288,17 +390,19 @@ final class ScanPreviewViewModel: ObservableObject {
             var f = frame
             f.redoFilter()
 
-            guard let base = f.displayBase else { return f }
+            guard let base = f.previewBase else { return f }
 
-            f.preview = filterRenderer.render(
+            let rendered = filterRenderer.render(
                 image: base,
                 state: f.currentFilter
             )
 
+            f.preview = rendered
             return f
         }
 
         scanPreviewModel[selectedPageIndex] = page
+        updateSliderFromCurrentFrame()
         rebuildFilterPreviewItems()
     }
 
@@ -323,7 +427,8 @@ final class ScanPreviewViewModel: ObservableObject {
 
             return newPage
         }
-
+        
+        updateSliderFromCurrentFrame()
         rebuildFilterPreviewItems()
     }
 
@@ -348,8 +453,8 @@ final class ScanPreviewViewModel: ObservableObject {
                 if let base = copy.previewBase {
                     copy.previewBase = ImageCompressionService.shared.compress(
                         base,
-                        maxDimension: 2048,
-                        quality: 0.85
+                        maxDimension: 1200,
+                        quality: 0.90
                     )
                 }
 

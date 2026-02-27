@@ -11,6 +11,8 @@ struct CapturedFrame: Equatable, Hashable {
     var quad: Quadrilateral? = nil
     var drawingData: Data? = nil
     var drawingBase: UIImage? = nil
+    var filteredBase: UIImage?
+    var filterAdjustments: [DocumentFilterType: CGFloat] = [:]
     var filterHistory: FilterHistory = FilterHistory(states: [FilterState()], currentIndex: 0)
     var isReady: Bool {
         preview != nil && original != nil
