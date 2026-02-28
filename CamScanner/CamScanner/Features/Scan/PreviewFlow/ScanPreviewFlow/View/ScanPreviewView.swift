@@ -7,9 +7,13 @@ struct ScanPreviewView: View {
     @StateObject private var viewModel: ScanPreviewViewModel
     @EnvironmentObject private var router: Router
     
-    init(inputModel: ScanPreviewInputModel, onFinish: @escaping (ScanPreviewInputModel) -> Void) {
+    init(
+        inputModel: ScanPreviewInputModel,
+        onFinish: @escaping (ScanPreviewInputModel) -> Void,
+        onSuccessFlow: @escaping () -> Void
+    ) {
         _viewModel = StateObject(
-            wrappedValue: ScanPreviewViewModel(inputModel: inputModel, onFinish: onFinish)
+            wrappedValue: ScanPreviewViewModel(inputModel: inputModel, onFinish: onFinish, onSuccessFlow: onSuccessFlow)
         )
     }
     
@@ -79,7 +83,13 @@ struct ScanPreviewView: View {
                         style: .primary,
                         size: .m
                     ),
-                    action: {}
+                    action: {
+                        do {
+                            try viewModel.saveDocument()
+                        } catch {
+                            // Мб вьюху с ошибкой
+                        }
+                    }
                 )
             }
         }

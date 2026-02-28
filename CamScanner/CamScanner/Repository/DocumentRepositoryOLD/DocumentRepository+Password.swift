@@ -1,7 +1,7 @@
 import Foundation
 import CoreData
 
-extension DocumentRepository {
+extension DocumentRepositoryOLD {
 
     func setPassword(docID: UUID, password: String) throws {
         guard let doc = try fetchDocument(id: docID) else { return }

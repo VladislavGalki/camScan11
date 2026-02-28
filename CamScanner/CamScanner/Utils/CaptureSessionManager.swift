@@ -73,9 +73,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                 // wide camera — keep neutral
                 device.videoZoomFactor = 1.0
             }
-        } catch {
-            print("Failed to set default zoom:", error)
-        }
+        } catch {}
     }
 
     // MARK: Life Cycle
@@ -162,6 +160,10 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         videoPreviewLayer.videoGravity = .resizeAspectFill
 
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "video_ouput_queue"))
+    }
+    
+    deinit {
+        print("!!! CaptureSessionManager deinit")
     }
 
     // MARK: Capture Session Life Cycle

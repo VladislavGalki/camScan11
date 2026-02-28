@@ -2,7 +2,7 @@ import Foundation
 import CoreData
 import UIKit
 
-extension DocumentRepository {
+extension DocumentRepositoryOLD {
     
     func loadFrames(docID: UUID) throws -> [CapturedFrame] {
         guard let doc = try fetchDocument(id: docID) else { return [] }

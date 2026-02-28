@@ -204,8 +204,11 @@ struct ScanView: View {
                             vm.shouldStartAutoShootCountdown = false
                             
                             router.push(
-                                ScanRoute.scanPreview(inputModel) { outputModel in
-                                    vm.buildOutputPreview(outputModel)
+                                ScanRoute.scanPreview(inputModel) { [weak vm] outputModel in
+                                    vm?.buildOutputPreview(outputModel)
+                                } onSuccessFlow: { [weak vm] in
+                                    vm?.shouldStartAutoShootCountdown = false
+                                    oncloseClick()
                                 }
                             )
                         }

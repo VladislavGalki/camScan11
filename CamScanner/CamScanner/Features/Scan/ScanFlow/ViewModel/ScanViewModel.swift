@@ -65,6 +65,10 @@ final class ScanViewModel: ObservableObject {
         subscribeForCameraService()
     }
     
+    deinit {
+        print("!!! DEINITED !!! ScanViewModel")
+    }
+    
     // MARK: - Lifecycle
     func onAppear() {
         camera.start()

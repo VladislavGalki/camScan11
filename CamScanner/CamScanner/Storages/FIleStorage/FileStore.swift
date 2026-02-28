@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 
 final class FileStore {
-
     static let shared = FileStore()
     private init() {}
 
@@ -13,7 +12,6 @@ final class FileStore {
         case fileNotFound
     }
 
-    // Папка: Library/Application Support/YourApp/Documents/
     private let rootFolderName = "Documents"
 
     private var appSupportURL: URL {
@@ -42,7 +40,6 @@ final class FileStore {
         }
     }
 
-    /// Сохраняем страницу как JPEG: Documents/<docID>/<pageID>.jpg
     @discardableResult
     func saveJPEG(image: UIImage, docID: UUID, pageID: UUID, fileName: String, quality: CGFloat = 0.92) throws -> URL {
         try ensureRootFolder()
@@ -88,32 +85,28 @@ final class FileStore {
 }
 
 extension FileStore {
-
     func relativePath(fromAbsolute url: URL) -> String {
         let root = rootURL.path
         let full = url.path
         if full.hasPrefix(root + "/") {
             return String(full.dropFirst(root.count + 1)) // без ведущего "/"
         }
-        return full // fallback
+        return full
     }
 
     func url(forRelativePath rel: String) -> URL {
-        // если вдруг в базе лежит абсолютный путь — поддержим
         if rel.hasPrefix("/") {
             return URL(fileURLWithPath: rel)
         }
         return rootURL.appendingPathComponent(rel)
     }
     
-    /// Удалить конкретный файл по path (если существует)
     func deleteFileIfExists(atPath path: String) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: path) else { return }
         try? fm.removeItem(atPath: path)
     }
 
-    /// Удалить папку документа по path (если существует)
     func deleteFolderIfExists(at url: URL) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else { return }

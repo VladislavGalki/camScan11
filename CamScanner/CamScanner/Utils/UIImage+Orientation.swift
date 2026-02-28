@@ -69,46 +69,6 @@ extension UIImage {
 
         return image
     }
-
-    /// Rotates the image based on the information collected by the accelerometer
-//    func withFixedOrientation() -> UIImage {
-//        var imageAngle: Double = 0.0
-//
-//        var shouldRotate = true
-//        switch CaptureSession.current.editImageOrientation {
-//        case .up:
-//            print("!!!!!!! МЫ ТУТ")
-//            shouldRotate = false
-//        case .left:
-//            imageAngle = Double.pi / 2
-//        case .right:
-//            imageAngle = -(Double.pi / 2)
-//        case .down:
-//            imageAngle = Double.pi
-//        default:
-//            shouldRotate = false
-//        }
-//
-//        if shouldRotate,
-//            let finalImage = rotated(by: Measurement(value: imageAngle, unit: .radians)) {
-//            return finalImage
-//        } else {
-//            return self
-//        }
-//    }
-
-//    func withFixedOrientation() -> UIImage {
-//        guard imageOrientation != .up else { return self }
-//
-//        let format = UIGraphicsImageRendererFormat()
-//        format.scale = self.scale
-//        format.opaque = false
-//
-//        let renderer = UIGraphicsImageRenderer(size: self.size, format: format)
-//        return renderer.image { _ in
-//            self.draw(in: CGRect(origin: .zero, size: self.size))
-//        }
-//    }
     
     /// Возвращает UIImage с ориентацией .up и корректным size (пиксели реально повернуты).
     func normalizedUp() -> UIImage {

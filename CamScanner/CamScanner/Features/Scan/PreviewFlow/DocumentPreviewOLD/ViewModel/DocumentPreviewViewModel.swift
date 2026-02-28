@@ -246,54 +246,54 @@ final class DocumentPreviewViewModel: ObservableObject {
     // MARK: - Save / Update
 
     func saveOrUpdate() {
-        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { idx, p in
-            guard let display = p.preview, let full = p.original else { return nil }
-
-            return DocumentRepository.PageInput(
-                displayImage: display,
-                originalFullImage: full,
-                quad: p.quad,
-                drawingData: p.drawingData,
-                drawingBaseImage: p.drawingBase,   // ✅ ВАЖНО
-                filterRaw: selectedFilter.persistKey
-            )
-        }
-
-        guard !inputs.isEmpty else { return }
-
-        let remembered = selectedFilter.persistKey
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                switch self.previewMode {
-                case .newFromCamera:
-                    switch self.kind {
-                    case .scan:
-                        _ = try DocumentRepository.shared.saveDocument(
-                            kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
-                        )
-                    case .id(let idTypeRaw, _):
-                        _ = try DocumentRepository.shared.saveDocument(
-                            kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
-                        )
-                    }
-
-                case .existing(let docID):
-                    switch self.kind {
-                    case .scan:
-                        try DocumentRepository.shared.updateDocument(
-                            docID: docID, kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
-                        )
-                    case .id(let idTypeRaw, _):
-                        try DocumentRepository.shared.updateDocument(
-                            docID: docID, kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
-                        )
-                    }
-                }
-            } catch {
-                print("!!! Error saveOrUpdate preview:", error)
-            }
-        }
+//        let inputs: [DocumentRepository.PageInput] = pages.enumerated().compactMap { idx, p in
+//            guard let display = p.preview, let full = p.original else { return nil }
+//
+//            return DocumentRepository.PageInput(
+//                displayImage: display,
+//                originalFullImage: full,
+//                quad: p.quad,
+//                drawingData: p.drawingData,
+//                drawingBaseImage: p.drawingBase,   // ✅ ВАЖНО
+//                filterRaw: selectedFilter.persistKey
+//            )
+//        }
+//
+//        guard !inputs.isEmpty else { return }
+//
+//        let remembered = selectedFilter.persistKey
+//
+//        DispatchQueue.global(qos: .userInitiated).async {
+//            do {
+//                switch self.previewMode {
+//                case .newFromCamera:
+//                    switch self.kind {
+//                    case .scan:
+//                        _ = try DocumentRepository.shared.saveDocument(
+//                            kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
+//                        )
+//                    case .id(let idTypeRaw, _):
+//                        _ = try DocumentRepository.shared.saveDocument(
+//                            kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
+//                        )
+//                    }
+//
+//                case .existing(let docID):
+//                    switch self.kind {
+//                    case .scan:
+//                        try DocumentRepository.shared.updateDocument(
+//                            docID: docID, kind: .scan, idTypeRaw: nil, rememberedFilterRaw: remembered, pages: inputs
+//                        )
+//                    case .id(let idTypeRaw, _):
+//                        try DocumentRepository.shared.updateDocument(
+//                            docID: docID, kind: .id, idTypeRaw: idTypeRaw, rememberedFilterRaw: remembered, pages: inputs
+//                        )
+//                    }
+//                }
+//            } catch {
+//                print("!!! Error saveOrUpdate preview:", error)
+//            }
+//        }
     }
 
     // MARK: - Crop apply

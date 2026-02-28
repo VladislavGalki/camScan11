@@ -1,31 +1,22 @@
-//
-//  DocumentEntity+CoreDataProperties.swift
-//  CamScanner
-//
-//  Created by Владислав Галкин on 08.01.2026.
-//
-//
-
 import Foundation
 import CoreData
-
 
 extension DocumentEntity {
 
     @nonobjc public class func fetchRequest() -> NSFetchRequest<DocumentEntity> {
-        return NSFetchRequest<DocumentEntity>(entityName: "DocumentEntity")
+        NSFetchRequest<DocumentEntity>(entityName: "DocumentEntity")
     }
 
-    @NSManaged public var createdAt: Date?
     @NSManaged public var id: UUID?
+    @NSManaged public var createdAt: Date?
+    @NSManaged public var documentTypeRaw: String?
     @NSManaged public var pageCount: Int16
-    @NSManaged public var rememberedFilter: String?
-    @NSManaged public var kind: String?
-    @NSManaged public var idType: String?
-    @NSManaged public var pages: NSSet?
     @NSManaged public var isLocked: Bool
     @NSManaged public var passwordSalt: Data?
     @NSManaged public var passwordHash: Data?
+
+    @NSManaged public var pages: NSSet?
+    @NSManaged public var folder: FolderEntity?
 }
 
 // MARK: Generated accessors for pages
@@ -42,9 +33,6 @@ extension DocumentEntity {
 
     @objc(removePages:)
     @NSManaged public func removeFromPages(_ values: NSSet)
-
 }
 
-extension DocumentEntity : Identifiable {
-
-}
+extension DocumentEntity: Identifiable {}

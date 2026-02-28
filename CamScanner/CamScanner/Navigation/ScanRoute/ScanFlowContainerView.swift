@@ -8,6 +8,10 @@ struct ScanFlowContainerView: View {
         NavigationStack(path: $router.path) {
             ScanView(oncloseClick: {
                 rootRouter.dismissPresented()
+                Task {
+                    try await Task.sleep(for: .seconds(0.25))
+                    router.path = NavigationPath()
+                }
             })
             .navigationDestination(for: AnyRoute.self) { route in
                 ScanFlowResolver.resolve(route.base)

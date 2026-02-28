@@ -12,18 +12,30 @@ final class ScanPreviewViewModel: ObservableObject {
     private var filterPreviewCache: [String : [DocumentFilterType : UIImage]] = [:]
     private var selectedPageIndex: Int = 0
 
+    private let documentRepository: DocumentRepository
     private let filterRenderer: FilterRenderer
     private var inputModel: ScanPreviewInputModel
     
     private let onFinish: (ScanPreviewInputModel) -> Void
+    private let onSuccessFlow: () -> Void
     
     private var sliderRenderTask: Task<Void, Never>?
 
-    init(inputModel: ScanPreviewInputModel, onFinish: @escaping (ScanPreviewInputModel) -> Void) {
+    init(
+        inputModel: ScanPreviewInputModel,
+        onFinish: @escaping (ScanPreviewInputModel) -> Void,
+        onSuccessFlow: @escaping () -> Void
+    ) {
         self.inputModel = inputModel
+        self.documentRepository = DocumentRepository.shared
         self.filterRenderer = FilterRenderer.shared
         self.onFinish = onFinish
+        self.onSuccessFlow = onSuccessFlow
         bootstrap()
+    }
+    
+    deinit {
+        print("!!! DEINITED !!! ScanPreviewViewModel")
     }
 
     // MARK: - Public
@@ -78,6 +90,27 @@ final class ScanPreviewViewModel: ObservableObject {
     
     func buildOutputClearModel() -> ScanPreviewInputModel {
         ScanPreviewInputModel(documentType: documentType, pages: [:])
+    }
+    
+    func saveDocument() throws {
+        let frames = scanPreviewModel.flatMap { $0.frames }
+
+        guard !frames.isEmpty else {
+            onFinish(buildOutputClearModel())
+            return
+        }
+
+        do {
+            let docID = try documentRepository.saveDocument(
+                documentType: documentType,
+                frames: frames
+            )
+
+            print("Document saved:", docID)
+            onSuccessFlow()
+        } catch {
+            print("Save error:", error)
+        }
     }
     
     func onFinishFlow(_ outputModel: ScanPreviewInputModel) {

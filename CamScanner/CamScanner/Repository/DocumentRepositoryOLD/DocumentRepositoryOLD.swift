@@ -2,9 +2,9 @@ import Foundation
 import CoreData
 import UIKit
 
-final class DocumentRepository {
+final class DocumentRepositoryOLD {
 
-    static let shared = DocumentRepository(
+    static let shared = DocumentRepositoryOLD(
         context: PersistenceController.shared.container.viewContext
     )
 
@@ -43,9 +43,9 @@ final class DocumentRepository {
         let doc = DocumentEntity(context: context)
         doc.id = docID
         doc.createdAt = Date()
-        doc.kind = kind.rawValue
-        doc.idType = idTypeRaw
-        doc.rememberedFilter = rememberedFilterRaw
+//        doc.kind = kind.rawValue
+//        doc.idType = idTypeRaw
+//        doc.rememberedFilter = rememberedFilterRaw
         doc.pageCount = Int16(pages.count)
 
         for (idx, p) in pages.enumerated() {
@@ -93,7 +93,7 @@ final class DocumentRepository {
             
             page.drawingData = p.drawingData
             
-            page.filter = p.filterRaw
+            //page.filter = p.filterRaw
             page.document = doc
         }
 
@@ -131,9 +131,9 @@ final class DocumentRepository {
         }
 
         // 4) обновить мета
-        doc.kind = kind.rawValue
-        doc.idType = idTypeRaw
-        doc.rememberedFilter = rememberedFilterRaw
+//        doc.kind = kind.rawValue
+//        doc.idType = idTypeRaw
+//        doc.rememberedFilter = rememberedFilterRaw
         doc.pageCount = Int16(pages.count)
         doc.createdAt = doc.createdAt ?? Date() // можно НЕ менять дату, если хочешь оставить
 
@@ -178,7 +178,7 @@ final class DocumentRepository {
             
             page.drawingData = p.drawingData
             
-            page.filter = p.filterRaw
+            //page.filter = p.filterRaw
 
             page.document = doc
         }

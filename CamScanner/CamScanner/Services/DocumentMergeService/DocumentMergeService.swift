@@ -15,10 +15,10 @@ final class DocumentMergeService {
     func mergeDocuments(docIDs: [UUID]) throws -> UUID {
         guard docIDs.count >= 2 else { throw MergeError.nothingToMerge }
 
-        var pageInputs: [DocumentRepository.PageInput] = []
+        var pageInputs: [DocumentRepositoryOLD.PageInput] = []
 
         for docID in docIDs {
-            let frames = try DocumentRepository.shared.loadFrames(docID: docID)
+            let frames = try DocumentRepositoryOLD.shared.loadFrames(docID: docID)
             guard !frames.isEmpty else { continue }
 
             for f in frames {
@@ -46,7 +46,7 @@ final class DocumentMergeService {
 
         guard !pageInputs.isEmpty else { throw MergeError.failedToLoadPages }
 
-        return try DocumentRepository.shared.saveDocument(
+        return try DocumentRepositoryOLD.shared.saveDocument(
             kind: .scan,
             idTypeRaw: nil,
             rememberedFilterRaw: "original",

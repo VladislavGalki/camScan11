@@ -5,8 +5,8 @@ enum ScanFlowResolver {
         switch route {
         case let r as ScanRoute:
             switch r {
-            case let .scanPreview(inputModel, onFinish):
-                return AnyView(ScanPreviewView(inputModel: inputModel, onFinish: onFinish))
+            case let .scanPreview(inputModel, onFinish, onSuccess):
+                return AnyView(ScanPreviewView(inputModel: inputModel, onFinish: onFinish, onSuccessFlow: onSuccess))
             case let.scanCropper(inputModel, onFinish):
                 return AnyView(ScanCropperView(input: inputModel, onFinish: onFinish))
             case let .share(inputModel):

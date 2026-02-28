@@ -3,7 +3,8 @@ import Foundation
 enum ScanRoute: Route {
     case scanPreview(
         ScanPreviewInputModel,
-        onFinish: (ScanPreviewInputModel) -> Void
+        onFinish: (ScanPreviewInputModel) -> Void,
+        onSuccessFlow: () -> Void
     )
     
     case scanCropper(
@@ -17,7 +18,7 @@ enum ScanRoute: Route {
 extension ScanRoute: Equatable {
     static func == (lhs: ScanRoute, rhs: ScanRoute) -> Bool {
         switch (lhs, rhs) {
-        case let (.scanPreview(lModel, _), .scanPreview(rModel, _)):
+        case let (.scanPreview(lModel, _, _), .scanPreview(rModel, _, _)):
             return lModel == rModel
         case let (.scanCropper(lModel, _), .scanCropper(rModel, _)):
             return lModel == rModel
@@ -32,7 +33,7 @@ extension ScanRoute: Equatable {
 extension ScanRoute: Hashable {
     func hash(into hasher: inout Hasher) {
         switch self {
-        case let .scanPreview(model, _):
+        case let .scanPreview(model, _, _):
             hasher.combine("scanPreview")
             hasher.combine(model)
         case let .scanCropper(model, _):
