@@ -49,9 +49,10 @@ final class MergeArrangeViewModel: ObservableObject {
     }
 
     func title(for item: DocumentListItem) -> String {
-        let kind = item.kind.lowercased()
-        if kind == "id" { return "\(item.idType ?? "ID") • \(item.pageCount) стр." }
-        return "Скан • \(item.pageCount) стр."
+        return ""
+//        let kind = item.kind.lowercased()
+//        if kind == "id" { return "\(item.idType ?? "ID") • \(item.pageCount) стр." }
+//        return "Скан • \(item.pageCount) стр."
     }
 
     func mergeAndSave(completion: @escaping (UUID?) -> Void) {

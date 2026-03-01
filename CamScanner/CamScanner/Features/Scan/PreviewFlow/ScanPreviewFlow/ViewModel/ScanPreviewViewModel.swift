@@ -348,17 +348,18 @@ final class ScanPreviewViewModel: ObservableObject {
 
         sliderRenderTask?.cancel()
 
-        // 👇 берём сохранённое значение если есть
         guard let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue else { return }
-
         sliderValue = savedAdjustment
 
+        var state = frame.currentFilter
+        state.type = type
+        state.adjustment = CGFloat(savedAdjustment)
+
+        let newState = state
+        let selectedIndex = self.selectedPageIndex
+        
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-
-            var newState = frame.currentFilter
-            newState.type = type
-            newState.adjustment = CGFloat(savedAdjustment)
 
             let rendered = self.filterRenderer.render(
                 image: base,
@@ -366,22 +367,19 @@ final class ScanPreviewViewModel: ObservableObject {
             )
 
             await MainActor.run {
-                guard self.scanPreviewModel.indices.contains(self.selectedPageIndex) else { return }
+                guard self.scanPreviewModel.indices.contains(selectedIndex) else { return }
 
-                var page = self.scanPreviewModel[self.selectedPageIndex]
+                var page = self.scanPreviewModel[selectedIndex]
 
                 page.frames = page.frames.map {
                     var f = $0
                     f.applyFilter(newState)
                     f.preview = rendered
-
-                    // 👇 сохраняем adjustment для этого фильтра
                     f.filterAdjustments[type] = newState.adjustment
-
                     return f
                 }
 
-                self.scanPreviewModel[self.selectedPageIndex] = page
+                self.scanPreviewModel[selectedIndex] = page
                 self.rebuildFilterPreviewItems()
             }
         }

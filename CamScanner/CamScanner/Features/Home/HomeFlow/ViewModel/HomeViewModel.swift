@@ -45,7 +45,11 @@ final class HomeViewModel: ObservableObject {
     
     private func buildRecentDocumentsLayout(_ documents: [DocumentEntity]) {
         let mappedDocuments: [RecentDocumentModel] = documents.compactMap { document in
-            guard let id = document.id else { return nil }
+            guard
+                let id = document.id,
+                let rawType = document.documentTypeRaw,
+                let docType = DocumentTypeEnum(rawValue: rawType)
+            else { return nil }
 
             let pages = (document.pages as? Set<PageEntity>) ?? []
             let sorted = pages.sorted { $0.index < $1.index }
@@ -55,22 +59,20 @@ final class HomeViewModel: ObservableObject {
 
             documentsStore.loadThumbnailsIfNeeded(docID: id, pagePaths: [p0, p1])
 
-            let kind = RecentDocumentModel.Kind(document.kind ?? "")
-            let pageCount = Int(document.pageCount) > 1 ? "\(Int(document.pageCount)) pages" : "1 page"
+            let pageCount = Int(document.pageCount)
+            let pageText = pageCount > 1 ? "\(pageCount) pages" : "1 page"
 
             return RecentDocumentModel(
                 id: id,
-                title: kind.title,
-                kind: kind,
-                idType: document.idType,
+                title: docType.title,
+                documentType: docType,
                 thumbnail: nil,
                 secondThumbnail: nil,
                 firstPageImagePath: p0,
                 secondPageImagePath: p1,
-                pageCount: pageCount,
+                pageCountText: pageText,
                 isLocked: document.isLocked,
-                createdAt: document.createdAt ?? Date(),
-                rememberedFilter: document.rememberedFilter
+                createdAt: document.createdAt ?? Date()
             )
         }
 

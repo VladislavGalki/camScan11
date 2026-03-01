@@ -128,7 +128,7 @@ struct RecentView: View {
                     .appTextStyle(.meta)
                     .foregroundStyle(.text(.primary))
                 
-                Text(item.pageCount)
+                Text(item.pageCountText)
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
             }
@@ -138,14 +138,14 @@ struct RecentView: View {
     
     @ViewBuilder
     private func itemImageView(for item: RecentDocumentModel) -> some View {
-        switch item.kind {
-        case .scan:
+        switch item.documentType {
+        case .documents:
             if let image = item.thumbnail {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             }
-        case .id:
+        case .idCard, .driverLicense:
             VStack(spacing: 8) {
                 if let image = item.thumbnail {
                     Image(uiImage: image)
@@ -161,6 +161,15 @@ struct RecentView: View {
                         .scaledToFit()
                 }
             }
+        case .passport:
+            if let image = item.thumbnail {
+                Image(uiImage: image)
+                    .resizable()
+                    .frame(width: 88, height: 125)
+                    .scaledToFit()
+            }
+        default:
+            EmptyView()
         }
     }
 }

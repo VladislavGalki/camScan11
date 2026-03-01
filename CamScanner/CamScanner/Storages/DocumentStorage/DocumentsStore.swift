@@ -12,10 +12,8 @@ struct DocumentListItem: Identifiable, Equatable {
     let id: UUID
     let isLocked: Bool
     let createdAt: Date
-    let kind: String
-    let idType: String?
+    let documentType: DocumentTypeEnum
     let pageCount: Int
-    let rememberedFilter: String?
     let firstPageImagePath: String?
 }
 
@@ -52,17 +50,17 @@ final class DocumentsStore: NSObject {
         request.sortDescriptors = [
             NSSortDescriptor(key: "createdAt", ascending: false)
         ]
-        
+
         request.fetchLimit = 4
         request.fetchBatchSize = 4
-        
+
         fetchResultController = NSFetchedResultsController(
             fetchRequest: request,
             managedObjectContext: context,
             sectionNameKeyPath: nil,
             cacheName: nil
         )
-        
+
         fetchResultController.delegate = self
     }
     
@@ -81,14 +79,12 @@ final class DocumentsStore: NSObject {
 
         let validIDs = Set(docs.compactMap { $0.id })
 
-        // ✅ чистим thumbnails у документов, которых больше нет в recent (fetchLimit)
         var dict = thumbnailsSubject.value
         dict.keys
             .filter { !validIDs.contains($0.docID) }
             .forEach { dict[$0] = nil }
+        
         thumbnailsSubject.send(dict)
-
-        // ✅ НЕ ДАЁМ "залипать" загрузкам миниатюр
         thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
     }
 }
@@ -129,21 +125,17 @@ extension DocumentsStore {
         req.fetchLimit = 1
 
         if let doc = try context.fetch(req).first {
-            // 1) удалить файлы
             FileStore.shared.deleteDocumentFolder(docID: docID)
 
-            // 2) удалить CoreData
             context.delete(doc)
             try context.save()
 
-            // 3) очистить кэш миниатюр (все страницы этого документа)
             var dict = thumbnailsSubject.value
             dict.keys
                 .filter { $0.docID == docID }
                 .forEach { dict[$0] = nil }
+            
             thumbnailsSubject.send(dict)
-
-            // 4) убрать "in flight" (все страницы этого документа)
             thumbInFlight = thumbInFlight.filter { $0.docID != docID }
         }
     }
@@ -152,12 +144,13 @@ extension DocumentsStore {
 // MARK: - FRC Delegate
 
 extension DocumentsStore: NSFetchedResultsControllerDelegate {
-    
-    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-                    didChange anObject: Any,
-                    at indexPath: IndexPath?,
-                    for type: NSFetchedResultsChangeType,
-                    newIndexPath: IndexPath?) {
+    func controller(
+        _ controller: NSFetchedResultsController<NSFetchRequestResult>,
+        didChange anObject: Any,
+        at indexPath: IndexPath?,
+        for type: NSFetchedResultsChangeType,
+        newIndexPath: IndexPath?
+    ) {
         guard let doc = anObject as? DocumentEntity, let id = doc.id else { return }
         
         switch type {
@@ -171,6 +164,7 @@ extension DocumentsStore: NSFetchedResultsControllerDelegate {
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
         if !changedDocIDs.isEmpty {
             var dict = thumbnailsSubject.value
+            
             for id in changedDocIDs {
                 dict.keys
                     .filter { $0.docID == id }
@@ -178,6 +172,7 @@ extension DocumentsStore: NSFetchedResultsControllerDelegate {
 
                 thumbInFlight = thumbInFlight.filter { $0.docID != id }
             }
+            
             thumbnailsSubject.send(dict)
             changedDocIDs.removeAll()
         }
