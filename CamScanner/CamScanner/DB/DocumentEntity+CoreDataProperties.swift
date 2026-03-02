@@ -12,11 +12,14 @@ extension DocumentEntity {
     @NSManaged public var documentTypeRaw: String?
     @NSManaged public var pageCount: Int16
     @NSManaged public var isLocked: Bool
+    @NSManaged public var isFavourite: Bool
     @NSManaged public var passwordSalt: Data?
     @NSManaged public var passwordHash: Data?
 
     @NSManaged public var pages: NSSet?
     @NSManaged public var folder: FolderEntity?
+    
+    @NSManaged public var cachedSize: Int64
 }
 
 // MARK: Generated accessors for pages

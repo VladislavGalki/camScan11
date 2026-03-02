@@ -8,7 +8,7 @@ final class MergeArrangeViewModel: ObservableObject {
     @Published var items: [DocumentListItem] = []
     @Published var thumbnails: [UUID: UIImage] = [:]
 
-    private let store = DocumentsStore()
+    private let store = HomeDocumentsStore()
     private let docIDs: [UUID]
     private var cancellables: Set<AnyCancellable> = []
 

@@ -37,35 +37,33 @@ final class DocumentRepository {
                 let original = frame.original,
                 let preview = frame.preview
             else { continue }
-            
+
             let pageID = UUID()
-            
-            // SAVE FINAL DISPLAY (для Home)
+
             let displayURL = try FileStore.shared.saveJPEG(
                 image: preview,
                 docID: docID,
                 pageID: pageID,
                 fileName: "\(pageID.uuidString)_display.jpg"
             )
-            
-            // SAVE ORIGINAL
+
             let originalURL = try FileStore.shared.saveJPEG(
                 image: original,
                 docID: docID,
                 pageID: pageID,
                 fileName: "\(pageID.uuidString)_original.jpg"
             )
-            
+
             let page = PageEntity(context: context)
             page.id = pageID
             page.index = Int16(index)
-            
+
             page.imagePath = FileStore.shared.relativePath(fromAbsolute: displayURL)
             page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
-            
+
             page.quadData = frame.quad.flatMap { QuadCodec.encode($0) }
             page.drawingData = frame.drawingData
-            
+
             if let drawingBase = frame.drawingBase {
                 let drawingURL = try FileStore.shared.saveJPEG(
                     image: drawingBase,
@@ -75,14 +73,17 @@ final class DocumentRepository {
                 )
                 page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: drawingURL)
             }
-            
+
             page.filterTypeRaw = frame.currentFilter.type.rawValue
             page.filterAdjustment = Double(frame.currentFilter.adjustment)
             page.rotationAngle = Double(frame.currentFilter.rotationAngle)
-            
+
             page.document = doc
         }
-        
+
+        let totalSize = FileStore.shared.documentFolderSize(docID: docID)
+        doc.cachedSize = totalSize
+
         try context.save()
         return docID
     }

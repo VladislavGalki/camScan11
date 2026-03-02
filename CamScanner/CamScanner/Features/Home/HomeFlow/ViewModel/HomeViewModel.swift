@@ -7,7 +7,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentModel: [RecentDocumentModel] = []
     @Published private(set) var exploreToolModel: [ExploreToolModel] = []
 
-    private let documentsStore: DocumentsStore = DocumentsStore()
+    private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
 
     private var cancellables = Set<AnyCancellable>()
     

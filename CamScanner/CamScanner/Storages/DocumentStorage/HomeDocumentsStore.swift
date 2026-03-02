@@ -17,7 +17,7 @@ struct DocumentListItem: Identifiable, Equatable {
     let firstPageImagePath: String?
 }
 
-final class DocumentsStore: NSObject {
+final class HomeDocumentsStore: NSObject {
     var documentEntitiesPublisher: AnyPublisher<[DocumentEntity], Never> {
         documentEntitiesSubject.eraseToAnyPublisher()
     }
@@ -89,7 +89,7 @@ final class DocumentsStore: NSObject {
     }
 }
 
-extension DocumentsStore {
+extension HomeDocumentsStore {
     func loadThumbnailsIfNeeded(docID: UUID, pagePaths: [String?]) {
         for (idx, path) in pagePaths.prefix(2).enumerated() {
             guard let relPath = path, !relPath.isEmpty else { continue }
@@ -143,7 +143,7 @@ extension DocumentsStore {
 
 // MARK: - FRC Delegate
 
-extension DocumentsStore: NSFetchedResultsControllerDelegate {
+extension HomeDocumentsStore: NSFetchedResultsControllerDelegate {
     func controller(
         _ controller: NSFetchedResultsController<NSFetchRequestResult>,
         didChange anObject: Any,

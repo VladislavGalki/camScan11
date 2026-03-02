@@ -12,7 +12,7 @@ final class MergeSelectViewModel: ObservableObject {
     @Published private(set) var selected: Set<UUID> = []
     private(set) var selectedInOrder: [UUID] = []
 
-    private let store = DocumentsStore()
+    private let store = HomeDocumentsStore()
     private var cancellables: Set<AnyCancellable> = []
 
     init() {

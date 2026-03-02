@@ -82,6 +82,23 @@ final class FileStore {
         let docFolder = rootURL.appendingPathComponent(docID.uuidString, isDirectory: true)
         try? fm.removeItem(at: docFolder)
     }
+    
+    func documentFolderSize(docID: UUID) -> Int64 {
+        let folder = rootURL.appendingPathComponent(docID.uuidString)
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder,
+            includingPropertiesForKeys: [.fileSizeKey]
+        ) else { return 0 }
+
+        var total: Int64 = 0
+
+        for case let fileURL as URL in enumerator {
+            let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            total += Int64(size)
+        }
+
+        return total
+    }
 }
 
 extension FileStore {

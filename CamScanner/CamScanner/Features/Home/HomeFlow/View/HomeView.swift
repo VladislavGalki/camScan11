@@ -6,7 +6,6 @@ struct HomeView: View {
     
     @EnvironmentObject private var router: Router
     
-    // ✅ для подтверждения удаления
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
     
