@@ -34,14 +34,15 @@ final class ScanCameraService: NSObject, ObservableObject {
         }
     }
 
-    func start() {
+    func start(mode: FlashMode) {
         authorizationDenied = false
         overlayView?.clearQuad()
-        captureSessionManager?.start()
+        captureSessionManager?.start(mode: mode)
     }
 
     func stop() {
         captureSessionManager?.stop()
+        captureSessionManager?.setTorch(mode: .off)
     }
 
     func capture() {
@@ -54,6 +55,10 @@ final class ScanCameraService: NSObject, ObservableObject {
     
     func setQRDetecting(_ enabled: Bool) {
         captureSessionManager?.setQRDetecting(enabled)
+    }
+    
+    func setTorch(mode: FlashMode) {
+        captureSessionManager?.setTorch(mode: mode)
     }
 }
 

@@ -11,7 +11,8 @@ struct QrCodeView: View {
         IdCardDriverLicenseFrameOverlayRepresentable(
             layout: .square(size: 250),
             title: "",
-            guideImage: nil
+            guideImage: nil,
+            shouldShowGrid: false
         ) { rect in
             ui.idFrameRectInCameraSpace = rect
         }

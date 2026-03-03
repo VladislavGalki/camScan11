@@ -11,7 +11,8 @@ struct PassportView: View {
                 aspect: 314.0/409.0
             ),
             title: "",
-            guideImage: UIImage(named: "passport_image")
+            guideImage: UIImage(named: "passport_image"),
+            shouldShowGrid: false
         ) { rect in
             ui.idFrameRectInCameraSpace = rect
         }

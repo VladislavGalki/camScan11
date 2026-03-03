@@ -103,6 +103,7 @@ struct ScanView: View {
                     .frame(width: 24, height: 24)
                     .onTapGesture {
                         store.ui.toggleFlashMode()
+                        vm.upsateFlashMode()
                     }
                 
                 Image(appIcon: store.settings.grid ? .grid : .gridOff)
@@ -144,6 +145,11 @@ struct ScanView: View {
             }
         )
         .coordinateSpace(name: "cameraSpace")
+        .overlay {
+            if store.settings.grid && store.ui.selectedDocumentType == .documents {
+                CameraGridView()
+            }
+        }
         .overlay(alignment: .top) {
             if !hintText.isEmpty {
                 Text(hintText)
@@ -228,7 +234,7 @@ struct ScanView: View {
     private var cameraTypeOverlayView: some View {
         if store.ui.selectedDocumentType == .idCard
             || store.ui.selectedDocumentType == .driverLicense {
-            IdCardDriverLicenseView(ui: store.ui)
+            IdCardDriverLicenseView(ui: store.ui, shouldShowGrid: store.settings.grid)
         } else if store.ui.selectedDocumentType == .qrCode {
             QrCodeView(
                 ui: store.ui,

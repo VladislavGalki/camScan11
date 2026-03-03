@@ -71,7 +71,7 @@ final class ScanViewModel: ObservableObject {
     
     // MARK: - Lifecycle
     func onAppear() {
-        camera.start()
+        camera.start(mode: ui.flashMode)
     }
     
     func onDisappear() {
@@ -387,6 +387,10 @@ final class ScanViewModel: ObservableObject {
         }
         
         camera.capture()
+    }
+    
+    func upsateFlashMode() {
+        camera.setTorch(mode: ui.flashMode)
     }
     
     // MARK: - Build input/output preview

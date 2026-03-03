@@ -9,6 +9,7 @@ import SwiftUI
 
 struct IdCardDriverLicenseView: View {
     @ObservedObject var ui: ScanUIStateStore
+    var shouldShowGrid: Bool = false
     
     var body: some View {
         IdCardDriverLicenseFrameOverlayRepresentable(
@@ -18,7 +19,8 @@ struct IdCardDriverLicenseView: View {
                 aspect: 314.0 / 202.0
             ),
             title: titleText,
-            guideImage: nil
+            guideImage: nil,
+            shouldShowGrid: shouldShowGrid
         ) { rect in
             ui.idFrameRectInCameraSpace = rect
         }

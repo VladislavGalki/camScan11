@@ -11,6 +11,8 @@ final class IdFrameOverlayView: UIView {
         case square(size: CGFloat, verticalOffset: CGFloat = 0)
     }
     
+    private let gridLayer = CAShapeLayer()
+    
     var layout: Layout = .padded(horizontalPadding: 16, verticalPadding: 90, height: 220) {
         didSet { setNeedsLayout() }
     }
@@ -32,6 +34,12 @@ final class IdFrameOverlayView: UIView {
 
     var dimAlpha: CGFloat = 0.55 {
         didSet { setNeedsLayout() }
+    }
+    
+    var showGrid = false {
+        didSet {
+            gridLayer.isHidden = !showGrid
+        }
     }
 
     var onFrameChanged: ((CGRect) -> Void)?
@@ -79,6 +87,11 @@ final class IdFrameOverlayView: UIView {
         dimLayer.fillRule = .evenOdd
         dimLayer.fillColor = UIColor.black.withAlphaComponent(dimAlpha).cgColor
         layer.addSublayer(dimLayer)
+        
+        gridLayer.strokeColor = UIColor.white.withAlphaComponent(0.4).cgColor
+        gridLayer.lineWidth = 1
+        gridLayer.fillColor = UIColor.clear.cgColor
+        layer.addSublayer(gridLayer)
 
         // stroke
         strokeLayer.fillColor = UIColor.clear.cgColor
@@ -155,6 +168,8 @@ final class IdFrameOverlayView: UIView {
             
             strokeLayer.lineWidth = 2
         }
+        
+        drawGrid(in: frameRect)
     }
     
     private func makeTitleAttributed(_ text: String) -> NSAttributedString {
@@ -174,6 +189,34 @@ final class IdFrameOverlayView: UIView {
                 .paragraphStyle: paragraph
             ]
         )
+    }
+    
+    private func drawGrid(in rect: CGRect) {
+        guard rect != .zero else {
+            gridLayer.path = nil
+            return
+        }
+
+        let path = UIBezierPath()
+
+        let thirdWidth = rect.width / 3
+        let thirdHeight = rect.height / 3
+
+        // Вертикальные линии
+        path.move(to: CGPoint(x: rect.minX + thirdWidth, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + thirdWidth, y: rect.maxY))
+
+        path.move(to: CGPoint(x: rect.minX + 2 * thirdWidth, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + 2 * thirdWidth, y: rect.maxY))
+
+        // Горизонтальные линии
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + thirdHeight))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + thirdHeight))
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + 2 * thirdHeight))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + 2 * thirdHeight))
+
+        gridLayer.path = path.cgPath
     }
 
     private func computeFrameRect() -> CGRect {

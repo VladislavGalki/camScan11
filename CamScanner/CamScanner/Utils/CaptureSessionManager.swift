@@ -34,7 +34,9 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
     
     private let metadataOutput = AVCaptureMetadataOutput()
     private var isQRDetecting = false
-
+    
+    private var currentFlashMode: FlashMode = .auto
+    
     private var isDetecting = true
 
     private var noRectangleCount = 0
@@ -216,6 +218,29 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         }
     }
     
+    internal func setTorch(mode: FlashMode) {
+        currentFlashMode = mode
+        
+        guard let device = videoDeviceInput?.device,
+              device.hasTorch else { return }
+
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+
+            switch mode {
+            case .on:
+                try device.setTorchModeOn(level: AVCaptureDevice.maxAvailableTorchLevel)
+                
+            case .off, .auto:
+                device.torchMode = .off
+            }
+
+        } catch {
+            print("Torch error:", error)
+        }
+    }
+    
     internal func resumeDetection() {
         DispatchQueue.main.async { [weak self] in
             self?.isDetecting = true
@@ -245,6 +270,17 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         let photoSettings = AVCapturePhotoSettings()
         photoSettings.isHighResolutionPhotoEnabled = true
         photoSettings.isAutoStillImageStabilizationEnabled = true
+        
+        if let device = videoDeviceInput?.device, device.hasFlash {
+            switch currentFlashMode {
+            case .on:
+                photoSettings.flashMode = .off
+            case .off:
+                photoSettings.flashMode = .off
+            case .auto:
+                photoSettings.flashMode = .auto
+            }
+        }
         
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
     }
