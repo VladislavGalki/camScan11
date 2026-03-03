@@ -1,0 +1,371 @@
+import SwiftUI
+
+struct GridLayoutView: View {
+    var model: [FilesGridItem]
+    
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 26),
+        count: 3
+    )
+    
+    private let cardHeight: CGFloat = 150
+    
+    var body: some View {
+        contentView
+    }
+    
+    private var contentView: some View {
+        ScrollView(.vertical) {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(model) { item in
+                    fileGridItemView(item: item)
+                }
+            }
+            .padding(16)
+        }
+    }
+    
+    @ViewBuilder
+    private func fileGridItemView(item: FilesGridItem) -> some View {
+        switch item {
+        case let .document(fileDocumentItem):
+            documentCardView(for: fileDocumentItem)
+        case let .folder(fileFolderItem):
+            folderCardView(for: fileFolderItem)
+        }
+    }
+    
+    private func documentCardView(for item: FileDocumentItem) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            documentBackgroundView(for: item)
+                .frame(height: cardHeight)
+                .overlay {
+                    documentCardImageView(for: item)
+                }
+                .overlay(alignment: .top) {
+                    HStack(spacing: 0) {
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(item.isFavourite ? .starFill : .star),
+                                style: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                
+                            }
+                        )
+                        
+                        Spacer(minLength: 0)
+                        
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(.dots),
+                                style: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                
+                            }
+                        )
+                    }
+                    .padding([.top, .horizontal], 4)
+                }
+                .cornerRadius(8, corners: .allCorners)
+                .appBorderModifier(.border(.primary), radius: 8)
+                .clipped()
+            
+            VStack(spacing: 0) {
+                Text(item.title)
+                    .appTextStyle(.meta)
+                    .foregroundStyle(.text(.primary))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .multilineTextAlignment(.leading)
+                
+                Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
+                    .appTextStyle(.helperText)
+                    .foregroundStyle(.text(.secondary))
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func documentBackgroundView(for item: FileDocumentItem) -> some View {
+        if item.isLocked {
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+        } else {
+            switch item.documentType {
+            case .documents:
+                Rectangle()
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.02),
+                                Color.black.opacity(0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            case .idCard, .passport, .driverLicense:
+                Rectangle()
+                    .foregroundStyle(.bg(.surface))
+            default:
+                EmptyView()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func documentCardImageView(for item: FileDocumentItem) -> some View {
+        if item.isLocked {
+            documentLockItemView
+                .padding(.bottom, 14)
+        } else {
+            switch item.documentType {
+            case .documents:
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+            case .idCard, .driverLicense:
+                VStack(spacing: 6) {
+                    if let image = item.thumbnail {
+                        Image(uiImage: image)
+                            .resizable()
+                            .frame(width: 54, height: 34)
+                            .scaledToFit()
+                    }
+                    
+                    if let secondImage = item.secondThumbnail {
+                        Image(uiImage: secondImage)
+                            .resizable()
+                            .frame(width: 54, height: 34)
+                            .scaledToFit()
+                    }
+                }
+            case .passport:
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .frame(width: 64, height: 87)
+                        .scaledToFit()
+                }
+            default:
+                EmptyView()
+            }
+        }
+    }
+    
+    private var documentLockItemView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+            
+            HStack(spacing: 0) {
+                Image(appIcon: .lock_fill)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(.elements(.accent))
+                    .frame(width: 20, height: 20)
+                    .padding(.leading, 12)
+                    .padding(.bottom, 9)
+                
+                Spacer(minLength: 0)
+            }
+            
+            VStack(alignment: .leading, spacing: 7) {
+                documentLockLineView
+                    .frame(width: 67, height: 4.2)
+                
+                documentLockLineView
+                    .frame(width: 79, height: 4.2)
+                
+                documentLockLineView
+                    .frame(width: 71, height: 4.2)
+                
+                documentLockLineView
+                    .frame(width: 79, height: 4.2)
+                
+                documentLockLineView
+                    .frame(width: 58, height: 4.2)
+            }
+            .padding(.leading, 14)
+        }
+    }
+    
+    private var documentLockLineView: some View {
+        Rectangle()
+            .foregroundStyle(
+                Color(
+                    UIColor(
+                        red: 209.0 / 255.0,
+                        green: 214.0 / 255.0,
+                        blue: 225.0 / 255.0,
+                        alpha: 1.0
+                    )
+                )
+            )
+            .cornerRadius(2, corners: .allCorners)
+    }
+    
+    private func folderCardView(for item: FileFolderItem) -> some View {
+        VStack(spacing: 8) {
+            Image(appIcon: .folder_image)
+                .frame(height: cardHeight)
+                .overlay {
+                    if !item.previewDocuments.isEmpty {
+                        folderOverlayView(for: item.previewDocuments)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.dots),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: {
+                            
+                        }
+                    )
+                    .padding(4)
+                }
+            
+            Text(item.title)
+                .appTextStyle(.meta)
+                .foregroundStyle(.text(.primary))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.leading)
+        
+                Text("\(item.documentsCount) Document)")
+                    .appTextStyle(.helperText)
+                    .foregroundStyle(.text(.secondary))
+        }
+        .padding(item.documentsCount == 0 ? 8 : 0)
+        .background(
+            item.documentsCount == 0 ? Color(
+                uiColor: UIColor(
+                    red: 52.0/255.0,
+                    green: 199.0/255.0,
+                    blue: 89.0/255.0,
+                    alpha: 0.1)
+            ) : .clear
+        )
+    }
+    
+    @ViewBuilder
+    private func folderOverlayView(for items: [FileDocumentItem]) -> some View {
+        if items.contains(where: { $0.isLocked }) {
+            Image(appIcon: .lock_image)
+        } else {
+            GeometryReader { geo in
+                let size = geo.size.width / 2
+                
+                VStack(spacing: 8) {
+                    HStack(spacing: 12) {
+                        folderOverlayImageView(for: items, index: 0, size: size)
+                        folderOverlayImageView(for: items, index: 1, size: size)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        folderOverlayImageView(for: items, index: 2, size: size)
+                        folderOverlayImageView(for: items, index: 3, size: size)
+                    }
+                }
+                .padding(.top, 30)
+                .padding([.horizontal, .bottom], 12)
+            }
+            .clipped()
+        }
+    }
+    
+    private func folderOverlayImageView(for items: [FileDocumentItem], index: Int, size: CGFloat) -> some View {
+        documentBackgroundView(for: items[index])
+            .cornerRadius(4, corners: .allCorners)
+            .overlay {
+                foldertCardImageView(for: items[index])
+            }
+    }
+    
+    @ViewBuilder
+    private func foldertCardImageView(for item: FileDocumentItem) -> some View {
+        if item.isLocked {
+            foldertLockItemView
+                .padding(.bottom, 4.67)
+        } else {
+            switch item.documentType {
+            case .documents:
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                }
+            case .idCard, .driverLicense:
+                VStack(spacing: 2) {
+                    if let image = item.thumbnail {
+                        Image(uiImage: image)
+                            .resizable()
+                            .frame(width: 18, height: 11.3)
+                            .scaledToFit()
+                    }
+                    
+                    if let secondImage = item.secondThumbnail {
+                        Image(uiImage: secondImage)
+                            .resizable()
+                            .frame(width: 18, height: 11.3)
+                            .scaledToFit()
+                    }
+                }
+            case .passport:
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
+                        .resizable()
+                        .frame(width: 21, height: 29)
+                        .scaledToFit()
+                }
+            default:
+                EmptyView()
+            }
+        }
+    }
+    
+    private var foldertLockItemView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+            
+            HStack(spacing: 0) {
+                Image(appIcon: .lock_fill)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(.elements(.accent))
+                    .frame(width: 11.33, height: 11.76)
+                    .padding(.leading, 4.56)
+                    .padding(.bottom, 4.24)
+                
+                Spacer(minLength: 0)
+            }
+            
+            VStack(alignment: .leading, spacing: 2.33) {
+                documentLockLineView
+                    .frame(width: 22.33, height: 1.4)
+                
+                documentLockLineView
+                    .frame(width: 26.33, height: 1.4)
+                
+                documentLockLineView
+                    .frame(width: 23.67, height: 1.4)
+                
+                documentLockLineView
+                    .frame(width: 26.33, height: 1.4)
+                
+                documentLockLineView
+                    .frame(width: 19.33, height: 1.4)
+            }
+            .padding(.leading, 4.67)
+        }
+    }
+}

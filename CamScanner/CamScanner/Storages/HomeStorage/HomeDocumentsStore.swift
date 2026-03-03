@@ -3,11 +3,6 @@ import CoreData
 import UIKit
 import Combine
 
-struct ThumbKey: Hashable {
-    let docID: UUID
-    let pageIndex: Int
-}
-
 struct DocumentListItem: Identifiable, Equatable {
     let id: UUID
     let isLocked: Bool

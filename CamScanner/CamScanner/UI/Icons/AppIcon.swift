@@ -49,6 +49,7 @@ public enum AppIcon: String, CaseIterable {
     case starFill = "star_fill"
     case flashFill = "flash_fill"
     case closeFill = "close_fill"
+    case lock_fill = "lock_fill"
     
     // MARK: - Outline
     case addCircle = "add_circle"
@@ -72,6 +73,10 @@ public enum AppIcon: String, CaseIterable {
     case check_image = "check_image"
     case empty_check_image = "empty_check_image"
     case rect_separator_image = "rect_separator_image"
+    case filesEmpty_image = "filesEmpty_image"
+    case folder_image = "folder_image"
+    case folder_small_image = "folder_small_image"
+    case lock_image = "lock_image"
 }
 
 public extension Image {

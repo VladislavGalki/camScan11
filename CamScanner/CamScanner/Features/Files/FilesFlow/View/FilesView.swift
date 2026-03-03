@@ -4,17 +4,42 @@ struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
     
     var body: some View {
+        contentView
+    }
+    
+    @ViewBuilder
+    private var contentView: some View {
+        switch viewModel.viewState {
+        case .empty:
+            emptyView
+        case .success:
+            successView
+        case .search:
+            EmptyView()
+        }
+    }
+    
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(appIcon: .filesEmpty_image)
+            
+            Text("No Files Yet")
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+        }
+        .frame(maxHeight: .infinity)
+    }
+    
+    private var successView: some View {
         VStack(alignment: .leading, spacing: 0) {
             navigationBarView
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-
-                }
+            switch viewModel.gridLayout {
+            case .grid:
+                gridLayoutView
+            case .list:
+                listLayoutView
             }
-            .scrollIndicators(.never)
-            .contentMargins(.top, 16, for: .scrollContent)
-            .contentMargins(.bottom, 16, for: .scrollContent)
         }
         .background(
             Color.bg(.main)
@@ -22,11 +47,19 @@ struct FilesView: View {
         .ignoresSafeArea(edges: .top)
     }
     
+    private var gridLayoutView: some View {
+        GridLayoutView(model: viewModel.items)
+    }
+    
+    private var listLayoutView: some View {
+        ListLayoutView(model: viewModel.items)
+    }
+    
     private var navigationBarView: some View {
         Rectangle()
             .foregroundStyle(.bg(.main))
             .frame(maxWidth: .infinity)
-            .frame(height: 114)
+            .frame(height: 128)
             .overlay(alignment: .bottom) {
                 HStack(spacing: 8) {
                     Text("Files")
@@ -56,7 +89,7 @@ struct FilesView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
             }
     }
 }
