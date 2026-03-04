@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CreateFolderView: View {
     @State private var folderName: String = ""
+    @FocusState private var isFocused: Bool
     
     var onFolderCreated: ((String) -> Void)?
     
@@ -25,6 +26,9 @@ struct CreateFolderView: View {
             Color.bg(.main)
                 .ignoresSafeArea()
         )
+        .onAppear {
+            isFocused = true
+        }
     }
     
     private var navigationView: some View {
@@ -84,6 +88,7 @@ struct CreateFolderView: View {
                 .tint(.bg(.accent))
                 .truncationMode(.tail)
                 .background(Color.clear)
+                .focused($isFocused)
                 .onSubmit {
                     onFolderCreated?(folderName)
                     dismiss()

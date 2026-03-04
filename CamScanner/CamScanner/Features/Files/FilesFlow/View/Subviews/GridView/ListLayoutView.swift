@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct ListLayoutView: View {
+    let highlightedID: UUID?
     var model: [FilesGridItem]
     
     @State private var shouldShowMenu: Bool = false
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
-    var onMenuClick: ((FileDocumentItem, CGRect) -> Void)?
+    var onMenuClick: ((UUID, CGRect) -> Void)?
 
     var body: some View {
         contentView
@@ -88,7 +89,7 @@ struct ListLayoutView: View {
                         ),
                         action: {
                             let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                            onMenuClick?(item, frame)
+                            onMenuClick?(item.id, frame)
                         }
                     )
                 }
@@ -244,28 +245,34 @@ struct ListLayoutView: View {
             
             Spacer(minLength: 0)
             
-            AppButton(
-                config: AppButtonConfig(
-                    content: .iconOnly(.dots),
-                    style: .secondary,
-                    size: .s
-                ),
-                action: {}
-            )
+            GeometryReader { geo in
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.dots),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action: {
+                        let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                        onMenuClick?(item.id, frame)
+                    }
+                )
+            }
+            .frame(width: 28, height: 28)
         }
         .padding(.vertical, 9)
         .background(
             Color(
-                uiColor: item.documentsCount == 0
-                ? UIColor(
+                UIColor(
                     red: 52.0/255.0,
                     green: 199.0/255.0,
                     blue: 89.0/255.0,
-                    alpha: 0.1
+                    alpha: highlightedID == item.id ? 0.1 : 0
                 )
-                : .clear
             )
+            .cornerRadius(8, corners: .allCorners)
             .padding(.horizontal, -16)
+            .animation(.easeIn, value: highlightedID == item.id)
         )
     }
 }

@@ -296,11 +296,12 @@ final class FileDocumentStore: NSObject {
         return FileDocumentItem(
             id: id,
             folderID: doc.folder?.id,
-            title: configureDocumentFileName(createAt: doc.createdAt, documentType: doc.documentTypeRaw),
+            title: doc.title,
             documentType: DocumentTypeEnum(rawValue: doc.documentTypeRaw ?? "") ?? .documents,
             createdAt: doc.createdAt,
             pageCount: Int(doc.pageCount),
             isLocked: doc.isLocked,
+            lockViaFaceId: doc.lockViaFaceId,
             isFavourite: doc.isFavourite,
             sizeInBytes: doc.cachedSize,
             firstPagePath: first,
@@ -308,16 +309,6 @@ final class FileDocumentStore: NSObject {
             thumbnail: nil,
             secondThumbnail: nil
         )
-    }
-    
-    private func configureDocumentFileName(createAt: Date?, documentType: String?) -> String {
-        guard let createAt else { return "Document" }
-        
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
-        
-        return "\(formatter.string(from: createAt)) \(documentType ?? "")"
     }
 }
 

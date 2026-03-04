@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct GridLayoutView: View {
+    let highlightedID: UUID?
     var model: [FilesGridItem]
     
     var onFavouriteClick: ((UUID, Bool) -> Void?)
-    var onMenuClick: ((FileDocumentItem, CGRect) -> Void)?
+    var onMenuClick: ((UUID, CGRect) -> Void)?
     
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 26),
@@ -71,7 +72,7 @@ struct GridLayoutView: View {
                                 ),
                                 action: {
                                     let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                                    onMenuClick?(item, frame)
+                                    onMenuClick?(item.id, frame)
                                 }
                             )
                         }
@@ -90,11 +91,11 @@ struct GridLayoutView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity)
                 
                 Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
-                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -230,17 +231,21 @@ struct GridLayoutView: View {
                     }
                 }
                 .overlay(alignment: .topLeading) {
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .iconOnly(.dots),
-                            style: .secondary,
-                            size: .s
-                        ),
-                        action: {
-                            
-                        }
-                    )
-                    .padding(4)
+                    GeometryReader { geo in
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(.dots),
+                                style: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                                onMenuClick?(item.id, frame)
+                            }
+                        )
+                        .padding(4)
+                    }
+                    .frame(width: 28, height: 28)
                 }
             
             VStack(spacing: 0) {
@@ -259,16 +264,15 @@ struct GridLayoutView: View {
         .padding(8)
         .background(
             Color(
-                uiColor: item.documentsCount == 0
-                ? UIColor(
+                UIColor(
                     red: 52.0/255.0,
                     green: 199.0/255.0,
                     blue: 89.0/255.0,
-                    alpha: 0.1
+                    alpha: highlightedID == item.id ? 0.1 : 0
                 )
-                : .clear
             )
             .cornerRadius(8, corners: .allCorners)
+            .animation(.easeIn, value: highlightedID == item.id)
         )
     }
     

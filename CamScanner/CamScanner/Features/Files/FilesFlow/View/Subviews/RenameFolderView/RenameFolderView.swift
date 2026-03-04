@@ -1,17 +1,21 @@
 import SwiftUI
 
-struct RenameFileView: View {
-    @State private var newTextFileName: String = ""
+struct RenameFolderView: View {
+    @State private var newFolderName: String = ""
     @FocusState private var isFocused: Bool
-
-    @Binding var documentFileName: String
+    
+    let folderTitle: String
+    let onClose: (() -> Void?)
+    let onFinish: ((String) -> Void?)
+    
+    init(folderTitle: String, onClose: @escaping () -> Void?, onFinish: @escaping (String) -> Void?) {
+        self.newFolderName = folderTitle
+        self.folderTitle = folderTitle
+        self.onClose = onClose
+        self.onFinish = onFinish
+    }
     
     @Environment(\.dismiss) private var dismiss
-    
-    init(documentFileName: Binding<String>) {
-        newTextFileName = documentFileName.wrappedValue
-        _documentFileName = documentFileName
-    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -42,11 +46,12 @@ struct RenameFileView: View {
                     size: .m
                 ),
                 action: {
+                    onClose()
                     dismiss()
                 }
             )
             
-            Text("Rename title")
+            Text("Rename")
                 .appTextStyle(.topBarTitle)
                 .foregroundStyle(.text(.primary))
                 .multilineTextAlignment(.center)
@@ -59,11 +64,11 @@ struct RenameFileView: View {
                     size: .m
                 ),
                 action: {
-                    documentFileName = newTextFileName
+                    onFinish(newFolderName)
                     dismiss()
                 }
             )
-            .appButtonEnabled(!newTextFileName.isEmpty)
+            .appButtonEnabled(!newFolderName.isEmpty)
         }
         .padding(.vertical, 12)
     }
@@ -80,7 +85,7 @@ struct RenameFileView: View {
     
     private var textFieldVIew: some View {
         HStack(spacing: 8) {
-            TextField("", text: $newTextFileName)
+            TextField("", text: $newFolderName)
                 .appTextStyle(.bodySecondary)
                 .foregroundStyle(.black)
                 .tint(.bg(.accent))
@@ -88,16 +93,16 @@ struct RenameFileView: View {
                 .background(Color.clear)
                 .focused($isFocused)
                 .onSubmit {
-                    documentFileName = newTextFileName
+                    onFinish(newFolderName)
                     dismiss()
                 }
             
-            if !newTextFileName.isEmpty {
+            if !newFolderName.isEmpty {
                 Image(appIcon: .closeFill)
                     .renderingMode(.template)
                     .foregroundStyle(.elements(.tertiary))
                     .onTapGesture {
-                        newTextFileName = ""
+                        newFolderName = ""
                     }
             }
         }
@@ -110,3 +115,4 @@ struct RenameFileView: View {
         )
     }
 }
+

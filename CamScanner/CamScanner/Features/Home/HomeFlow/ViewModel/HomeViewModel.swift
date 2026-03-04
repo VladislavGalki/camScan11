@@ -71,7 +71,7 @@ final class HomeViewModel: ObservableObject {
 
             return RecentDocumentModel(
                 id: id,
-                title: docType.title,
+                title: document.title,
                 documentType: docType,
                 thumbnail: nil,
                 secondThumbnail: nil,
@@ -98,15 +98,5 @@ final class HomeViewModel: ObservableObject {
             ExploreToolModel(type: .watermart, icon: .watermarkImage, title: "Watermark"),
             ExploreToolModel(type: .cloudStorage, icon: .cloudImage, title: "Cloud Storage")
         ]
-    }
-}
-
-extension HomeViewModel {
-    func delete(docID: UUID) {
-        do {
-            try documentsStore.delete(docID: docID)
-        } catch {
-            print("Delete error:", error)
-        }
     }
 }

@@ -22,6 +22,7 @@ struct FileDocumentItem: Equatable {
     let createdAt: Date
     let pageCount: Int
     let isLocked: Bool
+    var lockViaFaceId: Bool = false
     let isFavourite: Bool
     let sizeInBytes: Int64
     let firstPagePath: String?
@@ -29,6 +30,7 @@ struct FileDocumentItem: Equatable {
     var thumbnail: UIImage?
     var secondThumbnail: UIImage?
     var isSelected: Bool = false
+    var isHighlighted: Bool = false
 }
 
 struct FileFolderItem: Equatable {
@@ -36,7 +38,9 @@ struct FileFolderItem: Equatable {
     let title: String
     let createdAt: Date
     let isLocked: Bool
+    var lockViaFaceId: Bool = false
     let documentsCount: Int
     var previewDocuments: [FileDocumentItem]
     var isSelected: Bool = false
+    var isHighlighted: Bool = false
 }

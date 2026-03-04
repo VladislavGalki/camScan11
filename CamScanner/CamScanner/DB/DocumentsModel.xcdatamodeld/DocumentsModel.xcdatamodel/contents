@@ -8,9 +8,11 @@
         <attribute name="isFavourite" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isLocked" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastViewed" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lockViaFaceId" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="pageCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="passwordHash" optional="YES" attributeType="Binary"/>
         <attribute name="passwordSalt" optional="YES" attributeType="Binary"/>
+        <attribute name="title" attributeType="String"/>
         <relationship name="folder" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="FolderEntity" inverseName="documents" inverseEntity="FolderEntity"/>
         <relationship name="pages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PageEntity" inverseName="document" inverseEntity="PageEntity"/>
     </entity>
@@ -20,6 +22,7 @@
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="isLocked" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastViewed" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lockViaFaceId" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="title" attributeType="String"/>
         <relationship name="documents" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="DocumentEntity" inverseName="folder" inverseEntity="DocumentEntity"/>
     </entity>

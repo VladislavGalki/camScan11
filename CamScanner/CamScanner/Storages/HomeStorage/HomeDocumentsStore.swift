@@ -113,27 +113,6 @@ extension HomeDocumentsStore {
             }
         }
     }
-    
-    func delete(docID: UUID) throws {
-        let req: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        req.predicate = NSPredicate(format: "id == %@", docID as CVarArg)
-        req.fetchLimit = 1
-
-        if let doc = try context.fetch(req).first {
-            FileStore.shared.deleteDocumentFolder(docID: docID)
-
-            context.delete(doc)
-            try context.save()
-
-            var dict = thumbnailsSubject.value
-            dict.keys
-                .filter { $0.docID == docID }
-                .forEach { dict[$0] = nil }
-            
-            thumbnailsSubject.send(dict)
-            thumbInFlight = thumbInFlight.filter { $0.docID != docID }
-        }
-    }
 }
 
 // MARK: - FRC Delegate

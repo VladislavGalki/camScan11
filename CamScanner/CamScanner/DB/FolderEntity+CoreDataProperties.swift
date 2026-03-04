@@ -11,6 +11,7 @@ extension FolderEntity {
     @NSManaged public var createdAt: Date
     @NSManaged public var lastViewed: Date
     @NSManaged public var isLocked: Bool
+    @NSManaged public var lockViaFaceId: Bool
 
     @NSManaged public var documents: NSSet?
     

@@ -8,7 +8,9 @@ final class FilesViewModel: ObservableObject {
     @Published var viewMode: FilesViewMode = .grid
     @Published private(set) var items: [FilesGridItem] = []
     
+    @Published var highlightedID: UUID?
     @Published var shouldShowNotification = false
+    @Published var notificationOverlaystate: FilesNotificationOverlayState = .none
     @Published var notificationModel: NotificationModel?
     @Published var fileActiveSheet: FileActiveSheet?
     
@@ -22,8 +24,8 @@ final class FilesViewModel: ObservableObject {
         bootstrap()
     }
     
-    func handleFileDocumentMenuItem(item: FileDocumentItem?, menuItem: FilesMenuItem) {
-        guard let item else { return }
+    func handleFileDocumentMenuItem(id: UUID?, menuItem: FilesMenuItem?) {
+        guard let id, let menuItem else { return }
         
         switch menuItem {
         case .share:
@@ -36,16 +38,17 @@ final class FilesViewModel: ObservableObject {
             break
         case .delete:
             do {
-                try documentRepository.deleteDocument(id: item.id)
+                try documentRepository.deleteDocument(id: id)
             } catch {}
         }
     }
     
     func handleFolderCreated(folderName: String) {
         do {
-            try documentRepository.createFolder(title: folderName)
+            let documentId = try documentRepository.createFolder(title: folderName)
             notificationModel = .folderCreated
             shouldShowNotification = true
+            setHighlitedDocument(documentId)
         } catch {}
     }
     
@@ -54,10 +57,35 @@ final class FilesViewModel: ObservableObject {
         documentStore.updateSortType(type)
     }
     
+    func handleFileDocumentRenamed(_ id: UUID?, fileName: String) {
+        guard let id else { return }
+        
+        do {
+            try documentRepository.renameDocument(id: id, newTitle: fileName)
+        } catch {}
+    }
+    
     func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
         do {
             try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
         } catch {}
+    }
+    
+    func getTitleForItem(id: UUID?) -> String {
+        for item in items {
+            switch item {
+            case .document(let doc):
+                if doc.id == id {
+                    return doc.title
+                }
+            case .folder(let folder):
+                if folder.id == id {
+                    return folder.title
+                }
+            }
+        }
+        
+        return ""
     }
     
     private func bootstrap() {
@@ -122,6 +150,15 @@ final class FilesViewModel: ObservableObject {
                 }
                 return .folder(folder)
             }
+        }
+    }
+    
+    private func setHighlitedDocument(_ id: UUID) {
+        highlightedID = id
+        
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            highlightedID = nil
         }
     }
 }

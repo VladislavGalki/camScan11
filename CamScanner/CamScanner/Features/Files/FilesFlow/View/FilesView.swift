@@ -3,7 +3,8 @@ import SwiftUI
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
     
-    @State private var selectedFileDocumentItem: FileDocumentItem?
+    @State private var selectedFileDocumentItemId: UUID?
+    @State private var selectedMenuItem: FilesMenuItem?
     @State private var shouldShowMenuOverlay = false
     @State private var menuFrame: CGRect = .zero
     @State private var shouldShowDotsOverlay = false
@@ -19,9 +20,27 @@ struct FilesView: View {
                     grideMode: viewModel.viewMode,
                     menuFrame: menuFrame
                 ) { menuItem in
-                    viewModel.handleFileDocumentMenuItem(item: selectedFileDocumentItem, menuItem: menuItem)
-                    selectedFileDocumentItem = nil
+                    tabBar.isTabBarVisible = false
+                    selectedMenuItem = menuItem
+                    
+                    switch menuItem {
+                    case .delete:
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            viewModel.notificationOverlaystate = .deleteFile
+                        }
+                    case .rename:
+                        viewModel.fileActiveSheet = .rename
+                    case .lock:
+                        break
+                    case .move:
+                        break
+                    case .share:
+                        break
+                    }
                 }
+            }
+            .overlay {
+                notificationOverlayView
             }
             .overlay {
                 dotsOverlayView
@@ -42,7 +61,14 @@ struct FilesView: View {
                     }
                     .presentationCornerRadius(38)
                 case .rename:
-                    EmptyView()
+                    RenameFolderView(folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)) {
+                        tabBar.isTabBarVisible = true
+                    } onFinish: { fileName in
+                        viewModel.handleFileDocumentRenamed(selectedFileDocumentItemId, fileName: fileName)
+                        selectedFileDocumentItemId = nil
+                        tabBar.isTabBarVisible = true
+                    }
+                    .presentationCornerRadius(38)
                 }
             }
             .coordinateSpace(name: "filesCoordinateSpace")
@@ -89,10 +115,10 @@ struct FilesView: View {
     }
     
     private var gridLayoutView: some View {
-        GridLayoutView(model: viewModel.items) { documentId, isFavourite in
+        GridLayoutView(highlightedID: viewModel.highlightedID, model: viewModel.items) { documentId, isFavourite in
             viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
-        } onMenuClick: { item, buttonFrame in
-            selectedFileDocumentItem = item
+        } onMenuClick: { id, buttonFrame in
+            selectedFileDocumentItemId = id
             menuFrame = buttonFrame
             tabBar.isTabBarVisible = false
             
@@ -103,10 +129,10 @@ struct FilesView: View {
     }
     
     private var listLayoutView: some View {
-        ListLayoutView(model: viewModel.items) { documentId, isFavourite in
+        ListLayoutView(highlightedID: viewModel.highlightedID, model: viewModel.items) { documentId, isFavourite in
             viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
-        } onMenuClick: { item, buttonFrame in
-            selectedFileDocumentItem = item
+        } onMenuClick: { id, buttonFrame in
+            selectedFileDocumentItemId = id
             menuFrame = buttonFrame
             tabBar.isTabBarVisible = false
             
@@ -180,6 +206,85 @@ struct FilesView: View {
                 .cornerRadius(12, corners: .allCorners)
                 .appBorderModifier(.border(.onSuccess), radius: 12)
         )
+    }
+    
+    @ViewBuilder
+    private var notificationOverlayView: some View {
+        if viewModel.notificationOverlaystate != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+                
+                switch viewModel.notificationOverlaystate {
+                case .deleteFile:
+                    deleteOverlay
+                case .lock:
+                    EmptyView()
+                case .none:
+                    EmptyView()
+                }
+            }
+        }
+    }
+    
+    private var deleteOverlay: some View {
+        VStack(spacing: 0) {
+            Text("Delete document")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+            
+            Text("This document will not be recoverable. Delete?")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .padding(.bottom, 24)
+            
+            VStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Delete"),
+                        style: .secondary,
+                        size: .l,
+                        extraTitleColor: .text(.destructive),
+                        isFullWidth: true
+                    ),
+                    action: {
+                        viewModel.handleFileDocumentMenuItem(
+                            id: selectedFileDocumentItemId,
+                            menuItem: selectedMenuItem
+                        )
+                        
+                        selectedFileDocumentItemId = nil
+                        selectedMenuItem = nil
+                        viewModel.notificationOverlaystate = .none
+                        tabBar.isTabBarVisible = true
+                    }
+                )
+                
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Cancel"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        selectedFileDocumentItemId = nil
+                        selectedMenuItem = nil
+                        tabBar.isTabBarVisible = true
+                        viewModel.notificationOverlaystate = .none
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .foregroundStyle(.bg(.surface))
+        )
+        .frame(maxWidth: 300)
     }
     
     private var dotsOverlayView: some View {

@@ -88,11 +88,13 @@ extension DocumentRepository {
         
         let doc = DocumentEntity(context: context)
         doc.id = docID
+        
         doc.createdAt = Date()
         doc.lastViewed = Date()
         doc.documentTypeRaw = documentType.rawValue
         doc.pageCount = Int16(frames.count)
         doc.folder = folder
+        doc.title = configureDocumentFileName(createAt: doc.createdAt, documentType: doc.documentTypeRaw)
         
         for (index, frame) in frames.enumerated() {
             guard
@@ -163,19 +165,51 @@ extension DocumentRepository {
     }
     
     func deleteDocument(id: UUID) throws {
-        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        request.fetchLimit = 1
-        
-        guard let document = try context.fetch(request).first else { return }
-        
-        if let docID = document.id {
-            FileStore.shared.deleteDocumentFolder(docID: docID)
+        let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        documentRequest.fetchLimit = 1
+
+        if let document = try context.fetch(documentRequest).first {
+
+            if let docID = document.id {
+                FileStore.shared.deleteDocumentFolder(docID: docID)
+            }
+
+            context.delete(document)
+            try context.save()
+            return
         }
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        folderRequest.fetchLimit = 1
+
+        if let folder = try context.fetch(folderRequest).first {
+
+            if let documents = folder.documents as? Set<DocumentEntity> {
+                for doc in documents {
+                    if let docID = doc.id {
+                        FileStore.shared.deleteDocumentFolder(docID: docID)
+                    }
+                    
+                    context.delete(doc)
+                }
+            }
+
+            context.delete(folder)
+            try context.save()
+            return
+        }
+    }
+    
+    private func configureDocumentFileName(createAt: Date?, documentType: String?) -> String {
+        guard let createAt else { return "Document" }
         
-        context.delete(document)
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
         
-        try context.save()
+        return "\(formatter.string(from: createAt)) \(documentType ?? "")"
     }
 }
 
@@ -193,7 +227,6 @@ extension DocumentRepository {
             )
         }
         
-        // Проверка на дубликат имени (опционально, но желательно)
         let request: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
         request.predicate = NSPredicate(format: "title == %@", trimmedTitle)
         request.fetchLimit = 1
@@ -222,50 +255,75 @@ extension DocumentRepository {
         return folderID
     }
     
-    func renameFolder(_ folder: FolderEntity, newTitle: String) throws {
-        let trimmedTitle = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+    func renameDocument(id: UUID, newTitle: String) throws {
+        let trimmedTitle = newTitle.trimmingCharacters(in: .whitespaces)
+
         guard !trimmedTitle.isEmpty else {
             throw NSError(
                 domain: "DocumentRepository",
-                code: 2001,
-                userInfo: [NSLocalizedDescriptionKey: "Folder name cannot be empty"]
+                code: 3001,
+                userInfo: [NSLocalizedDescriptionKey: "Name cannot be empty"]
             )
         }
-        
-        // Проверка на дубликат имени
-        let request: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "title == %@ AND id != %@",
-            trimmedTitle,
-            folder.id! as CVarArg
-        )
-        request.fetchLimit = 1
-        
-        if let _ = try context.fetch(request).first {
-            throw NSError(
-                domain: "DocumentRepository",
-                code: 2002,
-                userInfo: [NSLocalizedDescriptionKey: "Folder with this name already exists"]
-            )
-        }
-        
-        folder.title = trimmedTitle
-        folder.lastViewed = Date()
-        
-        try context.save()
-    }
 
-    func deleteFolder(_ folder: FolderEntity) throws {
-        if let documents = folder.documents as? Set<DocumentEntity> {
-            for document in documents {
-                if let id = document.id {
-                    FileStore.shared.deleteDocumentFolder(docID: id)
-                }
-            }
+        let docRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        docRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        docRequest.fetchLimit = 1
+
+        if let document = try context.fetch(docRequest).first {
+            let uniqueTitle = try makeUniqueTitle(base: trimmedTitle, excludingID: id)
+            document.title = uniqueTitle
+
+            try context.save()
+            return
         }
-        
-        context.delete(folder)
-        try context.save()
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        folderRequest.fetchLimit = 1
+
+        if let folder = try context.fetch(folderRequest).first {
+            let uniqueTitle = try makeUniqueTitle(base: trimmedTitle, excludingID: id)
+            folder.title = uniqueTitle
+
+            try context.save()
+            return
+        }
+    }
+    
+    private func makeUniqueTitle(base: String, excludingID: UUID) throws -> String {
+        var candidate = base
+        var index = 1
+
+        while try titleExists(candidate, excludingID: excludingID) {
+            candidate = "\(base)_\(index)"
+            index += 1
+        }
+
+        return candidate
+    }
+    
+    private func titleExists(_ title: String, excludingID: UUID) throws -> Bool {
+        let docRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        docRequest.predicate = NSPredicate(
+            format: "title == %@ AND id != %@",
+            title,
+            excludingID as CVarArg
+        )
+        docRequest.fetchLimit = 1
+
+        if try context.fetch(docRequest).first != nil {
+            return true
+        }
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(
+            format: "title == %@ AND id != %@",
+            title,
+            excludingID as CVarArg
+        )
+        folderRequest.fetchLimit = 1
+
+        return try context.fetch(folderRequest).first != nil
     }
 }
