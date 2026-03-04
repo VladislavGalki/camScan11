@@ -22,6 +22,25 @@ final class FilesViewModel: ObservableObject {
         bootstrap()
     }
     
+    func handleFileDocumentMenuItem(item: FileDocumentItem?, menuItem: FilesMenuItem) {
+        guard let item else { return }
+        
+        switch menuItem {
+        case .share:
+            break
+        case .rename:
+            break
+        case .lock:
+            break
+        case .move:
+            break
+        case .delete:
+            do {
+                try documentRepository.deleteDocument(id: item.id)
+            } catch {}
+        }
+    }
+    
     func handleFolderCreated(folderName: String) {
         do {
             try documentRepository.createFolder(title: folderName)
@@ -79,6 +98,8 @@ final class FilesViewModel: ObservableObject {
             
             if !updatedItems.isEmpty {
                 self.viewState = .success
+            } else {
+                self.viewState = .empty
             }
         }
         .store(in: &cancellables)

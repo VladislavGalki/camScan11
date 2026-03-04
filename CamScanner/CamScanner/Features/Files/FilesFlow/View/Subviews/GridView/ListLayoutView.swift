@@ -2,9 +2,12 @@ import SwiftUI
 
 struct ListLayoutView: View {
     var model: [FilesGridItem]
+    
+    @State private var shouldShowMenu: Bool = false
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
-    
+    var onMenuClick: ((FileDocumentItem, CGRect) -> Void)?
+
     var body: some View {
         contentView
     }
@@ -25,7 +28,7 @@ struct ListLayoutView: View {
             }
             .padding(.top, 7)
             .padding(.horizontal, 16)
-            .padding(.bottom, 48)
+            .padding(.bottom, Constants.tabBarHeight)
         }
     }
     
@@ -76,14 +79,20 @@ struct ListLayoutView: View {
                     }
                 )
                 
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .iconOnly(.dots),
-                        style: .secondary,
-                        size: .s
-                    ),
-                    action: {}
-                )
+                GeometryReader { geo in
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.dots),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: {
+                            let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                            onMenuClick?(item, frame)
+                        }
+                    )
+                }
+                .frame(width: 28, height: 28)
             }
         }
         .padding(.vertical, 9)

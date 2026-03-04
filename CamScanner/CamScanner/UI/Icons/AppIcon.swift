@@ -43,6 +43,9 @@ public enum AppIcon: String, CaseIterable {
     case list = "list"
     case folder = "folder"
     case check_circle = "check_circle"
+    case lock = "lock"
+    case edit = "edit"
+    case move = "move"
     
     // MARK: - Fill
     case homeFill = "home_fill"
@@ -77,7 +80,7 @@ public enum AppIcon: String, CaseIterable {
     case check_image = "check_image"
     case empty_check_image = "empty_check_image"
     case rect_separator_image = "rect_separator_image"
-    case filesEmpty_image = "filesEmpty_image"
+    case filesEmpty_image = "filesEmpty_Image"
     case folder_image = "folder_image"
     case folder_small_image = "folder_small_image"
     case lock_image = "lock_image"

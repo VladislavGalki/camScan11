@@ -36,7 +36,7 @@ struct HomeView: View {
             }
             .scrollIndicators(.never)
             .contentMargins(.top, 26, for: .scrollContent)
-            .contentMargins(.bottom, 48, for: .scrollContent)
+            .contentMargins(.bottom, Constants.tabBarHeight, for: .scrollContent)
         }
         .background(
             Color.bg(.main)

@@ -4,6 +4,7 @@ struct GridLayoutView: View {
     var model: [FilesGridItem]
     
     var onFavouriteClick: ((UUID, Bool) -> Void?)
+    var onMenuClick: ((FileDocumentItem, CGRect) -> Void)?
     
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 26),
@@ -24,7 +25,7 @@ struct GridLayoutView: View {
                 }
             }
             .padding([.horizontal, .top], 16)
-            .padding(.bottom, 48)
+            .padding(.bottom, Constants.tabBarHeight)
         }
     }
     
@@ -61,16 +62,20 @@ struct GridLayoutView: View {
                         
                         Spacer(minLength: 0)
                         
-                        AppButton(
-                            config: AppButtonConfig(
-                                content: .iconOnly(.dots),
-                                style: .secondary,
-                                size: .s
-                            ),
-                            action: {
-                                
-                            }
-                        )
+                        GeometryReader { geo in
+                            AppButton(
+                                config: AppButtonConfig(
+                                    content: .iconOnly(.dots),
+                                    style: .secondary,
+                                    size: .s
+                                ),
+                                action: {
+                                    let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                                    onMenuClick?(item, frame)
+                                }
+                            )
+                        }
+                        .frame(width: 28, height: 28)
                     }
                     .padding([.top, .horizontal], 4)
                 }

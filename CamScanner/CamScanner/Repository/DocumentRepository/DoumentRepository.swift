@@ -162,11 +162,19 @@ extension DocumentRepository {
         try context.save()
     }
     
-    func deleteDocument(_ document: DocumentEntity) throws {
-        if let id = document.id {
-            FileStore.shared.deleteDocumentFolder(docID: id)
+    func deleteDocument(id: UUID) throws {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        guard let document = try context.fetch(request).first else { return }
+        
+        if let docID = document.id {
+            FileStore.shared.deleteDocumentFolder(docID: docID)
         }
+        
         context.delete(document)
+        
         try context.save()
     }
 }

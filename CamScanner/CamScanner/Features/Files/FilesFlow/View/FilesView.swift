@@ -3,6 +3,9 @@ import SwiftUI
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
     
+    @State private var selectedFileDocumentItem: FileDocumentItem?
+    @State private var shouldShowMenuOverlay = false
+    @State private var menuFrame: CGRect = .zero
     @State private var shouldShowDotsOverlay = false
     @State private var dotsFrame: CGRect = .zero
     
@@ -10,6 +13,19 @@ struct FilesView: View {
     
     var body: some View {
         contentView
+            .overlay {
+                LayoutMenuItemView(
+                    showGridMenu: $shouldShowMenuOverlay,
+                    grideMode: viewModel.viewMode,
+                    menuFrame: menuFrame
+                ) { menuItem in
+                    viewModel.handleFileDocumentMenuItem(item: selectedFileDocumentItem, menuItem: menuItem)
+                    selectedFileDocumentItem = nil
+                }
+            }
+            .overlay {
+                dotsOverlayView
+            }
             .overlay(alignment: .top) {
                 if viewModel.shouldShowNotification {
                     NotificationToast(
@@ -29,6 +45,7 @@ struct FilesView: View {
                     EmptyView()
                 }
             }
+            .coordinateSpace(name: "filesCoordinateSpace")
     }
     
     @ViewBuilder
@@ -38,9 +55,6 @@ struct FilesView: View {
             emptyView
         case .success:
             successView
-                .overlay {
-                    dotsOverlayView
-                }
         case .search:
             EmptyView()
         }
@@ -77,12 +91,28 @@ struct FilesView: View {
     private var gridLayoutView: some View {
         GridLayoutView(model: viewModel.items) { documentId, isFavourite in
             viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
+        } onMenuClick: { item, buttonFrame in
+            selectedFileDocumentItem = item
+            menuFrame = buttonFrame
+            tabBar.isTabBarVisible = false
+            
+            withAnimation(.easeInOut(duration: 0.15)) {
+                shouldShowMenuOverlay = true
+            }
         }
     }
     
     private var listLayoutView: some View {
         ListLayoutView(model: viewModel.items) { documentId, isFavourite in
             viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
+        } onMenuClick: { item, buttonFrame in
+            selectedFileDocumentItem = item
+            menuFrame = buttonFrame
+            tabBar.isTabBarVisible = false
+            
+            withAnimation(.easeInOut(duration: 0.15)) {
+                shouldShowMenuOverlay = true
+            }
         }
     }
     
@@ -116,9 +146,9 @@ struct FilesView: View {
                                 size: .m
                             ),
                             action: {
-                                tabBar.isTabBarVisible.toggle()
+                                tabBar.isTabBarVisible = false
                                 
-                                withAnimation {
+                                withAnimation(.easeInOut(duration: 0.15)) {
                                     shouldShowDotsOverlay = true
                                 }
                             }
@@ -178,7 +208,6 @@ struct FilesView: View {
     
     private var dotsMenu: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
                 meuDotRow(title: "New folder", icon: .folder) {
                     shouldShowDotsOverlay = false
                     tabBar.isTabBarVisible = true
@@ -224,7 +253,6 @@ struct FilesView: View {
                         viewModel.viewMode = mode
                     }
                 }
-            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)

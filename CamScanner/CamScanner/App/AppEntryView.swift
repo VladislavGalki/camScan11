@@ -18,6 +18,7 @@ struct AppEntryView: View {
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
         UITabBar.appearance().isTranslucent = true
+        UITabBar.appearance().isHidden = true
     }
 
     var body: some View {
