@@ -8,6 +8,17 @@ struct AppEntryView: View {
     @StateObject private var tabBar = TabBarController()
     
     @EnvironmentObject private var router: Router
+    
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().isTranslucent = true
+    }
 
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
@@ -21,9 +32,9 @@ struct AppEntryView: View {
                             router.present(ScanFlowRoute.scan)
                         }
                     )
-                    .transition(.move(edge: .bottom))
+                    .transition(.identity.combined(with: .move(edge: .bottom).combined(with: .opacity)))
                 }
             }
-            .animation(.easeOut(duration: 0.25), value: tabBar.isTabBarVisible)
+            .animation(.easeOut(duration: 0.15), value: tabBar.isTabBarVisible)
     }
 }

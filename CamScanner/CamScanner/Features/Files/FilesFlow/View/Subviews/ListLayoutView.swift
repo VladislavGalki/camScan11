@@ -1,8 +1,10 @@
 import SwiftUI
 
-struct ListLayoutView: View, Equatable {
+struct ListLayoutView: View {
     var model: [FilesGridItem]
 
+    var onFavouriteClick: ((UUID, Bool) -> Void?)
+    
     var body: some View {
         contentView
     }
@@ -22,7 +24,8 @@ struct ListLayoutView: View, Equatable {
                 }
             }
             .padding(.top, 7)
-            .padding([.horizontal, .bottom], 16)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 48)
         }
     }
     
@@ -65,9 +68,12 @@ struct ListLayoutView: View, Equatable {
                     config: AppButtonConfig(
                         content: .iconOnly(item.isFavourite ? .starFill : .star),
                         style: .secondary,
-                        size: .s
+                        size: .s,
+                        extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
                     ),
-                    action: {}
+                    action: {
+                        onFavouriteClick(item.id, !item.isFavourite)
+                    }
                 )
                 
                 AppButton(
@@ -240,13 +246,17 @@ struct ListLayoutView: View, Equatable {
         }
         .padding(.vertical, 9)
         .background(
-            item.documentsCount == 0 ? Color(
-                uiColor: UIColor(
+            Color(
+                uiColor: item.documentsCount == 0
+                ? UIColor(
                     red: 52.0/255.0,
                     green: 199.0/255.0,
                     blue: 89.0/255.0,
-                    alpha: 0.1)
-            ) : .clear
+                    alpha: 0.1
+                )
+                : .clear
+            )
+            .padding(.horizontal, -16)
         )
     }
 }

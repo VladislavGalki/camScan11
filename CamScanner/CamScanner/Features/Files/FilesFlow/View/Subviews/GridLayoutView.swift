@@ -3,6 +3,8 @@ import SwiftUI
 struct GridLayoutView: View {
     var model: [FilesGridItem]
     
+    var onFavouriteClick: ((UUID, Bool) -> Void?)
+    
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 26),
         count: 3
@@ -21,7 +23,8 @@ struct GridLayoutView: View {
                     fileGridItemView(item: item)
                 }
             }
-            .padding(16)
+            .padding([.horizontal, .top], 16)
+            .padding(.bottom, 48)
         }
     }
     
@@ -48,10 +51,11 @@ struct GridLayoutView: View {
                             config: AppButtonConfig(
                                 content: .iconOnly(item.isFavourite ? .starFill : .star),
                                 style: .secondary,
-                                size: .s
+                                size: .s,
+                                extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
                             ),
                             action: {
-                                
+                                onFavouriteClick(item.id, !item.isFavourite)
                             }
                         )
                         
@@ -234,26 +238,32 @@ struct GridLayoutView: View {
                     .padding(4)
                 }
             
-            Text(item.title)
-                .appTextStyle(.meta)
-                .foregroundStyle(.text(.primary))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .multilineTextAlignment(.leading)
-        
-                Text("\(item.documentsCount) Document)")
-                    .appTextStyle(.helperText)
-                    .foregroundStyle(.text(.secondary))
+            VStack(spacing: 0) {
+                Text(item.title)
+                    .appTextStyle(.meta)
+                    .foregroundStyle(.text(.primary))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .multilineTextAlignment(.leading)
+            
+                    Text("\(item.documentsCount) Documents")
+                        .appTextStyle(.helperText)
+                        .foregroundStyle(.text(.secondary))
+            }
         }
-        .padding(item.documentsCount == 0 ? 8 : 0)
+        .padding(8)
         .background(
-            item.documentsCount == 0 ? Color(
-                uiColor: UIColor(
+            Color(
+                uiColor: item.documentsCount == 0
+                ? UIColor(
                     red: 52.0/255.0,
                     green: 199.0/255.0,
                     blue: 89.0/255.0,
-                    alpha: 0.1)
-            ) : .clear
+                    alpha: 0.1
+                )
+                : .clear
+            )
+            .cornerRadius(8, corners: .allCorners)
         )
     }
     

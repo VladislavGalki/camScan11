@@ -7,6 +7,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentModel: [RecentDocumentModel] = []
     @Published private(set) var exploreToolModel: [ExploreToolModel] = []
 
+    private let documentRepository: DocumentRepository = DocumentRepository.shared
     private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
 
     private var cancellables = Set<AnyCancellable>()
@@ -14,6 +15,12 @@ final class HomeViewModel: ObservableObject {
     init() {
         subscribeToRecentDocuments()
         bootstap()
+    }
+    
+    func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
+        do {
+            try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
+        } catch {}
     }
     
     private func subscribeToRecentDocuments() {
@@ -71,10 +78,12 @@ final class HomeViewModel: ObservableObject {
                 firstPageImagePath: p0,
                 secondPageImagePath: p1,
                 pageCountText: pageText,
+                isFavorite: document.isFavourite,
                 isLocked: document.isLocked,
-                createdAt: document.createdAt ?? Date()
+                createdAt: document.createdAt,
+                lastViewedAt: document.lastViewed
             )
-        }
+        }.sorted { $0.lastViewedAt > $1.lastViewedAt }
 
         recentModel = mappedDocuments
     }

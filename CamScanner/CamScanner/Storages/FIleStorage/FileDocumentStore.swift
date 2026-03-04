@@ -3,7 +3,18 @@ import CoreData
 import Combine
 import UIKit
 
+#if DEBUG
+private func log(_ message: String) {
+    print("📦 FileStore | \(message)")
+}
+#else
+private func log(_ message: String) {}
+#endif
+
 final class FileDocumentStore: NSObject {
+    
+    // MARK: - Publishers
+    
     var itemsPublisher: AnyPublisher<[FilesGridItem], Never> {
         itemsSubject.eraseToAnyPublisher()
     }
@@ -12,35 +23,48 @@ final class FileDocumentStore: NSObject {
         thumbnailsSubject.eraseToAnyPublisher()
     }
     
+    // MARK: - State
+    
+    private var currentSortType: FilesSortType = .recent
+    
     private let itemsSubject = CurrentValueSubject<[FilesGridItem], Never>([])
     private let thumbnailsSubject = CurrentValueSubject<[ThumbKey: UIImage], Never>([:])
     
-    private let context: NSManagedObjectContext =
-        PersistenceController.shared.container.viewContext
+    private let context = PersistenceController.shared.container.viewContext
     
     private var documentsFRC: NSFetchedResultsController<DocumentEntity>!
     private var foldersFRC: NSFetchedResultsController<FolderEntity>!
     
     private var thumbInFlight = Set<ThumbKey>()
-    
     private var rebuildWorkItem: DispatchWorkItem?
-    
-    override init() {
-        super.init()
-        configureFRC()
-        performFetch()
-        rebuild()
-    }
     
     deinit {
         rebuildWorkItem?.cancel()
     }
     
+    // MARK: - Bootstrap
+    
+    func bootstrap(with sortType: FilesSortType) {
+        currentSortType = sortType
+        configureFRC()
+        performFetch()
+        rebuild()
+    }
+    
+    func updateSortType(_ type: FilesSortType) {
+        guard currentSortType != type else { return }
+        currentSortType = type
+        
+        applySortConfiguration()
+        rebuild()
+    }
+    
+    // MARK: - FRC Setup
+    
     private func configureFRC() {
         let docRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        docRequest.sortDescriptors = [
-            NSSortDescriptor(key: "createdAt", ascending: false)
-        ]
+        docRequest.sortDescriptors = sortDescriptors(for: currentSortType)
+        docRequest.predicate = predicate(for: currentSortType)
         
         documentsFRC = NSFetchedResultsController(
             fetchRequest: docRequest,
@@ -66,38 +90,94 @@ final class FileDocumentStore: NSObject {
         foldersFRC.delegate = self
     }
     
+    private func applySortConfiguration() {
+        let request = documentsFRC.fetchRequest
+        request.sortDescriptors = sortDescriptors(for: currentSortType)
+        request.predicate = predicate(for: currentSortType)
+        
+        try? documentsFRC.performFetch()
+    }
+    
     private func performFetch() {
         try? documentsFRC.performFetch()
         try? foldersFRC.performFetch()
     }
     
+    // MARK: - Sorting
+    
+    private func sortDescriptors(for type: FilesSortType) -> [NSSortDescriptor] {
+        switch type {
+        case .recent:
+            return [
+                NSSortDescriptor(key: "lastViewed", ascending: false),
+                NSSortDescriptor(key: "createdAt", ascending: false)
+            ]
+        case .dateCreated:
+            return [
+                NSSortDescriptor(key: "createdAt", ascending: false)
+            ]
+        case .size:
+            return [
+                NSSortDescriptor(key: "cachedSize", ascending: false)
+            ]
+        case .starred, .locked:
+            return [
+                NSSortDescriptor(key: "createdAt", ascending: false)
+            ]
+        }
+    }
+    
+    private func predicate(for type: FilesSortType) -> NSPredicate? {
+        switch type {
+        case .starred:
+            return NSPredicate(format: "isFavourite == YES")
+        case .locked:
+            return NSPredicate(format: "isLocked == YES")
+        default:
+            return nil
+        }
+    }
+    
+    // MARK: - Rebuild
+    
     private func rebuild(currentFolderID: UUID? = nil) {
+        log("🔁 REBUILD started | sort: \(currentSortType)")
+        
         let documents = documentsFRC.fetchedObjects ?? []
         let folders = foldersFRC.fetchedObjects ?? []
         
-        var result: [FilesGridItem] = []
+        log("Fetched documents: \(documents.count)")
+        log("Fetched folders: \(folders.count)")
         
-        if currentFolderID == nil {
+        var items: [FilesGridItem] = []
+        
+        if currentFolderID == nil && currentSortType != .starred {
             for folder in folders {
                 guard let id = folder.id else { continue }
+                
+                if currentSortType == .locked && !folder.isLocked {
+                    continue
+                }
                 
                 let docs = (folder.documents as? Set<DocumentEntity>) ?? []
                 
                 let previewDocs = docs
-                    .sorted { $0.createdAt ?? Date() > $1.createdAt ?? Date() }
+                    .sorted { $0.createdAt > $1.createdAt }
                     .prefix(4)
                     .compactMap { mapToPreview($0) }
+                
+                log("Folder \(id) preview count: \(previewDocs.count)")
                 
                 let item = FileFolderItem(
                     id: id,
                     title: folder.title ?? "Folder",
-                    createdAt: folder.createdAt ?? Date(),
+                    createdAt: folder.createdAt,
                     isLocked: folder.isLocked,
                     documentsCount: docs.count,
                     previewDocuments: previewDocs
                 )
                 
-                result.append(.folder(item))
+                items.append(.folder(item))
             }
         }
         
@@ -110,45 +190,95 @@ final class FileDocumentStore: NSObject {
                 if doc.folder?.id != currentFolderID { continue }
             }
             
-            result.append(.document(mapToDocument(doc)))
+            items.append(.document(mapToDocument(doc)))
         }
         
-        itemsSubject.send(result)
-
-        let validIDs: Set<UUID> = {
-            var ids = Set<UUID>()
-
-            for item in result {
-                switch item {
-                case .document(let doc):
-                    ids.insert(doc.id)
-
-                case .folder(let folder):
-                    for preview in folder.previewDocuments {
-                        ids.insert(preview.id)
-                    }
-                }
-            }
-
-            return ids
-        }()
-
-        var dict = thumbnailsSubject.value
+        let sorted = items.sorted(by: globalComparator)
         
-        dict.keys
-            .filter { !validIDs.contains($0.docID) }
-            .forEach { dict[$0] = nil }
-
-        if dict != thumbnailsSubject.value {
-            thumbnailsSubject.send(dict)
-        }
+        log("Items after sort: \(sorted.count)")
         
-        thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
-
-        for item in result {
+        cleanThumbnails(validItems: sorted)
+        
+        itemsSubject.send(sorted)
+        log("Items sent to UI")
+        
+        for item in sorted {
             loadThumbnailsIfNeeded(for: item)
         }
+        
+        log("🔁 REBUILD finished")
     }
+    
+    // MARK: - Global Comparator
+    
+    private func globalComparator(_ lhs: FilesGridItem, _ rhs: FilesGridItem) -> Bool {
+        switch currentSortType {
+            
+        case .recent:
+            return lastViewed(lhs) > lastViewed(rhs)
+            
+        case .dateCreated:
+            return createdAt(lhs) > createdAt(rhs)
+            
+        case .size:
+            return size(lhs) > size(rhs)
+            
+        case .locked:
+            return isLocked(lhs) && !isLocked(rhs)
+            
+        case .starred:
+            return isFavourite(lhs) && !isFavourite(rhs)
+        }
+    }
+    
+    private func lastViewed(_ item: FilesGridItem) -> Date {
+        switch item {
+        case .document(let doc):
+            return documentsFRC.fetchedObjects?
+                .first(where: { $0.id == doc.id })?.lastViewed ?? .distantPast
+        case .folder(let folder):
+            return foldersFRC.fetchedObjects?
+                .first(where: { $0.id == folder.id })?.lastViewed ?? .distantPast
+        }
+    }
+    
+    private func createdAt(_ item: FilesGridItem) -> Date {
+        switch item {
+        case .document(let doc):
+            return doc.createdAt
+        case .folder(let folder):
+            return folder.createdAt
+        }
+    }
+    
+    private func size(_ item: FilesGridItem) -> Int64 {
+        switch item {
+        case .document(let doc):
+            return doc.sizeInBytes
+        case .folder(let folder):
+            return Int64(folder.previewDocuments.reduce(0) { $0 + Int($1.sizeInBytes) })
+        }
+    }
+    
+    private func isLocked(_ item: FilesGridItem) -> Bool {
+        switch item {
+        case .document(let doc):
+            return doc.isLocked
+        case .folder(let folder):
+            return folder.isLocked
+        }
+    }
+    
+    private func isFavourite(_ item: FilesGridItem) -> Bool {
+        switch item {
+        case .document(let doc):
+            return doc.isFavourite
+        case .folder:
+            return false
+        }
+    }
+    
+    // MARK: - Mapping
     
     private func mapToPreview(_ doc: DocumentEntity) -> FileDocumentItem {
         mapToDocument(doc)
@@ -160,16 +290,15 @@ final class FileDocumentStore: NSObject {
         
         let first = pages.first?.imagePath
         let second = pages.count > 1 ? pages[1].imagePath : nil
-        let documentType = DocumentTypeEnum(rawValue: doc.documentTypeRaw ?? "") ?? .documents
         
         guard let id = doc.id else { fatalError("Document without id") }
         
         return FileDocumentItem(
             id: id,
             folderID: doc.folder?.id,
-            title: configureDocumentFileName(createAt: doc.createdAt, documentType: documentType.title),
-            documentType: documentType,
-            createdAt: doc.createdAt ?? Date(),
+            title: configureDocumentFileName(createAt: doc.createdAt, documentType: doc.documentTypeRaw),
+            documentType: DocumentTypeEnum(rawValue: doc.documentTypeRaw ?? "") ?? .documents,
+            createdAt: doc.createdAt,
             pageCount: Int(doc.pageCount),
             isLocked: doc.isLocked,
             isFavourite: doc.isFavourite,
@@ -182,50 +311,57 @@ final class FileDocumentStore: NSObject {
     }
     
     private func configureDocumentFileName(createAt: Date?, documentType: String?) -> String {
-        guard let createAt, let documentType else { return "Document" }
+        guard let createAt else { return "Document" }
+        
         let formatter = DateFormatter()
         formatter.locale = Locale.current
         formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
         
-        let dateString = formatter.string(from: createAt)
-        let typeString = documentType
-        
-        return "\(dateString) \(typeString)"
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
+        return "\(formatter.string(from: createAt)) \(documentType ?? "")"
     }
 }
+
+// MARK: - Thumbnails
 
 extension FileDocumentStore {
     func loadThumbnailsIfNeeded(for item: FilesGridItem) {
         switch item {
         case .document(let doc):
-            loadDocumentThumbs(
-                docID: doc.id,
-                paths: [doc.firstPagePath, doc.secondPagePath]
-            )
+            loadDocumentThumbs(docID: doc.id, paths: [doc.firstPagePath, doc.secondPagePath])
         case .folder(let folder):
             for preview in folder.previewDocuments {
-                loadDocumentThumbs(
-                    docID: preview.id,
-                    paths: [preview.firstPagePath, preview.secondPagePath]
-                )
+                loadDocumentThumbs(docID: preview.id, paths: [preview.firstPagePath, preview.secondPagePath])
             }
         }
     }
     
     private func loadDocumentThumbs(docID: UUID, paths: [String?]) {
         for (idx, path) in paths.prefix(2).enumerated() {
-            guard let relPath = path, !relPath.isEmpty else { continue }
+            guard let relPath = path, !relPath.isEmpty else {
+                log("⚠️ No path for \(docID)")
+                continue
+            }
             
             let key = ThumbKey(docID: docID, pageIndex: idx)
             
-            if thumbnailsSubject.value[key] != nil { continue }
-            if thumbInFlight.contains(key) { continue }
+            if thumbnailsSubject.value[key] != nil {
+                log("✅ Thumbnail already exists for \(docID)")
+                continue
+            }
+            
+            if thumbInFlight.contains(key) {
+                log("⏳ Thumbnail in flight for \(docID)")
+                continue
+            }
             
             let url = FileStore.shared.url(forRelativePath: relPath)
             
-            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                log("❌ File not found at path \(url.path)")
+                continue
+            }
+            
+            log("🚀 Loading thumbnail for \(docID)")
             
             thumbInFlight.insert(key)
             
@@ -239,28 +375,59 @@ extension FileDocumentStore {
                     var dict = self.thumbnailsSubject.value
                     dict[key] = thumb
                     
-                    if dict != self.thumbnailsSubject.value {
-                        self.thumbnailsSubject.send(dict)
-                    }
+                    self.thumbnailsSubject.send(dict)
                     self.thumbInFlight.remove(key)
+                    
+                    log("✅ Thumbnail stored for \(docID)")
                 }
             }
         }
     }
+    
+    private func cleanThumbnails(validItems: [FilesGridItem]) {
+        let validIDs: Set<UUID> = Set(validItems.flatMap {
+            switch $0 {
+            case .document(let doc):
+                return [doc.id]
+            case .folder(let folder):
+                return folder.previewDocuments.map { $0.id }
+            }
+        })
+        
+        log("🧹 Cleaning thumbnails | validIDs: \(validIDs.count)")
+        
+        var dict = thumbnailsSubject.value
+        let before = dict.count
+        
+        dict.keys
+            .filter { !validIDs.contains($0.docID) }
+            .forEach {
+                log("❌ Removing thumb for \($0.docID)")
+                dict[$0] = nil
+            }
+        
+        if dict != thumbnailsSubject.value {
+            thumbnailsSubject.send(dict)
+        }
+        
+        log("Thumbnails before: \(before) | after: \(dict.count)")
+        
+        thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
+    }
 }
 
-extension FileDocumentStore: NSFetchedResultsControllerDelegate {
-    func controllerDidChangeContent(
-        _ controller: NSFetchedResultsController<NSFetchRequestResult>
-    ) {
-        rebuildWorkItem?.cancel()
+// MARK: - FRC Delegate
 
+extension FileDocumentStore: NSFetchedResultsControllerDelegate {
+    
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        rebuildWorkItem?.cancel()
+        
         let workItem = DispatchWorkItem { [weak self] in
             self?.rebuild()
         }
-
+        
         rebuildWorkItem = workItem
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 }

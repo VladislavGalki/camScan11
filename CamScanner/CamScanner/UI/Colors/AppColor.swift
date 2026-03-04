@@ -59,6 +59,8 @@ enum AppColor: Hashable {
         case onAccent
         case onAccentDisabled
         
+        case onSuccess
+        
         case onImmersive
         case onImmersiveMuted
         
@@ -83,11 +85,14 @@ enum AppColor: Hashable {
         
         case accent
         case accentDisabled
+        case warning
         
         case destructive
         
         case onAccent
         case onAccentDisabled
+        
+        case onSuccess
         
         case onImmersive
         
@@ -107,6 +112,8 @@ enum AppColor: Hashable {
         
         case accent
         case accentSubtle
+        
+        case onSuccess
         
         case hintBlue
         case hintGreen
@@ -242,6 +249,9 @@ private extension AppColor {
         case .text(.onAccentDisabled):
             return .sRGB01(0.80784315, 0.86274511, 1, 1)
             
+        case .text(.onSuccess):
+            return .sRGB01(0.784, 0.996, 0.816, 1)
+            
         case .text(.onImmersive):
             return .sRGB01(1, 1, 1, 1)
             
@@ -284,6 +294,9 @@ private extension AppColor {
         case .elements(.accentDisabled):
             return .sRGB01(0.8509804, 0.8509804, 0.8509804, 1)
             
+        case .elements(.warning):
+            return .sRGB01(1.000, 0.553, 0.157, 1)
+            
         case .elements(.destructive):
             return .sRGB01(1, 0.21960784, 0.23529412, 1)
             
@@ -292,6 +305,9 @@ private extension AppColor {
             
         case .elements(.onAccentDisabled):
             return .sRGB01(0.80784315, 0.86274511, 1, 1)
+            
+        case .elements(.onSuccess):
+            return .sRGB01(0.784, 0.996, 0.816, 1)
             
         case .elements(.onImmersive):
             return .sRGB01(1, 1, 1, 1)
@@ -322,6 +338,9 @@ private extension AppColor {
             
         case .border(.accentSubtle):
             return .sRGB01(0.80784315, 0.86274511, 1, 1)
+            
+        case .border(.onSuccess):
+            return .sRGB01(0.235, 0.882, 0.400, 1)
             
         case .border(.hintBlue):
             return .sRGB01(0, 0.53333336, 1, 0.3)

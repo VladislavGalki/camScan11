@@ -4,6 +4,7 @@ struct RecentView: View {
     let model: [RecentDocumentModel]
     let onPreviewTapped: () -> Void
     let onDocumentTapped: (RecentDocumentModel) -> Void
+    let onFavoriteTapped: (UUID, Bool) -> Void
     
     private let itemSize = CGSize(width: 140, height: 182)
     
@@ -95,12 +96,13 @@ struct RecentView: View {
                     HStack(spacing: 0) {
                         AppButton(
                             config: AppButtonConfig(
-                                content: .iconOnly(.star),
+                                content: .iconOnly(item.isFavorite ? .starFill : .star),
                                 style: .secondary,
-                                size: .s
+                                size: .s,
+                                extraTitleColor: item.isFavorite ? .elements(.warning) : .elements(.accent)
                             ),
                             action: {
-                                
+                                onFavoriteTapped(item.id, !item.isFavorite)
                             }
                         )
                         
@@ -112,9 +114,7 @@ struct RecentView: View {
                                 style: .secondary,
                                 size: .s
                             ),
-                            action: {
-                                
-                            }
+                            action: {}
                         )
                     }
                     .padding([.top, .horizontal], 8)

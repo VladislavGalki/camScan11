@@ -39,6 +39,10 @@ public enum AppIcon: String, CaseIterable {
     case files = "files"
     case settings = "settings"
     case tools = "tools"
+    case grid2 = "grid2"
+    case list = "list"
+    case folder = "folder"
+    case check_circle = "check_circle"
     
     // MARK: - Fill
     case homeFill = "home_fill"

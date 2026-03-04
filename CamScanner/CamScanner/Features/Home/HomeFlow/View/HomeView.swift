@@ -21,6 +21,8 @@ struct HomeView: View {
                         if !item.isLocked {
                             router.push(HomeRoute.openDocument(id: item.id))
                         }
+                    } onFavoriteTapped: { documentId, isFavorite in
+                        vm.handleDocumentFavourite(documentId: documentId, isFavourite: isFavorite)
                     }
                     .padding(.bottom, 26)
                     
@@ -34,7 +36,7 @@ struct HomeView: View {
             }
             .scrollIndicators(.never)
             .contentMargins(.top, 26, for: .scrollContent)
-            .contentMargins(.bottom, 16, for: .scrollContent)
+            .contentMargins(.bottom, 48, for: .scrollContent)
         }
         .background(
             Color.bg(.main)

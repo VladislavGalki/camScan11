@@ -1,15 +1,22 @@
 import SwiftUI
 
 struct TabContainerView: View {
-
     @Binding var selectedTab: AppTab
 
     var body: some View {
-        switch selectedTab {
-        case .home: HomeView()
-        case .files: FilesView()
-        case .tools: ToolsPlaceholderView()
-        case .settings: ProfilePlaceholderView()
+        TabView(selection: $selectedTab) {
+            HomeView()
+                .tag(AppTab.home)
+
+            FilesView()
+                .tag(AppTab.files)
+
+            ToolsPlaceholderView()
+                .tag(AppTab.tools)
+
+            ProfilePlaceholderView()
+                .tag(AppTab.settings)
         }
+        .toolbar(.hidden, for: .tabBar)
     }
 }

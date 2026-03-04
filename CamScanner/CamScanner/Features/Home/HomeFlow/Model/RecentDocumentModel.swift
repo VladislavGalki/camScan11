@@ -15,6 +15,8 @@ struct RecentDocumentModel: Identifiable, Equatable {
     let firstPageImagePath: String?
     let secondPageImagePath: String?
     let pageCountText: String
+    let isFavorite: Bool
     let isLocked: Bool
     let createdAt: Date
+    let lastViewedAt: Date
 }

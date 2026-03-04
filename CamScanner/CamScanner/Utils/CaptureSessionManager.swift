@@ -170,7 +170,7 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
     // MARK: Capture Session Life Cycle
 
-    internal func start() {
+    internal func start(mode: FlashMode) {
         let authorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
 
         switch authorizationStatus {
@@ -189,13 +189,15 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                 DispatchQueue.main.async {
                     self.isDetecting = true
                 }
+                
+                setTorch(mode: mode)
             }
 
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     guard let self else { return }
-                    if granted { self.start() }
+                    if granted { self.start(mode: mode) }
                     else {
                         let error = ImageScannerControllerError.authorization
                         self.delegate?.captureSessionManager(self, didFailWithError: error)

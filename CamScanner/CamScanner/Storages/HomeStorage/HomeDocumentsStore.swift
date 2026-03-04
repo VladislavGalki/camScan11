@@ -146,32 +146,28 @@ extension HomeDocumentsStore: NSFetchedResultsControllerDelegate {
         for type: NSFetchedResultsChangeType,
         newIndexPath: IndexPath?
     ) {
-        guard let doc = anObject as? DocumentEntity, let id = doc.id else { return }
+        guard let doc = anObject as? DocumentEntity,
+              let id = doc.id else { return }
         
         switch type {
-        case .insert, .delete, .update, .move:
-            changedDocIDs.insert(id)
+            
+        case .delete:
+            var dict = thumbnailsSubject.value
+            dict.keys
+                .filter { $0.docID == id }
+                .forEach { dict[$0] = nil }
+            
+            thumbnailsSubject.send(dict)
+            thumbInFlight = thumbInFlight.filter { $0.docID != id }
+            
         default:
             break
         }
     }
     
-    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        if !changedDocIDs.isEmpty {
-            var dict = thumbnailsSubject.value
-            
-            for id in changedDocIDs {
-                dict.keys
-                    .filter { $0.docID == id }
-                    .forEach { dict[$0] = nil }
-
-                thumbInFlight = thumbInFlight.filter { $0.docID != id }
-            }
-            
-            thumbnailsSubject.send(dict)
-            changedDocIDs.removeAll()
-        }
-
+    func controllerDidChangeContent(
+        _ controller: NSFetchedResultsController<NSFetchRequestResult>
+    ) {
         rebuild()
     }
 }

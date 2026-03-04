@@ -8,10 +8,13 @@ extension FolderEntity {
 
     @NSManaged public var id: UUID?
     @NSManaged public var title: String?
-    @NSManaged public var createdAt: Date?
+    @NSManaged public var createdAt: Date
+    @NSManaged public var lastViewed: Date
     @NSManaged public var isLocked: Bool
 
     @NSManaged public var documents: NSSet?
+    
+    @NSManaged public var cachedSize: Int64
 }
 
 // MARK: Generated accessors for documents
