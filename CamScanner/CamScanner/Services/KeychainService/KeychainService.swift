@@ -62,6 +62,15 @@ final class KeychainService {
         SecItemAdd(query as CFDictionary, nil)
     }
     
+    func deletePIN(id: UUID) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: id.uuidString
+        ]
+
+        SecItemDelete(query as CFDictionary)
+    }
+    
     func loadPIN(id: UUID) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

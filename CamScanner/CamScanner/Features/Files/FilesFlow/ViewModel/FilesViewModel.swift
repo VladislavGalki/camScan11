@@ -100,20 +100,20 @@ final class FilesViewModel: ObservableObject {
         }
     }
     
-    private func isDocumentLocked(id: UUID) -> Bool {
-        items.contains {
-            switch $0 {
-            case .document(let doc): return doc.id == id && doc.isLocked
-            case .folder(let folder): return folder.id == id && folder.isLocked
-            }
-        }
-    }
-    
     private func isDocumentLockViaFaceId(id: UUID) -> Bool {
         items.contains {
             switch $0 {
             case .document(let doc): return doc.id == id && doc.lockViaFaceId
             case .folder(let folder): return folder.id == id && folder.lockViaFaceId
+            }
+        }
+    }
+    
+    func typeForItem(id: UUID) -> FilesItemType? {
+        items.first(where: { $0.id == id }).map {
+            switch $0 {
+            case .document: return .document
+            case .folder: return .folder
             }
         }
     }
@@ -147,11 +147,18 @@ final class FilesViewModel: ObservableObject {
             break
         case .move:
             break
+        case .unlockDocument:
+            notificationOverlaystate = .unlock
         case .delete:
             notificationOverlaystate = .deleteFile
         default:
             break
         }
+    }
+    
+    private func showNotification(type: NotificationModel) {
+        notificationModel = type
+        shouldShowNotification = true
     }
 }
 
@@ -192,24 +199,28 @@ extension FilesViewModel {
         switch menuItem {
         case .share:
             break
-        case .rename:
-            break
-        case .lock:
-            break
+        case .unlockDocument:
+            do {
+                try documentRepository.removePassword(id: id)
+                showNotification(type: .pinRemoved)
+                setHighlitedDocument(id)
+            } catch {}
         case .move:
             break
         case .delete:
             do {
                 try documentRepository.deleteDocument(id: id)
+                showNotification(type: typeForItem(id: id) == .document ? .fileRemoved : .folderRemoved)
             } catch {}
+        default:
+            return
         }
     }
     
     func handleFolderCreated(folderName: String) {
         do {
             let documentId = try documentRepository.createFolder(title: folderName)
-            notificationModel = .folderCreated
-            shouldShowNotification = true
+            showNotification(type: .folderCreated)
             setHighlitedDocument(documentId)
         } catch {}
     }
@@ -237,12 +248,15 @@ extension FilesViewModel {
         await faceIdService.requestAuthorizationIfNeeded()
     }
     
+    func handleUnlockDocument() {
+        
+    }
+    
     func hadleDocumentPinCreated(documentId: UUID?, pin: String, viaFaceId: Bool) {
         guard let documentId else { return }
         do {
             let id = try documentRepository.setPassword(id: documentId, pin: pin, viaFaceId: viaFaceId)
-            notificationModel = .pinCreated
-            shouldShowNotification = true
+            showNotification(type: .pinCreated)
             setHighlitedDocument(id)
         } catch {}
     }
@@ -272,5 +286,16 @@ extension FilesViewModel {
         }
         
         return ""
+    }
+    
+    func isDocumentLocked(id: UUID?) -> Bool {
+        guard let id else { return false }
+        
+        return items.contains {
+            switch $0 {
+            case .document(let doc): return doc.id == id && doc.isLocked
+            case .folder(let folder): return folder.id == id && folder.isLocked
+            }
+        }
     }
 }

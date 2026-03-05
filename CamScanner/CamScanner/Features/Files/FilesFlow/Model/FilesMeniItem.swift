@@ -4,6 +4,7 @@ enum FilesMenuItem: CaseIterable, Identifiable {
     case share
     case rename
     case lock
+    case unlockDocument
     case move
     case delete
     
@@ -14,6 +15,7 @@ enum FilesMenuItem: CaseIterable, Identifiable {
         case .share: return "Share"
         case .rename: return "Rename"
         case .lock: return "Lock"
+        case .unlockDocument: return "Unlock"
         case .move: return "Move"
         case .delete: return "Delete"
         }

@@ -210,6 +210,49 @@ extension DocumentRepository {
         )
     }
     
+    @discardableResult
+    func removePassword(id: UUID) throws -> UUID {
+        let docRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        docRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        docRequest.fetchLimit = 1
+
+        if let doc = try context.fetch(docRequest).first {
+            doc.passwordSalt = nil
+            doc.passwordHash = nil
+            doc.lockViaFaceId = false
+            doc.isLocked = false
+
+            try context.save()
+
+            keychainService.deletePIN(id: id)
+
+            return id
+        }
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        folderRequest.fetchLimit = 1
+
+        if let folder = try context.fetch(folderRequest).first {
+            folder.passwordSalt = nil
+            folder.passwordHash = nil
+            folder.lockViaFaceId = false
+            folder.isLocked = false
+
+            try context.save()
+
+            keychainService.deletePIN(id: id)
+
+            return id
+        }
+
+        throw NSError(
+            domain: "DocumentRepository",
+            code: 1002,
+            userInfo: [NSLocalizedDescriptionKey: "Id not found"]
+        )
+    }
+    
     func deleteDocument(id: UUID) throws {
         let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         documentRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)

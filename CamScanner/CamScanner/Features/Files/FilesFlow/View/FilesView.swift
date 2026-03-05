@@ -16,33 +16,47 @@ struct FilesView: View {
     var body: some View {
         contentView
             .overlay {
-                LayoutMenuItemView(
-                    showGridMenu: $shouldShowMenuOverlay,
-                    grideMode: viewModel.viewMode,
-                    menuFrame: menuFrame
-                ) { menuItem in
-                    selectedMenuItem = menuItem
-                    
-                    switch menuItem {
-                    case .delete:
-                        tabBar.isTabBarVisible = false
+                if shouldShowMenuOverlay {
+                    LayoutMenuItemView(
+                        showGridMenu: $shouldShowMenuOverlay,
+                        isItemLocked: viewModel.isDocumentLocked(id: selectedFileDocumentItemId),
+                        grideMode: viewModel.viewMode,
+                        menuFrame: menuFrame
+                    ) { menuItem in
+                        selectedMenuItem = menuItem
                         
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.handleFileDocumentMenuItemSelected(
-                                id: selectedFileDocumentItemId,
-                                menuItem: menuItem
-                            )
+                        switch menuItem {
+                        case .delete:
+                            hideTabBar()
+                            
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                viewModel.handleFileDocumentMenuItemSelected(
+                                    id: selectedFileDocumentItemId,
+                                    menuItem: menuItem
+                                )
+                            }
+                        case .rename:
+                            viewModel.fileActiveSheet = .rename
+                        case .lock:
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                viewModel.notificationOverlaystate = .lock
+                            }
+                        case .unlockDocument:
+                            hideTabBar()
+                            
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                viewModel.handleFileDocumentMenuItemSelected(
+                                    id: selectedFileDocumentItemId,
+                                    menuItem: menuItem
+                                )
+                            }
+                        case .move:
+                            break
+                        case .share:
+                            break
                         }
-                    case .rename:
-                        viewModel.fileActiveSheet = .rename
-                    case .lock:
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.notificationOverlaystate = .lock
-                        }
-                    case .move:
-                        break
-                    case .share:
-                        break
+                    } onClose: {
+                        showTabBar()
                     }
                 }
             }
@@ -50,7 +64,27 @@ struct FilesView: View {
                 notificationOverlayView
             }
             .overlay {
-                dotsOverlayView
+                if shouldShowDotsOverlay {
+                    DotsMenuView(
+                        isVisible: $shouldShowDotsOverlay,
+                        dotsFrame: dotsFrame,
+                        sortType: viewModel.sortType,
+                        viewMode: viewModel.viewMode,
+                        onCreateFolder: {
+                            viewModel.fileActiveSheet = .createFolder
+                        },
+                        onSelectFiles: {},
+                        onSortChange: { type in
+                            viewModel.handleFilesSortType(type: type)
+                        },
+                        onViewModeChange: { mode in
+                            viewModel.viewMode = mode
+                        }
+                    )
+                    .onDisappear {
+                        showTabBar()
+                    }
+                }
             }
             .overlay(alignment: .top) {
                 if viewModel.shouldShowNotification {
@@ -124,11 +158,8 @@ struct FilesView: View {
         } onMenuClick: { id, buttonFrame in
             selectedFileDocumentItemId = id
             menuFrame = buttonFrame
-            tabBar.isTabBarVisible = false
-            
-            withAnimation(.easeInOut(duration: 0.15)) {
-                shouldShowMenuOverlay = true
-            }
+            hideTabBar()
+            shouldShowMenuOverlay = true
         }
     }
     
@@ -138,11 +169,8 @@ struct FilesView: View {
         } onMenuClick: { id, buttonFrame in
             selectedFileDocumentItemId = id
             menuFrame = buttonFrame
-            tabBar.isTabBarVisible = false
-            
-            withAnimation(.easeInOut(duration: 0.15)) {
-                shouldShowMenuOverlay = true
-            }
+            hideTabBar()
+            shouldShowMenuOverlay = true
         }
     }
     
@@ -176,15 +204,14 @@ struct FilesView: View {
                                 size: .m
                             ),
                             action: {
-                                tabBar.isTabBarVisible = false
-                                
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    shouldShowDotsOverlay = true
-                                }
+                                hideTabBar()
+                                shouldShowDotsOverlay = true
                             }
                         )
                         .reportFrame { frame in
-                            dotsFrame = frame
+                            if dotsFrame == .zero {
+                                dotsFrame = frame
+                            }
                         }
                     }
                 }
@@ -221,7 +248,40 @@ struct FilesView: View {
                 
                 switch viewModel.notificationOverlaystate {
                 case .deleteFile:
-                    deleteOverlay
+                    DeleteDocumentView(
+                        onDelete: {
+                            viewModel.handleApplyFileDocumentMenuItem(
+                                id: selectedFileDocumentItemId,
+                                menuItem: selectedMenuItem
+                            )
+
+                            clearOverlayState()
+                        },
+                        onCancel: {
+                            clearOverlayState()
+                        }
+                    )
+                    .onDisappear {
+                        showTabBar()
+                    }
+                case .unlockDocument:
+                    UnlockDocumentView(
+                        documentTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId),
+                        onRemove: {
+                            viewModel.handleApplyFileDocumentMenuItem(
+                                id: selectedFileDocumentItemId,
+                                menuItem: selectedMenuItem
+                            )
+                            
+                            clearOverlayState()
+                        },
+                        onCancel: {
+                            clearOverlayState()
+                        }
+                    )
+                    .onDisappear {
+                        showTabBar()
+                    }
                 case .lock:
                     LockDocumentView {
                         await viewModel.handleFaceIdRequest()
@@ -246,9 +306,17 @@ struct FilesView: View {
                             )
                         },
                         onSuccess: {
-                            viewModel.notificationOverlaystate = .deleteFile
+                            switch selectedMenuItem {
+                            case .unlockDocument:
+                                viewModel.notificationOverlaystate = .unlockDocument
+                            case .delete:
+                                viewModel.notificationOverlaystate = .deleteFile
+                            default:
+                                clearOverlayState()
+                            }
                         },
                         onClose: {
+                            showTabBar()
                             clearOverlayState()
                         }
                     )
@@ -259,219 +327,12 @@ struct FilesView: View {
         }
     }
     
-    private var deleteOverlay: some View {
-        VStack(spacing: 0) {
-            Text("Delete document")
-                .multilineTextAlignment(.center)
-                .appTextStyle(.itemTitle)
-                .foregroundStyle(.text(.primary))
-                .padding(.bottom, 8)
-            
-            Text("This document will not be recoverable. Delete?")
-                .multilineTextAlignment(.center)
-                .appTextStyle(.bodyPrimary)
-                .foregroundStyle(.text(.secondary))
-                .padding(.bottom, 24)
-            
-            VStack(spacing: 10) {
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .title("Delete"),
-                        style: .secondary,
-                        size: .l,
-                        extraTitleColor: .text(.destructive),
-                        isFullWidth: true
-                    ),
-                    action: {
-                        viewModel.handleApplyFileDocumentMenuItem(
-                            id: selectedFileDocumentItemId,
-                            menuItem: selectedMenuItem
-                        )
-                        
-                        clearOverlayState()
-                        tabBar.isTabBarVisible = true
-                    }
-                )
-                
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .title("Cancel"),
-                        style: .secondary,
-                        size: .l,
-                        isFullWidth: true
-                    ),
-                    action: {
-                        clearOverlayState()
-                        tabBar.isTabBarVisible = true
-                    }
-                )
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .foregroundStyle(.bg(.surface))
-        )
-        .frame(maxWidth: 300)
+    func showTabBar() {
+        tabBar.isTabBarVisible = true
     }
     
-    private var dotsOverlayView: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black
-                .opacity(shouldShowDotsOverlay ? 0.12 : 0)
-                .ignoresSafeArea()
-                .allowsHitTesting(shouldShowDotsOverlay)
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        shouldShowDotsOverlay = false
-                        tabBar.isTabBarVisible = true
-                    }
-                }
-
-            if shouldShowDotsOverlay {
-                dotsMenu
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.95, anchor: .topTrailing)
-                            .combined(with: .opacity),
-                        removal: .opacity
-                    ))
-            }
-        }
-    }
-    
-    private var dotsMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-                meuDotRow(title: "New folder", icon: .folder) {
-                    shouldShowDotsOverlay = false
-                    tabBar.isTabBarVisible = true
-                    viewModel.fileActiveSheet = .createFolder
-                }
-                
-                meuDotRow(title: "Select files", icon: .check_circle) {
-                    shouldShowDotsOverlay = false
-                    tabBar.isTabBarVisible = true
-                }
-                
-                dividerView
-                    .padding(.vertical, 8)
-                
-                sectionTitle("Sort by")
-                
-                ForEach(FilesSortType.allCases) { type in
-                    dotsSelectableRow(
-                        title: type.title,
-                        leftIcon: nil,
-                        isSelected: viewModel.sortType == type,
-                        action: {
-                            shouldShowDotsOverlay = false
-                            tabBar.isTabBarVisible = true
-                            viewModel.handleFilesSortType(type: type)
-                        }
-                    )
-                }
-                
-                dividerView
-                    .padding(.vertical, 8)
-                
-                sectionTitle("View by")
-                
-                ForEach(FilesViewMode.allCases) { mode in
-                    dotsSelectableRow(
-                        title: mode.title,
-                        leftIcon: imageByViewMode(mode: mode),
-                        isSelected: viewModel.viewMode == mode
-                    ) {
-                        shouldShowDotsOverlay = false
-                        tabBar.isTabBarVisible = true
-                        viewModel.viewMode = mode
-                    }
-                }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 16)
-        .frame(width: 200)
-        .background(Color.bg(.surface))
-        .cornerRadius(24)
-        .appBorderModifier(.border(.primary), radius: 24)
-        .shadow(color: .black.opacity(0.05), radius: 30)
-        .padding(.trailing, 16)
-        .offset(y: dotsFrame.maxY + 64)
-        .animation(nil, value: viewModel.sortType)
-        .animation(nil, value: viewModel.viewMode)
-    }
-    
-    private func sectionTitle(_ title: String) -> some View {
-        Text("Sort by")
-            .appTextStyle(.meta)
-            .foregroundStyle(.text(.secondary))
-            .padding(.vertical, 8)
-    }
-    
-    private func meuDotRow(title: String, icon: AppIcon, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            Image(appIcon: icon)
-                .resizable()
-                .renderingMode(.template)
-                .foregroundStyle(.elements(.primary))
-                .frame(width: 18, height: 18)
-            
-            Text(title)
-                .appTextStyle(.bodyPrimary)
-                .foregroundStyle(.text(.primary))
-            
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 9)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            action()
-        }
-    }
-    
-    private func dotsSelectableRow(title: String, leftIcon: Image?, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            if let leftIcon {
-                leftIcon
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(.elements(.primary))
-                    .frame(width: 18, height: 18)
-            }
-            
-            Text(title)
-                .appTextStyle(.bodyPrimary)
-                .foregroundStyle(.text(.primary))
-            
-            Spacer(minLength: 0)
-            
-            if isSelected {
-                Image(appIcon: .check)
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundColor(.elements(.accent))
-                    .frame(width: 18, height: 18)
-            }
-        }
-        .padding(.vertical, 9)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            action()
-        }
-    }
-    
-    private func imageByViewMode(mode: FilesViewMode) -> Image {
-        switch mode {
-        case .grid:
-            return Image(appIcon: .grid2)
-        case .list:
-            return Image(appIcon: .list)
-        }
-    }
-    
-    private var dividerView: some View {
-        RoundedRectangle(cornerRadius: 2, style: .continuous)
-            .foregroundStyle(.divider(.default))
-            .frame(height: 1)
+    func hideTabBar() {
+        tabBar.isTabBarVisible = false
     }
     
     private func clearOverlayState() {

@@ -2,13 +2,14 @@ import SwiftUI
 
 struct LayoutMenuItemView: View {
     @Binding var showGridMenu: Bool
-    
-    @EnvironmentObject private var tabBar: TabBarController
 
+    let isItemLocked: Bool
     let grideMode: FilesViewMode
     let menuFrame: CGRect
     let onSelectMenuItem: (FilesMenuItem) -> Void
+    let onClose: () -> Void
     
+    private let screen = UIScreen.main.bounds
     private let menuWidth: CGFloat = 200
     private let horizontalPadding: CGFloat = 16
 
@@ -20,8 +21,7 @@ struct LayoutMenuItemView: View {
                 .allowsHitTesting(showGridMenu)
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        showGridMenu = false
-                        tabBar.isTabBarVisible = true
+                        closeMenu()
                     }
                 }
 
@@ -47,10 +47,13 @@ struct LayoutMenuItemView: View {
 
     private var gridMenu: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(FilesMenuItem.allCases) { item in
-                menuRow(item.title, icon: imageForItem(item), desctructive: item == FilesMenuItem.delete) {
-                    showGridMenu = false
-                    tabBar.isTabBarVisible = true
+            ForEach(visibleMenuItems) { item in
+                menuRow(
+                    item.title,
+                    icon: imageForItem(item),
+                    desctructive: item == .delete
+                ) {
+                    closeMenu()
                     onSelectMenuItem(item)
                 }
             }
@@ -68,7 +71,7 @@ struct LayoutMenuItemView: View {
         _ title: String,
         icon: AppIcon,
         desctructive: Bool = false,
-        closure: (() -> Void)?
+        action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 8) {
             Image(appIcon: icon)
@@ -85,9 +88,7 @@ struct LayoutMenuItemView: View {
         }
         .padding(.vertical, 9)
         .contentShape(Rectangle())
-        .onTapGesture {
-            closure?()
-        }
+        .onTapGesture(perform: action)
     }
     
     private func imageForItem(_ item: FilesMenuItem) -> AppIcon {
@@ -96,7 +97,7 @@ struct LayoutMenuItemView: View {
             return .share
         case .rename:
             return .edit
-        case .lock:
+        case .lock, .unlockDocument:
             return .lock
         case .move:
             return .move
@@ -106,35 +107,41 @@ struct LayoutMenuItemView: View {
     }
     
     private var safeX: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-
-        let maxAllowedX = screenWidth - horizontalPadding
+        let maxAllowedX = screen.width - horizontalPadding
         let minAllowedX = menuWidth + horizontalPadding
 
         return min(max(menuFrame.maxX, minAllowedX), maxAllowedX)
     }
     
     private var showAbove: Bool {
-        menuFrame.midY > UIScreen.main.bounds.height / 2
+        menuFrame.midY > screen.height / 2
     }
 
     private var menuLocation: CGPoint {
-        let x = safeX
-        
-        if showAbove {
-            return CGPoint(
-                x: x,
-                y: menuFrame.minY - 10
-            )
-        } else {
-            return CGPoint(
-                x: x,
-                y: menuFrame.maxY + 10
-            )
-        }
+        CGPoint(
+            x: safeX,
+            y: showAbove
+                ? menuFrame.minY - 10
+                : menuFrame.maxY + 10
+        )
     }
 
     private var menuAnchor: UnitPoint {
         showAbove ? .bottomTrailing : .topTrailing
+    }
+    
+    private var visibleMenuItems: [FilesMenuItem] {
+        FilesMenuItem.allCases.filter {
+            switch $0 {
+            case .lock: return !isItemLocked
+            case .unlockDocument: return isItemLocked
+            default: return true
+            }
+        }
+    }
+    
+    private func closeMenu() {
+        showGridMenu = false
+        onClose()
     }
 }

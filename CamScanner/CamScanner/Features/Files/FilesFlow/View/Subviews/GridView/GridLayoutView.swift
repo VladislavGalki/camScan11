@@ -3,118 +3,142 @@ import SwiftUI
 struct GridLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
-    
+
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
-    
+
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 26),
         count: 3
     )
-    
-    private let cardHeight: CGFloat = 150
-    
+
     var body: some View {
-        contentView
-    }
-    
-    private var contentView: some View {
         ScrollView(.vertical) {
             LazyVGrid(columns: columns, spacing: 24) {
                 ForEach(model) { item in
-                    fileGridItemView(item: item)
+                    switch item {
+                    case let .document(doc):
+                        GridDocumentItemView(
+                            item: doc,
+                            highlightedID: highlightedID,
+                            onFavouriteClick: onFavouriteClick,
+                            onMenuClick: onMenuClick
+                        )
+                        .id(doc.id)
+                    case let .folder(folder):
+                        GridFolderItemView(
+                            item: folder,
+                            highlightedID: highlightedID,
+                            onMenuClick: onMenuClick
+                        )
+                        .id(folder.id)
+                    }
                 }
             }
             .padding([.horizontal, .top], 16)
             .padding(.bottom, Constants.tabBarHeight)
         }
     }
-    
-    @ViewBuilder
-    private func fileGridItemView(item: FilesGridItem) -> some View {
-        switch item {
-        case let .document(fileDocumentItem):
-            documentCardView(for: fileDocumentItem)
-        case let .folder(fileFolderItem):
-            folderCardView(for: fileFolderItem)
-        }
-    }
-    
-    private func documentCardView(for item: FileDocumentItem) -> some View {
+}
+
+struct GridDocumentItemView: View {
+    let item: FileDocumentItem
+    let highlightedID: UUID?
+
+    var onFavouriteClick: ((UUID, Bool) -> Void?)
+    var onMenuClick: ((UUID, CGRect) -> Void)?
+
+    private let cardHeight: CGFloat = 150
+
+    var body: some View {
+
         VStack(alignment: .leading, spacing: 8) {
-            documentBackgroundView(for: item)
+            GridDocumentBackground(item: item)
                 .frame(height: cardHeight)
                 .overlay {
-                    documentCardImageView(for: item)
+                    GridDocumentPreview(item: item)
                 }
                 .overlay(alignment: .top) {
-                    HStack(spacing: 0) {
-                        AppButton(
-                            config: AppButtonConfig(
-                                content: .iconOnly(item.isFavourite ? .starFill : .star),
-                                style: .secondary,
-                                size: .s,
-                                extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
-                            ),
-                            action: {
-                                onFavouriteClick(item.id, !item.isFavourite)
-                            }
-                        )
-                        
-                        Spacer(minLength: 0)
-                        
-                        GeometryReader { geo in
-                            AppButton(
-                                config: AppButtonConfig(
-                                    content: .iconOnly(.dots),
-                                    style: .secondary,
-                                    size: .s
-                                ),
-                                action: {
-                                    let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                                    onMenuClick?(item.id, frame)
-                                }
-                            )
-                        }
-                        .frame(width: 28, height: 28)
-                    }
-                    .padding([.top, .horizontal], 4)
+                    header
                 }
-                .cornerRadius(8, corners: .allCorners)
+                .cornerRadius(8)
                 .appBorderModifier(.border(.primary), radius: 8)
                 .clipped()
-            
-            VStack(spacing: 0) {
-                Text(item.title)
-                    .appTextStyle(.meta)
-                    .foregroundStyle(.text(.primary))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity)
-                
-                Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
-                    .appTextStyle(.helperText)
-                    .foregroundStyle(.text(.secondary))
-            }
+
+            footer
         }
-        .background(
-            Color(
-                UIColor(
-                    red: 52.0/255.0,
-                    green: 199.0/255.0,
-                    blue: 89.0/255.0,
-                    alpha: highlightedID == item.id ? 0.1 : 0
-                )
-            )
-            .cornerRadius(8, corners: .allCorners)
-            .animation(.easeIn, value: highlightedID == item.id)
-            .padding(-8)
-        )
+        .drawingGroup()
+        .background(highlight)
     }
-    
-    @ViewBuilder
-    private func documentBackgroundView(for item: FileDocumentItem) -> some View {
+
+    private var header: some View {
+        HStack(spacing: 0) {
+            AppButton(
+                config: AppButtonConfig(
+                    content: .iconOnly(item.isFavourite ? .starFill : .star),
+                    style: .secondary,
+                    size: .s,
+                    extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
+                ),
+                action: {
+                    onFavouriteClick(item.id, !item.isFavourite)
+                }
+            )
+
+            Spacer()
+
+            GeometryReader { geo in
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.dots),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action: {
+
+                        let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                        onMenuClick?(item.id, frame)
+                    }
+                )
+            }
+            .frame(width: 28, height: 28)
+        }
+        .padding([.top, .horizontal], 4)
+    }
+
+    private var footer: some View {
+        VStack(spacing: 0) {
+            Text(item.title)
+                .appTextStyle(.meta)
+                .foregroundStyle(.text(.primary))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+
+            Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
+                .appTextStyle(.helperText)
+                .foregroundStyle(.text(.secondary))
+        }
+    }
+
+    private var highlight: some View {
+        Color(
+            UIColor(
+                red: 52/255,
+                green: 199/255,
+                blue: 89/255,
+                alpha: highlightedID == item.id ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .padding(-8)
+        .animation(.easeIn, value: highlightedID == item.id)
+    }
+}
+
+struct GridDocumentBackground: View {
+    let item: FileDocumentItem
+
+    var body: some View {
         if item.isLocked {
             Rectangle()
                 .foregroundStyle(.bg(.surface))
@@ -140,11 +164,14 @@ struct GridLayoutView: View {
             }
         }
     }
-    
-    @ViewBuilder
-    private func documentCardImageView(for item: FileDocumentItem) -> some View {
+}
+
+struct GridDocumentPreview: View {
+    let item: FileDocumentItem
+
+    var body: some View {
         if item.isLocked {
-            documentLockItemView
+            GridDocumentLockSkeleton()
                 .padding(.bottom, 14)
         } else {
             switch item.documentType {
@@ -160,14 +187,12 @@ struct GridLayoutView: View {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 54, height: 34)
-                            .scaledToFit()
                     }
-                    
-                    if let secondImage = item.secondThumbnail {
-                        Image(uiImage: secondImage)
+
+                    if let image = item.secondThumbnail {
+                        Image(uiImage: image)
                             .resizable()
                             .frame(width: 54, height: 34)
-                            .scaledToFit()
                     }
                 }
             case .passport:
@@ -175,19 +200,20 @@ struct GridLayoutView: View {
                     Image(uiImage: image)
                         .resizable()
                         .frame(width: 64, height: 87)
-                        .scaledToFit()
                 }
             default:
                 EmptyView()
             }
         }
     }
-    
-    private var documentLockItemView: some View {
+}
+
+struct GridDocumentLockSkeleton: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-            
-            HStack(spacing: 0) {
+            Spacer()
+
+            HStack {
                 Image(appIcon: .lock_fill)
                     .resizable()
                     .renderingMode(.template)
@@ -195,51 +221,52 @@ struct GridLayoutView: View {
                     .frame(width: 20, height: 20)
                     .padding(.leading, 12)
                     .padding(.bottom, 9)
-                
-                Spacer(minLength: 0)
+
+                Spacer()
             }
-            
+
             VStack(alignment: .leading, spacing: 7) {
-                documentLockLineView
-                    .frame(width: 67, height: 4.2)
-                
-                documentLockLineView
-                    .frame(width: 79, height: 4.2)
-                
-                documentLockLineView
-                    .frame(width: 71, height: 4.2)
-                
-                documentLockLineView
-                    .frame(width: 79, height: 4.2)
-                
-                documentLockLineView
-                    .frame(width: 58, height: 4.2)
+                lockLine(67)
+                lockLine(79)
+                lockLine(71)
+                lockLine(79)
+                lockLine(58)
             }
             .padding(.leading, 14)
         }
     }
-    
-    private var documentLockLineView: some View {
+
+    private func lockLine(_ width: CGFloat) -> some View {
         Rectangle()
             .foregroundStyle(
                 Color(
                     UIColor(
-                        red: 209.0 / 255.0,
-                        green: 214.0 / 255.0,
-                        blue: 225.0 / 255.0,
-                        alpha: 1.0
+                        red: 209/255,
+                        green: 214/255,
+                        blue: 225/255,
+                        alpha: 1
                     )
                 )
             )
-            .cornerRadius(2, corners: .allCorners)
+            .cornerRadius(2)
+            .frame(width: width, height: 4.2)
     }
-    
-    private func folderCardView(for item: FileFolderItem) -> some View {
+}
+
+struct GridFolderItemView: View {
+    let item: FileFolderItem
+    let highlightedID: UUID?
+
+    var onMenuClick: ((UUID, CGRect) -> Void)?
+
+    private let cardHeight: CGFloat = 150
+
+    var body: some View {
         VStack(spacing: 8) {
             Image(appIcon: .folder_image)
                 .frame(height: cardHeight)
                 .overlay {
-                    folderOverlayView(for: item)
+                    GridFolderOverlay(item: item)
                 }
                 .overlay(alignment: .topLeading) {
                     GeometryReader { geo in
@@ -258,37 +285,41 @@ struct GridLayoutView: View {
                     }
                     .frame(width: 28, height: 28)
                 }
-            
+
             VStack(spacing: 0) {
                 Text(item.title)
                     .appTextStyle(.meta)
                     .foregroundStyle(.text(.primary))
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                    .multilineTextAlignment(.leading)
-            
-                    Text("\(item.documentsCount) Documents")
-                        .appTextStyle(.helperText)
-                        .foregroundStyle(.text(.secondary))
+
+                Text("\(item.documentsCount) Documents")
+                    .appTextStyle(.helperText)
+                    .foregroundStyle(.text(.secondary))
             }
         }
         .padding(8)
-        .background(
-            Color(
-                UIColor(
-                    red: 52.0/255.0,
-                    green: 199.0/255.0,
-                    blue: 89.0/255.0,
-                    alpha: highlightedID == item.id ? 0.1 : 0
-                )
-            )
-            .cornerRadius(8, corners: .allCorners)
-            .animation(.easeIn, value: highlightedID == item.id)
-        )
+        .background(highlight)
+        .drawingGroup()
     }
-    
-    @ViewBuilder
-    private func folderOverlayView(for item: FileFolderItem) -> some View {
+
+    private var highlight: some View {
+        Color(
+            UIColor(
+                red: 52/255,
+                green: 199/255,
+                blue: 89/255,
+                alpha: highlightedID == item.id ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .animation(.easeIn, value: highlightedID == item.id)
+    }
+}
+
+struct GridFolderOverlay: View {
+    let item: FileFolderItem
+
+    var body: some View {
         if item.isLocked {
             Image(appIcon: .lock_image)
         } else {
@@ -298,20 +329,22 @@ struct GridLayoutView: View {
                     
                     VStack(spacing: 8) {
                         HStack(spacing: 12) {
-                            if let firstDocument = item.previewDocuments[safe: 0] {
-                                folderOverlayImageView(for: firstDocument, size: size)
+                            if let first = item.previewDocuments[safe: 0] {
+                                GridFolderPreviewCell(document: first, size: size)
                             }
-                            if let secondDocument = item.previewDocuments[safe: 1] {
-                                folderOverlayImageView(for: secondDocument, size: size)
+
+                            if let second = item.previewDocuments[safe: 1] {
+                                GridFolderPreviewCell(document: second, size: size)
                             }
                         }
-                        
+
                         HStack(spacing: 12) {
-                            if let firstDocument = item.previewDocuments[safe: 2] {
-                                folderOverlayImageView(for: firstDocument, size: size)
+                            if let first = item.previewDocuments[safe: 2] {
+                                GridFolderPreviewCell(document: first, size: size)
                             }
-                            if let secondDocument = item.previewDocuments[safe: 3] {
-                                folderOverlayImageView(for: secondDocument, size: size)
+
+                            if let second = item.previewDocuments[safe: 3] {
+                                GridFolderPreviewCell(document: second, size: size)
                             }
                         }
                     }
@@ -322,62 +355,68 @@ struct GridLayoutView: View {
             }
         }
     }
-    
-    private func folderOverlayImageView(for document: FileDocumentItem, size: CGFloat) -> some View {
-        documentBackgroundView(for: document)
-            .cornerRadius(4, corners: .allCorners)
+}
+
+struct GridFolderPreviewCell: View {
+    let document: FileDocumentItem
+    let size: CGFloat
+
+    var body: some View {
+        GridDocumentBackground(item: document)
+            .cornerRadius(4)
             .overlay {
-                foldertCardImageView(for: document)
+                GridFolderPreviewImage(document: document)
             }
     }
-    
-    @ViewBuilder
-    private func foldertCardImageView(for item: FileDocumentItem) -> some View {
-        if item.isLocked {
-            foldertLockItemView
+}
+
+struct GridFolderPreviewImage: View {
+    let document: FileDocumentItem
+
+    var body: some View {
+        if document.isLocked {
+            GridFolderLockSkeleton()
                 .padding(.bottom, 4.67)
         } else {
-            switch item.documentType {
+            switch document.documentType {
             case .documents:
-                if let image = item.thumbnail {
+                if let image = document.thumbnail {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                 }
             case .idCard, .driverLicense:
                 VStack(spacing: 2) {
-                    if let image = item.thumbnail {
+                    if let image = document.thumbnail {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.3)
-                            .scaledToFit()
                     }
-                    
-                    if let secondImage = item.secondThumbnail {
-                        Image(uiImage: secondImage)
+                    if let image = document.secondThumbnail {
+                        Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.3)
-                            .scaledToFit()
                     }
                 }
             case .passport:
-                if let image = item.thumbnail {
+                if let image = document.thumbnail {
                     Image(uiImage: image)
                         .resizable()
                         .frame(width: 21, height: 29)
-                        .scaledToFit()
                 }
             default:
                 EmptyView()
             }
         }
     }
-    
-    private var foldertLockItemView: some View {
+}
+
+struct GridFolderLockSkeleton: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-            
-            HStack(spacing: 0) {
+            Spacer()
+
+            HStack {
                 Image(appIcon: .lock_fill)
                     .resizable()
                     .renderingMode(.template)
@@ -385,27 +424,34 @@ struct GridLayoutView: View {
                     .frame(width: 11.33, height: 11.76)
                     .padding(.leading, 4.56)
                     .padding(.bottom, 4.24)
-                
-                Spacer(minLength: 0)
+
+                Spacer()
             }
-            
+
             VStack(alignment: .leading, spacing: 2.33) {
-                documentLockLineView
-                    .frame(width: 22.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 26.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 23.67, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 26.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 19.33, height: 1.4)
+                line(22.33)
+                line(26.33)
+                line(23.67)
+                line(26.33)
+                line(19.33)
             }
             .padding(.leading, 4.67)
         }
+    }
+
+    private func line(_ width: CGFloat) -> some View {
+        Rectangle()
+            .foregroundStyle(
+                Color(
+                    UIColor(
+                        red: 209/255,
+                        green: 214/255,
+                        blue: 225/255,
+                        alpha: 1
+                    )
+                )
+            )
+            .cornerRadius(2)
+            .frame(width: width, height: 1.4)
     }
 }

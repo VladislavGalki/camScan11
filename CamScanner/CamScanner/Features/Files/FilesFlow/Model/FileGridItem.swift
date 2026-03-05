@@ -1,5 +1,10 @@
 import UIKit
 
+enum FilesItemType {
+    case document
+    case folder
+}
+
 enum FilesGridItem: Identifiable, Equatable {
     case document(FileDocumentItem)
     case folder(FileFolderItem)

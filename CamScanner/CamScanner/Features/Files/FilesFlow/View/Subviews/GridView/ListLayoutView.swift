@@ -3,27 +3,23 @@ import SwiftUI
 struct ListLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
-    
-    @State private var shouldShowMenu: Bool = false
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
 
     var body: some View {
-        contentView
-    }
-    
-    private var contentView: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(model.enumerated()), id: \.element.id) { index, item in
-                    fileListItemView(item: item)
+                ForEach(model.indices, id: \.self) { index in
+                    ListItemRow(
+                        item: model[index],
+                        highlightedID: highlightedID,
+                        onFavouriteClick: onFavouriteClick,
+                        onMenuClick: onMenuClick
+                    )
 
                     if index < model.count - 1 {
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .foregroundStyle(.divider(.default))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 1)
+                        divider
                     }
                 }
             }
@@ -32,41 +28,70 @@ struct ListLayoutView: View {
             .padding(.bottom, Constants.tabBarHeight)
         }
     }
-    
-    @ViewBuilder
-    private func fileListItemView(item: FilesGridItem) -> some View {
+
+    private var divider: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .foregroundStyle(.divider(.default))
+            .frame(height: 1)
+    }
+}
+
+struct ListItemRow: View {
+    let item: FilesGridItem
+    let highlightedID: UUID?
+
+    var onFavouriteClick: ((UUID, Bool) -> Void?)
+    var onMenuClick: ((UUID, CGRect) -> Void)?
+
+    var body: some View {
         switch item {
-        case let .document(fileDocumentItem):
-            documentCardView(for: fileDocumentItem)
-        case let .folder(fileFolderItem):
-            folderCardView(for: fileFolderItem)
+        case let .document(document):
+            ListDocumentRow(
+                item: document,
+                highlightedID: highlightedID,
+                onFavouriteClick: onFavouriteClick,
+                onMenuClick: onMenuClick
+            )
+        case let .folder(folder):
+            ListFolderRow(
+                item: folder,
+                highlightedID: highlightedID,
+                onMenuClick: onMenuClick
+            )
         }
     }
-    
-    private func documentCardView(for item: FileDocumentItem) -> some View {
+}
+
+struct ListDocumentRow: View {
+    let item: FileDocumentItem
+    let highlightedID: UUID?
+
+    var onFavouriteClick: ((UUID, Bool) -> Void?)
+    var onMenuClick: ((UUID, CGRect) -> Void)?
+
+    var body: some View {
         HStack(spacing: 10) {
-            documentBackgroundView(for: item)
+            ListDocumentBackground(item: item)
                 .frame(width: 35.33, height: 50)
                 .appBorderModifier(.border(.primary), radius: 4)
                 .overlay {
-                    documentCardImageView(for: item)
+                    ListDocumentPreview(item: item)
                 }
-                .cornerRadius(4, corners: .allCorners)
-            
+                .cornerRadius(4)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .appTextStyle(.bodySecondary)
                     .foregroundStyle(.text(.primary))
-                
+
                 Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
-                    .multilineTextAlignment(.center)
             }
             .padding(.vertical, 7)
-            
-            Spacer(minLength: 0)
-            
+
+            Spacer()
+
             HStack(spacing: 12) {
                 AppButton(
                     config: AppButtonConfig(
@@ -79,7 +104,7 @@ struct ListLayoutView: View {
                         onFavouriteClick(item.id, !item.isFavourite)
                     }
                 )
-                
+
                 GeometryReader { geo in
                     AppButton(
                         config: AppButtonConfig(
@@ -97,23 +122,28 @@ struct ListLayoutView: View {
             }
         }
         .padding(.vertical, 9)
-        .background(
-            Color(
-                UIColor(
-                    red: 52.0/255.0,
-                    green: 199.0/255.0,
-                    blue: 89.0/255.0,
-                    alpha: highlightedID == item.id ? 0.1 : 0
-                )
-            )
-            .cornerRadius(8, corners: .allCorners)
-            .padding(.horizontal, -16)
-            .animation(.easeIn, value: highlightedID == item.id)
-        )
+        .background(highlight)
     }
-    
-    @ViewBuilder
-    private func documentBackgroundView(for item: FileDocumentItem) -> some View {
+
+    private var highlight: some View {
+        Color(
+            UIColor(
+                red: 52/255,
+                green: 199/255,
+                blue: 89/255,
+                alpha: highlightedID == item.id ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .padding(.horizontal, -16)
+        .animation(.easeIn, value: highlightedID == item.id)
+    }
+}
+
+struct ListDocumentBackground: View {
+    let item: FileDocumentItem
+
+    var body: some View {
         if item.isLocked {
             Rectangle()
                 .foregroundStyle(.bg(.surface))
@@ -139,12 +169,14 @@ struct ListLayoutView: View {
             }
         }
     }
-    
-    @ViewBuilder
-    private func documentCardImageView(for item: FileDocumentItem) -> some View {
+}
+
+struct ListDocumentPreview: View {
+    let item: FileDocumentItem
+
+    var body: some View {
         if item.isLocked {
-            documentLockItemView
-                .padding(.bottom, 4.67)
+            ListDocumentLock()
         } else {
             switch item.documentType {
             case .documents:
@@ -159,14 +191,12 @@ struct ListLayoutView: View {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.33)
-                            .scaledToFit()
                     }
-                    
-                    if let secondImage = item.secondThumbnail {
-                        Image(uiImage: secondImage)
+
+                    if let image = item.secondThumbnail {
+                        Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.33)
-                            .scaledToFit()
                     }
                 }
             case .passport:
@@ -174,19 +204,20 @@ struct ListLayoutView: View {
                     Image(uiImage: image)
                         .resizable()
                         .frame(width: 21.45, height: 29)
-                        .scaledToFit()
                 }
             default:
                 EmptyView()
             }
         }
     }
-    
-    private var documentLockItemView: some View {
+}
+
+struct ListDocumentLock: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-            
-            HStack(spacing: 0) {
+            Spacer()
+
+            HStack {
                 Image(appIcon: .lock_fill)
                     .resizable()
                     .renderingMode(.template)
@@ -194,46 +225,45 @@ struct ListLayoutView: View {
                     .frame(width: 11.33, height: 11.76)
                     .padding(.leading, 4.56)
                     .padding(.bottom, 4.24)
-                
-                Spacer(minLength: 0)
+
+                Spacer()
             }
-            
+
             VStack(alignment: .leading, spacing: 2.33) {
-                documentLockLineView
-                    .frame(width: 22.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 26.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 23.67, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 26.33, height: 1.4)
-                
-                documentLockLineView
-                    .frame(width: 19.33, height: 1.4)
+                line(22.33)
+                line(26.33)
+                line(23.67)
+                line(26.33)
+                line(19.33)
             }
             .padding(.leading, 4.67)
         }
     }
-    
-    private var documentLockLineView: some View {
+
+    private func line(_ width: CGFloat) -> some View {
         Rectangle()
             .foregroundStyle(
                 Color(
                     UIColor(
-                        red: 209.0 / 255.0,
-                        green: 214.0 / 255.0,
-                        blue: 225.0 / 255.0,
-                        alpha: 1.0
+                        red: 209/255,
+                        green: 214/255,
+                        blue: 225/255,
+                        alpha: 1
                     )
                 )
             )
-            .cornerRadius(2, corners: .allCorners)
+            .cornerRadius(2)
+            .frame(width: width, height: 1.4)
     }
-    
-    private func folderCardView(for item: FileFolderItem) -> some View {
+}
+
+struct ListFolderRow: View {
+    let item: FileFolderItem
+    let highlightedID: UUID?
+
+    var onMenuClick: ((UUID, CGRect) -> Void)?
+
+    var body: some View {
         HStack(spacing: 10) {
             Image(appIcon: .folder_small_image)
                 .overlay {
@@ -243,21 +273,20 @@ struct ListLayoutView: View {
                             .frame(width: 16, height: 16)
                     }
                 }
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .appTextStyle(.bodySecondary)
                     .foregroundStyle(.text(.primary))
-                
-                Text("\(item.documentsCount) Documents)")
+
+                Text("\(item.documentsCount) Documents")
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
-                    .multilineTextAlignment(.center)
             }
             .padding(.vertical, 7)
-            
-            Spacer(minLength: 0)
-            
+
+            Spacer()
+
             GeometryReader { geo in
                 AppButton(
                     config: AppButtonConfig(
@@ -274,18 +303,20 @@ struct ListLayoutView: View {
             .frame(width: 28, height: 28)
         }
         .padding(.vertical, 9)
-        .background(
-            Color(
-                UIColor(
-                    red: 52.0/255.0,
-                    green: 199.0/255.0,
-                    blue: 89.0/255.0,
-                    alpha: highlightedID == item.id ? 0.1 : 0
-                )
+        .background(highlight)
+    }
+
+    private var highlight: some View {
+        Color(
+            UIColor(
+                red: 52/255,
+                green: 199/255,
+                blue: 89/255,
+                alpha: highlightedID == item.id ? 0.1 : 0
             )
-            .cornerRadius(8, corners: .allCorners)
-            .padding(.horizontal, -16)
-            .animation(.easeIn, value: highlightedID == item.id)
         )
+        .cornerRadius(8)
+        .padding(.horizontal, -16)
+        .animation(.easeIn, value: highlightedID == item.id)
     }
 }
