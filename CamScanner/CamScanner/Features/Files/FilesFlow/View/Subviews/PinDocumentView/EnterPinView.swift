@@ -60,6 +60,7 @@ struct EnterPinView: View {
             .foregroundStyle(.text(.secondary))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
     }
     
     private var pinInputView: some View {

@@ -3,190 +3,239 @@ import SwiftUI
 @MainActor
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
-    
+
     @State private var selectedFileDocumentItemId: UUID?
     @State private var selectedMenuItem: FilesMenuItem?
+
     @State private var shouldShowMenuOverlay = false
     @State private var menuFrame: CGRect = .zero
+
     @State private var shouldShowDotsOverlay = false
     @State private var dotsFrame: CGRect = .zero
-    
+
     @EnvironmentObject private var tabBar: TabBarController
-    
+
     var body: some View {
         contentView
-            .overlay {
-                if shouldShowMenuOverlay {
-                    LayoutMenuItemView(
-                        showGridMenu: $shouldShowMenuOverlay,
-                        isItemLocked: viewModel.isDocumentLocked(id: selectedFileDocumentItemId),
-                        grideMode: viewModel.viewMode,
-                        menuFrame: menuFrame
-                    ) { menuItem in
-                        selectedMenuItem = menuItem
-                        
-                        switch menuItem {
-                        case .delete:
-                            hideTabBar()
-                            
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                viewModel.handleFileDocumentMenuItemSelected(
-                                    id: selectedFileDocumentItemId,
-                                    menuItem: menuItem
-                                )
-                            }
-                        case .rename:
-                            viewModel.fileActiveSheet = .rename
-                        case .lock:
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                viewModel.notificationOverlaystate = .lock
-                            }
-                        case .unlockDocument:
-                            hideTabBar()
-                            
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                viewModel.handleFileDocumentMenuItemSelected(
-                                    id: selectedFileDocumentItemId,
-                                    menuItem: menuItem
-                                )
-                            }
-                        case .move:
-                            break
-                        case .share:
-                            break
-                        }
-                    } onClose: {
-                        showTabBar()
-                    }
-                }
-            }
-            .overlay {
-                notificationOverlayView
-            }
-            .overlay {
-                if shouldShowDotsOverlay {
-                    DotsMenuView(
-                        isVisible: $shouldShowDotsOverlay,
-                        dotsFrame: dotsFrame,
-                        sortType: viewModel.sortType,
-                        viewMode: viewModel.viewMode,
-                        onCreateFolder: {
-                            viewModel.fileActiveSheet = .createFolder
-                        },
-                        onSelectFiles: {},
-                        onSortChange: { type in
-                            viewModel.handleFilesSortType(type: type)
-                        },
-                        onViewModeChange: { mode in
-                            viewModel.viewMode = mode
-                        }
-                    )
-                    .onDisappear {
-                        showTabBar()
-                    }
-                }
-            }
-            .overlay(alignment: .top) {
-                if viewModel.shouldShowNotification {
-                    NotificationToast(
-                        isPresented: $viewModel.shouldShowNotification,
-                        title: viewModel.notificationModel?.title ?? ""
-                    )
-                }
-            }
-            .sheet(item: $viewModel.fileActiveSheet) { sheet in
-                switch sheet {
-                case .createFolder:
-                    CreateFolderView { folderName in
-                        viewModel.handleFolderCreated(folderName: folderName)
-                    }
-                    .presentationCornerRadius(38)
-                case .rename:
-                    RenameFolderView(folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)) { fileName in
-                        viewModel.handleFileDocumentRenamed(selectedFileDocumentItemId, fileName: fileName)
-                        clearOverlayState()
-                    }
-                    .presentationCornerRadius(38)
-                }
-            }
+            .overlay { menuOverlay }
+            .overlay { notificationOverlay }
+            .overlay { dotsOverlay }
+            .overlay(alignment: .top) { toastOverlay }
+            .sheet(item: $viewModel.fileActiveSheet) { sheetView($0) }
             .coordinateSpace(name: "filesCoordinateSpace")
     }
-    
+}
+
+// MARK: - Content
+private extension FilesView {
     @ViewBuilder
-    private var contentView: some View {
+    var contentView: some View {
         switch viewModel.viewState {
         case .empty:
             emptyView
         case .success:
             successView
         case .search:
-            EmptyView()
+            searchView
         }
     }
-    
-    private var emptyView: some View {
+
+    var emptyView: some View {
         VStack(spacing: 16) {
             Image(appIcon: .filesEmpty_image)
-            
+
             Text("No Files Yet")
                 .appTextStyle(.bodyPrimary)
                 .foregroundStyle(.text(.secondary))
         }
         .frame(maxHeight: .infinity)
     }
-    
-    private var successView: some View {
+
+    var successView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            navigationBarView
-            
-            switch viewModel.viewMode {
-            case .grid:
-                gridLayoutView
-            case .list:
-                listLayoutView
-            }
+            FilesNavigationBarView(
+                onDotsTap: {
+                    hideTabBar()
+                    shouldShowDotsOverlay = true
+                },
+                onSearchTap: {
+                    viewModel.viewState = .search
+                },
+                onDotsFrame: { frame in
+                    if dotsFrame == .zero {
+                        dotsFrame = frame
+                    }
+                }
+            )
+
+            FilesLayoutContainer(
+                mode: viewModel.viewMode,
+                items: viewModel.items,
+                highlightedID: viewModel.highlightedID,
+                onFavourite: { id, isFavourite in
+                    viewModel.handleDocumentFavourite(
+                        documentId: id,
+                        isFavourite: isFavourite
+                    )
+                },
+                onMenuClick: { id, frame in
+                    selectedFileDocumentItemId = id
+                    menuFrame = frame
+                    hideTabBar()
+                    shouldShowMenuOverlay = true
+                }
+            )
         }
-        .background(
-            Color.bg(.main)
-        )
+        .background(Color.bg(.main))
         .ignoresSafeArea(edges: .top)
     }
     
-    private var gridLayoutView: some View {
-        GridLayoutView(highlightedID: viewModel.highlightedID, model: viewModel.items) { documentId, isFavourite in
-            viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
-        } onMenuClick: { id, buttonFrame in
-            selectedFileDocumentItemId = id
-            menuFrame = buttonFrame
-            hideTabBar()
-            shouldShowMenuOverlay = true
+    private var searchView: some View {
+        EmptyView()
+    }
+}
+
+// MARK: - Overlays
+private extension FilesView {
+    var menuOverlay: some View {
+        FilesMenuOverlay(
+            isVisible: $shouldShowMenuOverlay,
+            isLocked: viewModel.isDocumentLocked(id: selectedFileDocumentItemId),
+            viewMode: viewModel.viewMode,
+            frame: menuFrame,
+            onSelect: handleMenuSelection,
+            onClose: showTabBar
+        )
+    }
+
+    var dotsOverlay: some View {
+        FilesDotsOverlay(
+            isVisible: $shouldShowDotsOverlay,
+            frame: dotsFrame,
+            sortType: viewModel.sortType,
+            viewMode: viewModel.viewMode,
+            onCreateFolder: {
+                viewModel.fileActiveSheet = .createFolder
+            },
+            onSort: { viewModel.handleFilesSortType(type: $0) },
+            onViewMode: { viewModel.viewMode = $0 },
+            onDisappear: showTabBar
+        )
+    }
+
+    var notificationOverlay: some View {
+        FilesNotificationOverlay(
+            state: viewModel.notificationOverlaystate,
+            selectedID: selectedFileDocumentItemId,
+            selectedMenuItem: selectedMenuItem,
+            viewModel: viewModel,
+            onClear: clearOverlayState,
+            onShowTabBar: showTabBar
+        )
+    }
+
+    var toastOverlay: some View {
+        Group {
+            if viewModel.shouldShowNotification {
+
+                NotificationToast(
+                    isPresented: $viewModel.shouldShowNotification,
+                    title: viewModel.notificationModel?.title ?? ""
+                )
+            }
         }
     }
-    
-    private var listLayoutView: some View {
-        ListLayoutView(highlightedID: viewModel.highlightedID, model: viewModel.items) { documentId, isFavourite in
-            viewModel.handleDocumentFavourite(documentId: documentId, isFavourite: isFavourite)
-        } onMenuClick: { id, buttonFrame in
-            selectedFileDocumentItemId = id
-            menuFrame = buttonFrame
-            hideTabBar()
-            shouldShowMenuOverlay = true
+}
+
+// MARK: - Sheet
+private extension FilesView {
+    @ViewBuilder
+    func sheetView(_ sheet: FileActiveSheet) -> some View {
+        switch sheet {
+        case .createFolder:
+            CreateFolderView { folderName in
+                viewModel.handleFolderCreated(folderName: folderName)
+            }
+            .presentationCornerRadius(38)
+
+        case .rename:
+            RenameFolderView(
+                folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)
+            ) { fileName in
+
+                viewModel.handleFileDocumentRenamed(
+                    selectedFileDocumentItemId,
+                    fileName: fileName
+                )
+
+                clearOverlayState()
+            }
+            .presentationCornerRadius(38)
         }
     }
-    
-    private var navigationBarView: some View {
+}
+
+// MARK: - Menu Handling
+private extension FilesView {
+    func handleMenuSelection(_ menuItem: FilesMenuItem) {
+        selectedMenuItem = menuItem
+
+        switch menuItem {
+        case .delete, .unlockDocument:
+            hideTabBar()
+
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.handleFileDocumentMenuItemSelected(
+                    id: selectedFileDocumentItemId,
+                    menuItem: menuItem
+                )
+            }
+        case .rename:
+            viewModel.fileActiveSheet = .rename
+        case .lock:
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.notificationOverlaystate = .lock
+            }
+        case .move, .share:
+            break
+        }
+    }
+}
+
+// MARK: - Helpers
+private extension FilesView {
+    func showTabBar() {
+        tabBar.isTabBarVisible = true
+    }
+
+    func hideTabBar() {
+        tabBar.isTabBarVisible = false
+    }
+
+    func clearOverlayState() {
+        selectedFileDocumentItemId = nil
+        selectedMenuItem = nil
+        viewModel.notificationOverlaystate = .none
+    }
+}
+
+struct FilesNavigationBarView: View {
+    let onDotsTap: () -> Void
+    let onSearchTap: () -> Void
+    let onDotsFrame: (CGRect) -> Void
+
+    var body: some View {
         Rectangle()
             .foregroundStyle(.bg(.main))
-            .frame(maxWidth: .infinity)
             .frame(height: 128)
             .overlay(alignment: .bottom) {
                 HStack(spacing: 8) {
                     Text("Files")
                         .appTextStyle(.screenTitle)
                         .foregroundStyle(.text(.primary))
-                    
-                    Spacer(minLength: 0)
-                    
+
+                    Spacer()
+
                     HStack(spacing: 8) {
                         AppButton(
                             config: AppButtonConfig(
@@ -194,24 +243,19 @@ struct FilesView: View {
                                 style: .secondary,
                                 size: .m
                             ),
-                            action: {}
+                            action: onSearchTap
                         )
-                        
+
                         AppButton(
                             config: AppButtonConfig(
                                 content: .iconOnly(.dots),
                                 style: .secondary,
                                 size: .m
                             ),
-                            action: {
-                                hideTabBar()
-                                shouldShowDotsOverlay = true
-                            }
+                            action: onDotsTap
                         )
                         .reportFrame { frame in
-                            if dotsFrame == .zero {
-                                dotsFrame = frame
-                            }
+                            onDotsFrame(frame)
                         }
                     }
                 }
@@ -219,105 +263,181 @@ struct FilesView: View {
                 .padding(.vertical, 12)
             }
     }
-    
-    private func successNotificationView(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(appIcon: .check_circle)
-                .renderingMode(.template)
-                .foregroundStyle(.elements(.onSuccess))
-            
-            Text(text)
-                .appTextStyle(.bodyPrimary)
-                .foregroundStyle(.text(.onSuccess))
+}
+
+struct FilesLayoutContainer: View {
+    let mode: FilesViewMode
+    let items: [FilesGridItem]
+    let highlightedID: UUID?
+
+    let onFavourite: (UUID, Bool) -> Void
+    let onMenuClick: (UUID, CGRect) -> Void
+
+    var body: some View {
+        switch mode {
+        case .grid:
+            GridLayoutView(
+                highlightedID: highlightedID,
+                model: items,
+                onFavouriteClick: onFavourite,
+                onMenuClick: onMenuClick
+            )
+        case .list:
+            ListLayoutView(
+                highlightedID: highlightedID,
+                model: items,
+                onFavouriteClick: onFavourite,
+                onMenuClick: onMenuClick
+            )
         }
-        .frame(height: 44)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color.bg(.success)
-                .cornerRadius(12, corners: .allCorners)
-                .appBorderModifier(.border(.onSuccess), radius: 12)
-        )
     }
+}
+
+struct FilesDotsOverlay: View {
+    @Binding var isVisible: Bool
+
+    let frame: CGRect
+    let sortType: FilesSortType
+    let viewMode: FilesViewMode
+
+    let onCreateFolder: () -> Void
+    let onSort: (FilesSortType) -> Void
+    let onViewMode: (FilesViewMode) -> Void
+    let onDisappear: () -> Void
+
+    var body: some View {
+        if isVisible {
+            DotsMenuView(
+                isVisible: $isVisible,
+                dotsFrame: frame,
+                sortType: sortType,
+                viewMode: viewMode,
+                onCreateFolder: onCreateFolder,
+                onSelectFiles: {},
+                onSortChange: onSort,
+                onViewModeChange: onViewMode
+            )
+            .onDisappear {
+                onDisappear()
+            }
+        }
+    }
+}
+
+struct FilesMenuOverlay: View {
+    @Binding var isVisible: Bool
+
+    let isLocked: Bool
+    let viewMode: FilesViewMode
+    let frame: CGRect
+
+    let onSelect: (FilesMenuItem) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        if isVisible {
+            LayoutMenuItemView(
+                showGridMenu: $isVisible,
+                isItemLocked: isLocked,
+                grideMode: viewMode,
+                menuFrame: frame,
+                onSelectMenuItem: onSelect,
+                onClose: onClose
+            )
+        }
+    }
+}
+
+struct FilesNotificationOverlay: View {
+    let state: FilesNotificationOverlayState
     
-    @ViewBuilder
-    private var notificationOverlayView: some View {
-        if viewModel.notificationOverlaystate != .none {
+    let selectedID: UUID?
+    let selectedMenuItem: FilesMenuItem?
+    
+    let viewModel: FilesViewModel
+    
+    let onClear: () -> Void
+    let onShowTabBar: () -> Void
+    
+    var body: some View {
+        if state != .none {
             ZStack {
                 Color.black.opacity(0.24)
                     .ignoresSafeArea()
                 
-                switch viewModel.notificationOverlaystate {
+                switch state {
                 case .deleteFile:
                     DeleteDocumentView(
                         onDelete: {
                             viewModel.handleApplyFileDocumentMenuItem(
-                                id: selectedFileDocumentItemId,
+                                id: selectedID,
                                 menuItem: selectedMenuItem
                             )
-
-                            clearOverlayState()
+                            onClear()
                         },
                         onCancel: {
-                            clearOverlayState()
+                            onClear()
                         }
                     )
                     .onDisappear {
-                        showTabBar()
+                        onShowTabBar()
                     }
                 case .unlockDocument:
                     UnlockDocumentView(
-                        documentTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId),
+                        documentTitle: viewModel.getTitleForItem(id: selectedID),
                         onRemove: {
                             viewModel.handleApplyFileDocumentMenuItem(
-                                id: selectedFileDocumentItemId,
+                                id: selectedID,
                                 menuItem: selectedMenuItem
                             )
-                            
-                            clearOverlayState()
+                            onClear()
                         },
                         onCancel: {
-                            clearOverlayState()
+                            onClear()
                         }
                     )
                     .onDisappear {
-                        showTabBar()
+                        onShowTabBar()
                     }
                 case .lock:
                     LockDocumentView {
                         await viewModel.handleFaceIdRequest()
                     } onSuccess: { pin, viaFaceId in
                         viewModel.hadleDocumentPinCreated(
-                            documentId: selectedFileDocumentItemId,
+                            documentId: selectedID,
                             pin: pin,
                             viaFaceId: viaFaceId
                         )
                         
-                        clearOverlayState()
+                        onClear()
                     } onClose: {
-                        clearOverlayState()
+                        onClear()
                     }
                 case .unlock:
                     EnterPinView(
-                        documentTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId),
+                        documentTitle: viewModel.getTitleForItem(id: selectedID),
                         validatePin: { pin in
                             return viewModel.handleDocumentPinValidation(
-                                documentId: selectedFileDocumentItemId,
+                                documentId: selectedID,
                                 pin: pin
                             )
                         },
                         onSuccess: {
                             switch selectedMenuItem {
+                                
                             case .unlockDocument:
                                 viewModel.notificationOverlaystate = .unlockDocument
+                                
                             case .delete:
                                 viewModel.notificationOverlaystate = .deleteFile
+                                
                             default:
-                                clearOverlayState()
+                                onClear()
                             }
                         },
                         onClose: {
-                            showTabBar()
-                            clearOverlayState()
+                            onShowTabBar()
+                            onClear()
                         }
                     )
                 case .none:
@@ -325,19 +445,5 @@ struct FilesView: View {
                 }
             }
         }
-    }
-    
-    func showTabBar() {
-        tabBar.isTabBarVisible = true
-    }
-    
-    func hideTabBar() {
-        tabBar.isTabBarVisible = false
-    }
-    
-    private func clearOverlayState() {
-        selectedFileDocumentItemId = nil
-        selectedMenuItem = nil
-        viewModel.notificationOverlaystate = .none
     }
 }

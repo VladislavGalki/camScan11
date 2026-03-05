@@ -30,6 +30,8 @@ struct LockDocumentView: View {
                 .appTextStyle(.bodyPrimary)
                 .foregroundStyle(.text(.secondary))
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 24)
 
             pinInputView

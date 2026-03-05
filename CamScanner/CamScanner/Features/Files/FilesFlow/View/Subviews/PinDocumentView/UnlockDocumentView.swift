@@ -29,7 +29,6 @@ struct UnlockDocumentView: View {
             .appTextStyle(.itemTitle)
             .foregroundStyle(.text(.primary))
             .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
             .padding(.bottom, 8)
     }
     
@@ -39,6 +38,7 @@ struct UnlockDocumentView: View {
             .foregroundStyle(.text(.secondary))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
     }
     
     private var removeButton: some View {

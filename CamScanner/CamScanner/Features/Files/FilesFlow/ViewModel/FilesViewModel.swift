@@ -3,7 +3,7 @@ import Combine
 import UIKit
 
 final class FilesViewModel: ObservableObject {
-    @Published private(set) var viewState: FileViewState = .empty
+    @Published var viewState: FileViewState = .empty
     @Published var sortType: FilesSortType = .recent
     @Published var viewMode: FilesViewMode = .grid
     @Published private(set) var items: [FilesGridItem] = []
@@ -246,10 +246,6 @@ extension FilesViewModel {
     
     func handleFaceIdRequest() async -> Bool {
         await faceIdService.requestAuthorizationIfNeeded()
-    }
-    
-    func handleUnlockDocument() {
-        
     }
     
     func hadleDocumentPinCreated(documentId: UUID?, pin: String, viaFaceId: Bool) {
