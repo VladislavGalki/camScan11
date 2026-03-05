@@ -12,6 +12,9 @@ extension FolderEntity {
     @NSManaged public var lastViewed: Date
     @NSManaged public var isLocked: Bool
     @NSManaged public var lockViaFaceId: Bool
+    
+    @NSManaged public var passwordSalt: Data?
+    @NSManaged public var passwordHash: Data?
 
     @NSManaged public var documents: NSSet?
     

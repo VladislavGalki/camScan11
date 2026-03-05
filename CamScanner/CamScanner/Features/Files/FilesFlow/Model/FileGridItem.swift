@@ -30,7 +30,8 @@ struct FileDocumentItem: Equatable {
     var thumbnail: UIImage?
     var secondThumbnail: UIImage?
     var isSelected: Bool = false
-    var isHighlighted: Bool = false
+    var passwordHash: Data?
+    var passwordSalt: Data?
 }
 
 struct FileFolderItem: Equatable {
@@ -43,4 +44,6 @@ struct FileFolderItem: Equatable {
     var previewDocuments: [FileDocumentItem]
     var isSelected: Bool = false
     var isHighlighted: Bool = false
+    var passwordHash: Data?
+    var passwordSalt: Data?
 }

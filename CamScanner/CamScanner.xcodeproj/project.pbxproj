@@ -278,6 +278,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "SmartScan AI - PDF Scanner & Converter";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We use the camera to scan documents.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Allow Face ID to quickly unlock your protected documents.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Добавить фото";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -325,6 +326,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "SmartScan AI - PDF Scanner & Converter";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We use the camera to scan documents.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Allow Face ID to quickly unlock your protected documents.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Добавить фото";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

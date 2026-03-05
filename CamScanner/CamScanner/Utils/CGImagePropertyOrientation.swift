@@ -1,11 +1,3 @@
-//
-//  CGImagePropertyOrientation.swift
-//  WeScan
-//
-//  Created by Yang Chen on 5/21/19.
-//  Copyright © 2019 WeTransfer. All rights reserved.
-//
-
 import Foundation
 import UIKit
 

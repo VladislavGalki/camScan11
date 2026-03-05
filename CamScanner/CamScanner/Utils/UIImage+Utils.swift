@@ -1,22 +1,7 @@
-//
-//  UIImage+Utils.swift
-//  WeScan
-//
-//  Created by Bobo on 5/25/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import Foundation
 import UIKit
 
 extension UIImage {
-    /// Draws a new cropped and scaled (zoomed in) image.
-    ///
-    /// - Parameters:
-    ///   - point: The center of the new image.
-    ///   - scaleFactor: Factor by which the image should be zoomed in.
-    ///   - size: The size of the rect the image will be displayed in.
-    /// - Returns: The scaled and cropped image.
     func scaledImage(atPoint point: CGPoint, scaleFactor: CGFloat, targetSize size: CGSize) -> UIImage? {
         guard let cgImage = self.cgImage else { return nil }
 
@@ -32,11 +17,6 @@ extension UIImage {
         return UIImage(cgImage: croppedImage)
     }
 
-    /// Scales the image to the specified size in the RGB color space.
-    ///
-    /// - Parameters:
-    ///   - scaleFactor: Factor by which the image should be scaled.
-    /// - Returns: The scaled image.
     func scaledImage(scaleFactor: CGFloat) -> UIImage? {
         guard let cgImage = self.cgImage else { return nil }
 
@@ -64,9 +44,7 @@ extension UIImage {
         return context.makeImage().flatMap { UIImage(cgImage: $0) }
     }
 
-    /// Returns the data for the image in the PDF format
     func pdfData() -> Data? {
-        // Typical Letter PDF page size and margins
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let margin: CGFloat = 40
 
@@ -87,10 +65,6 @@ extension UIImage {
         return data
     }
 
-    /// Function gathered from [here](https://stackoverflow.com/questions/44462087/how-to-convert-a-uiimage-to-a-cvpixelbuffer)
-    /// to convert UIImage to CVPixelBuffer
-    ///
-    /// - Returns: new [CVPixelBuffer](apple-reference-documentation://hsVf8OXaJX)
     func pixelBuffer() -> CVPixelBuffer? {
         let attrs = [
             kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
@@ -136,7 +110,6 @@ extension UIImage {
         return pixelBuffer
     }
 
-    /// Creates a UIImage from the specified CIImage.
     static func from(ciImage: CIImage) -> UIImage {
         if let cgImage = CIContext(options: nil).createCGImage(ciImage, from: ciImage.extent) {
             return UIImage(cgImage: cgImage)

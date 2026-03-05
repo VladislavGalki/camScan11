@@ -7,6 +7,9 @@ final class DocumentRepository {
         context: PersistenceController.shared.container.viewContext
     )
     
+    private let passwordCryptoService = PasswordCryptoService.shared
+    private let keychainService = KeychainService.shared
+    
     private let context: NSManagedObjectContext
     
     init(context: NSManagedObjectContext) {
@@ -162,6 +165,49 @@ extension DocumentRepository {
         document.isFavourite = isFavourite
         
         try context.save()
+    }
+    
+    func setPassword(id: UUID, pin: String, viaFaceId: Bool) throws -> UUID {
+        let salt = passwordCryptoService.generateSalt()
+        let hash = passwordCryptoService.hash(pin: pin, salt: salt)
+        
+        let docRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        docRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        docRequest.fetchLimit = 1
+        
+        if let doc = try context.fetch(docRequest).first {
+            doc.passwordSalt = salt
+            doc.passwordHash = hash
+            doc.lockViaFaceId = viaFaceId
+            doc.isLocked = true
+            
+            try context.save()
+            
+            keychainService.savePIN(pin, id: id)
+            return id
+        }
+        
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        folderRequest.fetchLimit = 1
+        
+        if let folder = try context.fetch(folderRequest).first {
+            folder.passwordSalt = salt
+            folder.passwordHash = hash
+            folder.lockViaFaceId = viaFaceId
+            folder.isLocked = true
+            
+            try context.save()
+            
+            keychainService.savePIN(pin, id: id)
+            return id
+        }
+        
+        throw NSError(
+            domain: "DocumentRepository",
+            code: 1001,
+            userInfo: [NSLocalizedDescriptionKey: "Id not found"]
+        )
     }
     
     func deleteDocument(id: UUID) throws {

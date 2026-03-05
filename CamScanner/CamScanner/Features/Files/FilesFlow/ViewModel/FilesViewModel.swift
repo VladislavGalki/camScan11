@@ -14,78 +14,16 @@ final class FilesViewModel: ObservableObject {
     @Published var notificationModel: NotificationModel?
     @Published var fileActiveSheet: FileActiveSheet?
     
+    private let passwordCryptoService = PasswordCryptoService.shared
     private let documentRepository: DocumentRepository
     private let documentStore = FileDocumentStore()
+    private let faceIdService = FaceIDService.shared
     
     private var cancellables = Set<AnyCancellable>()
     
     init() {
         self.documentRepository = DocumentRepository.shared
         bootstrap()
-    }
-    
-    func handleFileDocumentMenuItem(id: UUID?, menuItem: FilesMenuItem?) {
-        guard let id, let menuItem else { return }
-        
-        switch menuItem {
-        case .share:
-            break
-        case .rename:
-            break
-        case .lock:
-            break
-        case .move:
-            break
-        case .delete:
-            do {
-                try documentRepository.deleteDocument(id: id)
-            } catch {}
-        }
-    }
-    
-    func handleFolderCreated(folderName: String) {
-        do {
-            let documentId = try documentRepository.createFolder(title: folderName)
-            notificationModel = .folderCreated
-            shouldShowNotification = true
-            setHighlitedDocument(documentId)
-        } catch {}
-    }
-    
-    func handleFilesSortType(type: FilesSortType) {
-        sortType = type
-        documentStore.updateSortType(type)
-    }
-    
-    func handleFileDocumentRenamed(_ id: UUID?, fileName: String) {
-        guard let id else { return }
-        
-        do {
-            try documentRepository.renameDocument(id: id, newTitle: fileName)
-        } catch {}
-    }
-    
-    func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
-        do {
-            try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
-        } catch {}
-    }
-    
-    func getTitleForItem(id: UUID?) -> String {
-        for item in items {
-            switch item {
-            case .document(let doc):
-                if doc.id == id {
-                    return doc.title
-                }
-            case .folder(let folder):
-                if folder.id == id {
-                    return folder.title
-                }
-            }
-        }
-        
-        return ""
     }
     
     private func bootstrap() {
@@ -160,5 +98,179 @@ final class FilesViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             highlightedID = nil
         }
+    }
+    
+    private func isDocumentLocked(id: UUID) -> Bool {
+        items.contains {
+            switch $0 {
+            case .document(let doc): return doc.id == id && doc.isLocked
+            case .folder(let folder): return folder.id == id && folder.isLocked
+            }
+        }
+    }
+    
+    private func isDocumentLockViaFaceId(id: UUID) -> Bool {
+        items.contains {
+            switch $0 {
+            case .document(let doc): return doc.id == id && doc.lockViaFaceId
+            case .folder(let folder): return folder.id == id && folder.lockViaFaceId
+            }
+        }
+    }
+    
+    private func getPasswordData(for id: UUID) -> (salt: Data, hash: Data)? {
+        for item in items {
+            switch item {
+                
+            case .document(let doc):
+                if doc.id == id,
+                   let salt = doc.passwordSalt,
+                   let hash = doc.passwordHash {
+                    return (salt, hash)
+                }
+                
+            case .folder(let folder):
+                if folder.id == id,
+                   let salt = folder.passwordSalt,
+                   let hash = folder.passwordHash {
+                    return (salt, hash)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func processSuccessMenuItemSelection(menuItem: FilesMenuItem) {
+        switch menuItem {
+        case .share:
+            break
+        case .move:
+            break
+        case .delete:
+            notificationOverlaystate = .deleteFile
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - Public
+
+extension FilesViewModel {
+    func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
+        guard let id else { return }
+        
+        let isDocumentLockedViaFaceId = isDocumentLockViaFaceId(id: id)
+        
+        if isDocumentLocked(id: id) {
+            Task {
+                if isDocumentLockedViaFaceId {
+                    let authentificated = await faceIdService.authenticateForUnlock()
+                    
+                    await MainActor.run {
+                        if authentificated {
+                            processSuccessMenuItemSelection(menuItem: menuItem)
+                        } else {
+                            notificationOverlaystate = .unlock
+                        }
+                    }
+                } else {
+                    await MainActor.run {
+                        notificationOverlaystate = .unlock
+                    }
+                }
+            }
+        } else {
+            processSuccessMenuItemSelection(menuItem: menuItem)
+        }
+    }
+    
+    func handleApplyFileDocumentMenuItem(id: UUID?, menuItem: FilesMenuItem?) {
+        guard let id, let menuItem else { return }
+        
+        switch menuItem {
+        case .share:
+            break
+        case .rename:
+            break
+        case .lock:
+            break
+        case .move:
+            break
+        case .delete:
+            do {
+                try documentRepository.deleteDocument(id: id)
+            } catch {}
+        }
+    }
+    
+    func handleFolderCreated(folderName: String) {
+        do {
+            let documentId = try documentRepository.createFolder(title: folderName)
+            notificationModel = .folderCreated
+            shouldShowNotification = true
+            setHighlitedDocument(documentId)
+        } catch {}
+    }
+    
+    func handleFilesSortType(type: FilesSortType) {
+        sortType = type
+        documentStore.updateSortType(type)
+    }
+    
+    func handleFileDocumentRenamed(_ id: UUID?, fileName: String) {
+        guard let id else { return }
+        
+        do {
+            try documentRepository.renameDocument(id: id, newTitle: fileName)
+        } catch {}
+    }
+    
+    func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
+        do {
+            try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
+        } catch {}
+    }
+    
+    func handleFaceIdRequest() async -> Bool {
+        await faceIdService.requestAuthorizationIfNeeded()
+    }
+    
+    func hadleDocumentPinCreated(documentId: UUID?, pin: String, viaFaceId: Bool) {
+        guard let documentId else { return }
+        do {
+            let id = try documentRepository.setPassword(id: documentId, pin: pin, viaFaceId: viaFaceId)
+            notificationModel = .pinCreated
+            shouldShowNotification = true
+            setHighlitedDocument(id)
+        } catch {}
+    }
+    
+    func handleDocumentPinValidation(documentId: UUID?, pin: String) -> Bool {
+        guard let documentId, let documentData = getPasswordData(for: documentId) else { return false }
+        
+        return passwordCryptoService.verify(
+            pin: pin,
+            salt: documentData.salt,
+            hash: documentData.hash
+        )
+    }
+    
+    func getTitleForItem(id: UUID?) -> String {
+        for item in items {
+            switch item {
+            case .document(let doc):
+                if doc.id == id {
+                    return doc.title
+                }
+            case .folder(let folder):
+                if folder.id == id {
+                    return folder.title
+                }
+            }
+        }
+        
+        return ""
     }
 }

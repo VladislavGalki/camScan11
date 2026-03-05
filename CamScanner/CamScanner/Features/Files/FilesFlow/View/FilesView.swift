@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct FilesView: View {
     @StateObject private var viewModel = FilesViewModel()
     
@@ -20,18 +21,24 @@ struct FilesView: View {
                     grideMode: viewModel.viewMode,
                     menuFrame: menuFrame
                 ) { menuItem in
-                    tabBar.isTabBarVisible = false
                     selectedMenuItem = menuItem
                     
                     switch menuItem {
                     case .delete:
+                        tabBar.isTabBarVisible = false
+                        
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.notificationOverlaystate = .deleteFile
+                            viewModel.handleFileDocumentMenuItemSelected(
+                                id: selectedFileDocumentItemId,
+                                menuItem: menuItem
+                            )
                         }
                     case .rename:
                         viewModel.fileActiveSheet = .rename
                     case .lock:
-                        break
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            viewModel.notificationOverlaystate = .lock
+                        }
                     case .move:
                         break
                     case .share:
@@ -61,12 +68,9 @@ struct FilesView: View {
                     }
                     .presentationCornerRadius(38)
                 case .rename:
-                    RenameFolderView(folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)) {
-                        tabBar.isTabBarVisible = true
-                    } onFinish: { fileName in
+                    RenameFolderView(folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)) { fileName in
                         viewModel.handleFileDocumentRenamed(selectedFileDocumentItemId, fileName: fileName)
-                        selectedFileDocumentItemId = nil
-                        tabBar.isTabBarVisible = true
+                        clearOverlayState()
                     }
                     .presentationCornerRadius(38)
                 }
@@ -219,7 +223,35 @@ struct FilesView: View {
                 case .deleteFile:
                     deleteOverlay
                 case .lock:
-                    EmptyView()
+                    LockDocumentView {
+                        await viewModel.handleFaceIdRequest()
+                    } onSuccess: { pin, viaFaceId in
+                        viewModel.hadleDocumentPinCreated(
+                            documentId: selectedFileDocumentItemId,
+                            pin: pin,
+                            viaFaceId: viaFaceId
+                        )
+                        
+                        clearOverlayState()
+                    } onClose: {
+                        clearOverlayState()
+                    }
+                case .unlock:
+                    EnterPinView(
+                        documentTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId),
+                        validatePin: { pin in
+                            return viewModel.handleDocumentPinValidation(
+                                documentId: selectedFileDocumentItemId,
+                                pin: pin
+                            )
+                        },
+                        onSuccess: {
+                            viewModel.notificationOverlaystate = .deleteFile
+                        },
+                        onClose: {
+                            clearOverlayState()
+                        }
+                    )
                 case .none:
                     EmptyView()
                 }
@@ -251,14 +283,12 @@ struct FilesView: View {
                         isFullWidth: true
                     ),
                     action: {
-                        viewModel.handleFileDocumentMenuItem(
+                        viewModel.handleApplyFileDocumentMenuItem(
                             id: selectedFileDocumentItemId,
                             menuItem: selectedMenuItem
                         )
                         
-                        selectedFileDocumentItemId = nil
-                        selectedMenuItem = nil
-                        viewModel.notificationOverlaystate = .none
+                        clearOverlayState()
                         tabBar.isTabBarVisible = true
                     }
                 )
@@ -271,10 +301,8 @@ struct FilesView: View {
                         isFullWidth: true
                     ),
                     action: {
-                        selectedFileDocumentItemId = nil
-                        selectedMenuItem = nil
+                        clearOverlayState()
                         tabBar.isTabBarVisible = true
-                        viewModel.notificationOverlaystate = .none
                     }
                 )
             }
@@ -444,5 +472,11 @@ struct FilesView: View {
         RoundedRectangle(cornerRadius: 2, style: .continuous)
             .foregroundStyle(.divider(.default))
             .frame(height: 1)
+    }
+    
+    private func clearOverlayState() {
+        selectedFileDocumentItemId = nil
+        selectedMenuItem = nil
+        viewModel.notificationOverlaystate = .none
     }
 }

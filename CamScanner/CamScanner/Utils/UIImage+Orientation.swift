@@ -1,17 +1,7 @@
-//
-//  UIImage+Orientation.swift
-//  WeScan
-//
-//  Created by Boris Emorine on 2/16/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import Foundation
 import UIKit
 
 extension UIImage {
-
-    /// Data structure to easily express rotation options.
     struct RotationOptions: OptionSet {
         let rawValue: Int
 
@@ -19,7 +9,6 @@ extension UIImage {
         static let flipOnHorizontalAxis = RotationOptions(rawValue: 2)
     }
 
-    /// Returns the same image with a portrait orientation.
     func applyingPortraitOrientation() -> UIImage {
         switch imageOrientation {
         case .up:
@@ -35,12 +24,6 @@ extension UIImage {
         }
     }
 
-    /// Rotate the image by the given angle, and perform other transformations based on the passed in options.
-    ///
-    /// - Parameters:
-    ///   - rotationAngle: The angle to rotate the image by.
-    ///   - options: Options to apply to the image.
-    /// - Returns: The new image rotated and optionally flipped (@see options).
     func rotated(by rotationAngle: Measurement<UnitAngle>, options: RotationOptions = []) -> UIImage? {
         guard let cgImage = self.cgImage else { return nil }
 
@@ -70,7 +53,6 @@ extension UIImage {
         return image
     }
     
-    /// Возвращает UIImage с ориентацией .up и корректным size (пиксели реально повернуты).
     func normalizedUp() -> UIImage {
         if imageOrientation == .up { return self }
 
@@ -82,7 +64,6 @@ extension UIImage {
         return normalized ?? self
     }
 
-    /// Crop в координатах `image.size` (points), корректно переводит в пиксели через `scale`.
     func cropped(to rectInPoints: CGRect) -> UIImage? {
         guard let cg = self.cgImage else { return nil }
 

@@ -72,7 +72,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
                                   device.maxAvailableVideoZoomFactor)
                 device.videoZoomFactor = clamped
             } else {
-                // wide camera — keep neutral
                 device.videoZoomFactor = 1.0
             }
         } catch {}

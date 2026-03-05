@@ -1,16 +1,6 @@
-//
-//  CaptureSession+Flash.swift
-//  WeScan
-//
-//  Created by Julian Schiavo on 28/11/2018.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import Foundation
 
-/// Extension to CaptureSession to manage the device flashlight
 extension CaptureSession {
-    /// The possible states that the current device's flashlight can be in
     enum FlashState {
         case on
         case off
@@ -18,7 +8,6 @@ extension CaptureSession {
         case unknown
     }
 
-    /// Toggles the current device's flashlight on or off.
     func toggleFlash() -> FlashState {
         guard let device, device.isTorchAvailable else { return .unavailable }
 

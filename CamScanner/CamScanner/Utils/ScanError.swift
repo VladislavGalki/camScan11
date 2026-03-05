@@ -1,28 +1,14 @@
-//
-//  Error.swift
-//  WeScan
-//
-//  Created by Boris Emorine on 2/28/18.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import CoreImage
 import Foundation
 
-/// Errors related to the `ImageScannerController`
 public enum ImageScannerControllerError: Error {
-    /// The user didn't grant permission to use the camera.
     case authorization
-    /// An error occurred when setting up the user's device.
     case inputDevice
-    /// An error occurred when trying to capture a picture.
     case capture
-    /// Error when creating the CIImage.
     case ciImageCreation
 }
 
 extension ImageScannerControllerError: LocalizedError {
-
     public var errorDescription: String? {
         switch self {
         case .authorization:

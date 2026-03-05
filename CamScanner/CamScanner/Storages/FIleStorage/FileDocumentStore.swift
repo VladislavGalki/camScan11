@@ -173,8 +173,11 @@ final class FileDocumentStore: NSObject {
                     title: folder.title ?? "Folder",
                     createdAt: folder.createdAt,
                     isLocked: folder.isLocked,
+                    lockViaFaceId: folder.lockViaFaceId,
                     documentsCount: docs.count,
-                    previewDocuments: previewDocs
+                    previewDocuments: previewDocs,
+                    passwordHash: folder.passwordHash,
+                    passwordSalt: folder.passwordSalt
                 )
                 
                 items.append(.folder(item))
@@ -307,7 +310,9 @@ final class FileDocumentStore: NSObject {
             firstPagePath: first,
             secondPagePath: second,
             thumbnail: nil,
-            secondThumbnail: nil
+            secondThumbnail: nil,
+            passwordHash: doc.passwordHash,
+            passwordSalt: doc.passwordSalt
         )
     }
 }

@@ -24,7 +24,7 @@ struct AppEntryView: View {
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
             .environmentObject(tabBar)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .overlay(alignment: .bottom) {
                 if tabBar.isTabBarVisible {
                     CustomTabBar(
                         selectedTab: $selectedTab,
@@ -37,5 +37,6 @@ struct AppEntryView: View {
                 }
             }
             .animation(.easeOut(duration: 0.15), value: tabBar.isTabBarVisible)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }

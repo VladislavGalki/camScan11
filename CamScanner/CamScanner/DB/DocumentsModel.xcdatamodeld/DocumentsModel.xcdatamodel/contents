@@ -23,6 +23,8 @@
         <attribute name="isLocked" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastViewed" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="lockViaFaceId" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="passwordHash" optional="YES" attributeType="Binary"/>
+        <attribute name="passwordSalt" optional="YES" attributeType="Binary"/>
         <attribute name="title" attributeType="String"/>
         <relationship name="documents" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="DocumentEntity" inverseName="folder" inverseEntity="DocumentEntity"/>
     </entity>

@@ -158,6 +158,7 @@ struct PasswordField: View {
             Group {
                 if isVisible {
                     TextField("", text: $password)
+                        .keyboardType(.numberPad)
                         .focused($isFocused)
                         .onSubmit {
                             isFocused = false
@@ -165,6 +166,7 @@ struct PasswordField: View {
                 } else {
                     SecureField("", text: $password)
                         .focused($isFocused)
+                        .keyboardType(.numberPad)
                         .onSubmit {
                             isFocused = false
                         }

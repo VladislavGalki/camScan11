@@ -5,13 +5,11 @@ struct RenameFolderView: View {
     @FocusState private var isFocused: Bool
     
     let folderTitle: String
-    let onClose: (() -> Void?)
     let onFinish: ((String) -> Void?)
     
-    init(folderTitle: String, onClose: @escaping () -> Void?, onFinish: @escaping (String) -> Void?) {
+    init(folderTitle: String, onFinish: @escaping (String) -> Void?) {
         self.newFolderName = folderTitle
         self.folderTitle = folderTitle
-        self.onClose = onClose
         self.onFinish = onFinish
     }
     
@@ -46,7 +44,6 @@ struct RenameFolderView: View {
                     size: .m
                 ),
                 action: {
-                    onClose()
                     dismiss()
                 }
             )

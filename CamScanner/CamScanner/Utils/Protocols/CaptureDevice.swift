@@ -1,11 +1,3 @@
-//
-//  CaptureDevice.swift
-//  WeScan
-//
-//  Created by Julian Schiavo on 28/11/2018.
-//  Copyright © 2018 WeTransfer. All rights reserved.
-//
-
 import AVFoundation
 import Foundation
 

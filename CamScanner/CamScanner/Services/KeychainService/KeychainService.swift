@@ -46,4 +46,40 @@ final class KeychainService {
 
         return try JSONDecoder().decode(type, from: data)
     }
+    
+    
+    func savePIN(_ pin: String, id: UUID) {
+        let data = Data(pin.utf8)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: id.uuidString,
+            kSecValueData as String: data,
+            kSecAttrSynchronizable as String: true
+        ]
+
+        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
+    }
+    
+    func loadPIN(id: UUID) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: id.uuidString,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess else { return nil }
+
+        if let data = result as? Data {
+            return String(data: data, encoding: .utf8)
+        }
+
+        return nil
+    }
 }

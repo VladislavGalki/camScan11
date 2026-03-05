@@ -98,6 +98,19 @@ struct GridLayoutView: View {
                     .foregroundStyle(.text(.secondary))
             }
         }
+        .background(
+            Color(
+                UIColor(
+                    red: 52.0/255.0,
+                    green: 199.0/255.0,
+                    blue: 89.0/255.0,
+                    alpha: highlightedID == item.id ? 0.1 : 0
+                )
+            )
+            .cornerRadius(8, corners: .allCorners)
+            .animation(.easeIn, value: highlightedID == item.id)
+            .padding(-8)
+        )
     }
     
     @ViewBuilder
@@ -226,9 +239,7 @@ struct GridLayoutView: View {
             Image(appIcon: .folder_image)
                 .frame(height: cardHeight)
                 .overlay {
-                    if !item.previewDocuments.isEmpty {
-                        folderOverlayView(for: item.previewDocuments)
-                    }
+                    folderOverlayView(for: item)
                 }
                 .overlay(alignment: .topLeading) {
                     GeometryReader { geo in
@@ -277,36 +288,46 @@ struct GridLayoutView: View {
     }
     
     @ViewBuilder
-    private func folderOverlayView(for items: [FileDocumentItem]) -> some View {
-        if items.contains(where: { $0.isLocked }) {
+    private func folderOverlayView(for item: FileFolderItem) -> some View {
+        if item.isLocked {
             Image(appIcon: .lock_image)
         } else {
-            GeometryReader { geo in
-                let size = geo.size.width / 2
-                
-                VStack(spacing: 8) {
-                    HStack(spacing: 12) {
-                        folderOverlayImageView(for: items, index: 0, size: size)
-                        folderOverlayImageView(for: items, index: 1, size: size)
-                    }
+            if !item.previewDocuments.isEmpty {
+                GeometryReader { geo in
+                    let size = geo.size.width / 2
                     
-                    HStack(spacing: 12) {
-                        folderOverlayImageView(for: items, index: 2, size: size)
-                        folderOverlayImageView(for: items, index: 3, size: size)
+                    VStack(spacing: 8) {
+                        HStack(spacing: 12) {
+                            if let firstDocument = item.previewDocuments[safe: 0] {
+                                folderOverlayImageView(for: firstDocument, size: size)
+                            }
+                            if let secondDocument = item.previewDocuments[safe: 1] {
+                                folderOverlayImageView(for: secondDocument, size: size)
+                            }
+                        }
+                        
+                        HStack(spacing: 12) {
+                            if let firstDocument = item.previewDocuments[safe: 2] {
+                                folderOverlayImageView(for: firstDocument, size: size)
+                            }
+                            if let secondDocument = item.previewDocuments[safe: 3] {
+                                folderOverlayImageView(for: secondDocument, size: size)
+                            }
+                        }
                     }
+                    .padding(.top, 30)
+                    .padding([.horizontal, .bottom], 12)
                 }
-                .padding(.top, 30)
-                .padding([.horizontal, .bottom], 12)
+                .clipped()
             }
-            .clipped()
         }
     }
     
-    private func folderOverlayImageView(for items: [FileDocumentItem], index: Int, size: CGFloat) -> some View {
-        documentBackgroundView(for: items[index])
+    private func folderOverlayImageView(for document: FileDocumentItem, size: CGFloat) -> some View {
+        documentBackgroundView(for: document)
             .cornerRadius(4, corners: .allCorners)
             .overlay {
-                foldertCardImageView(for: items[index])
+                foldertCardImageView(for: document)
             }
     }
     

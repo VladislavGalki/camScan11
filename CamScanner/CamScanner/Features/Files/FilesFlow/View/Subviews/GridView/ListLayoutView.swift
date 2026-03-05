@@ -97,6 +97,19 @@ struct ListLayoutView: View {
             }
         }
         .padding(.vertical, 9)
+        .background(
+            Color(
+                UIColor(
+                    red: 52.0/255.0,
+                    green: 199.0/255.0,
+                    blue: 89.0/255.0,
+                    alpha: highlightedID == item.id ? 0.1 : 0
+                )
+            )
+            .cornerRadius(8, corners: .allCorners)
+            .padding(.horizontal, -16)
+            .animation(.easeIn, value: highlightedID == item.id)
+        )
     }
     
     @ViewBuilder
