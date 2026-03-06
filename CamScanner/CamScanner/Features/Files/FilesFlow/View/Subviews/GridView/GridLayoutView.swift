@@ -3,6 +3,7 @@ import SwiftUI
 struct GridLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
+    var shouldHideSettings: Bool = false
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -21,6 +22,7 @@ struct GridLayoutView: View {
                         GridDocumentItemView(
                             item: doc,
                             highlightedID: highlightedID,
+                            shouldHideSettings: shouldHideSettings,
                             onFavouriteClick: onFavouriteClick,
                             onMenuClick: onMenuClick
                         )
@@ -29,6 +31,7 @@ struct GridLayoutView: View {
                         GridFolderItemView(
                             item: folder,
                             highlightedID: highlightedID,
+                            shouldHideSettings: shouldHideSettings,
                             onMenuClick: onMenuClick
                         )
                         .id(folder.id)
@@ -44,6 +47,7 @@ struct GridLayoutView: View {
 struct GridDocumentItemView: View {
     let item: FileDocumentItem
     let highlightedID: UUID?
+    let shouldHideSettings: Bool
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -87,21 +91,23 @@ struct GridDocumentItemView: View {
 
             Spacer()
 
-            GeometryReader { geo in
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .iconOnly(.dots),
-                        style: .secondary,
-                        size: .s
-                    ),
-                    action: {
+            if !shouldHideSettings {
+                GeometryReader { geo in
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.dots),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: {
 
-                        let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                        onMenuClick?(item.id, frame)
-                    }
-                )
+                            let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                            onMenuClick?(item.id, frame)
+                        }
+                    )
+                }
+                .frame(width: 28, height: 28)
             }
-            .frame(width: 28, height: 28)
         }
         .padding([.top, .horizontal], 4)
     }
@@ -256,6 +262,7 @@ struct GridDocumentLockSkeleton: View {
 struct GridFolderItemView: View {
     let item: FileFolderItem
     let highlightedID: UUID?
+    let shouldHideSettings: Bool
 
     var onMenuClick: ((UUID, CGRect) -> Void)?
 
@@ -269,21 +276,23 @@ struct GridFolderItemView: View {
                     GridFolderOverlay(item: item)
                 }
                 .overlay(alignment: .topLeading) {
-                    GeometryReader { geo in
-                        AppButton(
-                            config: AppButtonConfig(
-                                content: .iconOnly(.dots),
-                                style: .secondary,
-                                size: .s
-                            ),
-                            action: {
-                                let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                                onMenuClick?(item.id, frame)
-                            }
-                        )
-                        .padding(4)
+                    if !shouldHideSettings {
+                        GeometryReader { geo in
+                            AppButton(
+                                config: AppButtonConfig(
+                                    content: .iconOnly(.dots),
+                                    style: .secondary,
+                                    size: .s
+                                ),
+                                action: {
+                                    let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                                    onMenuClick?(item.id, frame)
+                                }
+                            )
+                            .padding(4)
+                        }
+                        .frame(width: 28, height: 28)
                     }
-                    .frame(width: 28, height: 28)
                 }
 
             VStack(spacing: 0) {

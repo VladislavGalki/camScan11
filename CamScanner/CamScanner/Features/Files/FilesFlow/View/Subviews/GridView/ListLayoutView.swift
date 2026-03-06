@@ -3,6 +3,7 @@ import SwiftUI
 struct ListLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
+    var shouldHideSettings: Bool = false
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -14,6 +15,7 @@ struct ListLayoutView: View {
                     ListItemRow(
                         item: model[index],
                         highlightedID: highlightedID,
+                        shouldHideSettings: shouldHideSettings,
                         onFavouriteClick: onFavouriteClick,
                         onMenuClick: onMenuClick
                     )
@@ -39,6 +41,7 @@ struct ListLayoutView: View {
 struct ListItemRow: View {
     let item: FilesGridItem
     let highlightedID: UUID?
+    let shouldHideSettings: Bool
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -49,6 +52,7 @@ struct ListItemRow: View {
             ListDocumentRow(
                 item: document,
                 highlightedID: highlightedID,
+                shouldHideSettings: shouldHideSettings,
                 onFavouriteClick: onFavouriteClick,
                 onMenuClick: onMenuClick
             )
@@ -56,6 +60,7 @@ struct ListItemRow: View {
             ListFolderRow(
                 item: folder,
                 highlightedID: highlightedID,
+                shouldHideSettings: shouldHideSettings,
                 onMenuClick: onMenuClick
             )
         }
@@ -65,6 +70,7 @@ struct ListItemRow: View {
 struct ListDocumentRow: View {
     let item: FileDocumentItem
     let highlightedID: UUID?
+    let shouldHideSettings: Bool
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -105,20 +111,22 @@ struct ListDocumentRow: View {
                     }
                 )
 
-                GeometryReader { geo in
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .iconOnly(.dots),
-                            style: .secondary,
-                            size: .s
-                        ),
-                        action: {
-                            let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                            onMenuClick?(item.id, frame)
-                        }
-                    )
+                if !shouldHideSettings {
+                    GeometryReader { geo in
+                        AppButton(
+                            config: AppButtonConfig(
+                                content: .iconOnly(.dots),
+                                style: .secondary,
+                                size: .s
+                            ),
+                            action: {
+                                let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                                onMenuClick?(item.id, frame)
+                            }
+                        )
+                    }
+                    .frame(width: 28, height: 28)
                 }
-                .frame(width: 28, height: 28)
             }
         }
         .padding(.vertical, 9)
@@ -260,6 +268,7 @@ struct ListDocumentLock: View {
 struct ListFolderRow: View {
     let item: FileFolderItem
     let highlightedID: UUID?
+    let shouldHideSettings: Bool
 
     var onMenuClick: ((UUID, CGRect) -> Void)?
 
@@ -287,20 +296,22 @@ struct ListFolderRow: View {
 
             Spacer()
 
-            GeometryReader { geo in
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .iconOnly(.dots),
-                        style: .secondary,
-                        size: .s
-                    ),
-                    action: {
-                        let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                        onMenuClick?(item.id, frame)
-                    }
-                )
+            if !shouldHideSettings {
+                GeometryReader { geo in
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.dots),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: {
+                            let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                            onMenuClick?(item.id, frame)
+                        }
+                    )
+                }
+                .frame(width: 28, height: 28)
             }
-            .frame(width: 28, height: 28)
         }
         .padding(.vertical, 9)
         .background(highlight)

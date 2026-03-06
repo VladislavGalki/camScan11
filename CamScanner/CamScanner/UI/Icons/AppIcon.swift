@@ -85,6 +85,7 @@ public enum AppIcon: String, CaseIterable {
     case folder_small_image = "folder_small_image"
     case lock_image = "lock_image"
     case faceId_image = "faceId_image"
+    case empty_seatch_image = "empty_seatch_image"
 }
 
 public extension Image {

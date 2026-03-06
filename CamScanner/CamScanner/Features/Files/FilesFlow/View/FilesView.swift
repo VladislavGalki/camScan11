@@ -59,7 +59,7 @@ private extension FilesView {
                     shouldShowDotsOverlay = true
                 },
                 onSearchTap: {
-                    viewModel.viewState = .search
+                    viewModel.startSearch()
                 },
                 onDotsFrame: { frame in
                     if dotsFrame == .zero {
@@ -91,7 +91,38 @@ private extension FilesView {
     }
     
     private var searchView: some View {
-        EmptyView()
+        VStack(spacing: 0) {
+            if viewModel.items.isEmpty {
+                FilesSearchEmptyView(
+                    isSearching: !viewModel.searchText.isEmpty
+                )
+                .ignoresSafeArea(.keyboard)
+            } else {
+                FilesSearchResultsView(
+                    viewMode: viewModel.viewMode,
+                    items: viewModel.items,
+                    highlightedID: viewModel.highlightedID
+                ) { id, isFavourite in
+                    viewModel.handleDocumentFavourite(
+                        documentId: id,
+                        isFavourite: isFavourite
+                    )
+                }
+                .ignoresSafeArea(edges: .top)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.bg(.main)
+                .ignoresSafeArea()
+        )
+        .safeAreaInset(edge: .bottom) {
+            FilesSearchBarView(
+                text: $viewModel.searchText,
+                onClear: viewModel.clearSearch
+            )
+            .padding(16)
+        }
     }
 }
 
@@ -269,6 +300,7 @@ struct FilesLayoutContainer: View {
     let mode: FilesViewMode
     let items: [FilesGridItem]
     let highlightedID: UUID?
+    var shouldHideSettings: Bool = false
 
     let onFavourite: (UUID, Bool) -> Void
     let onMenuClick: (UUID, CGRect) -> Void
@@ -279,6 +311,7 @@ struct FilesLayoutContainer: View {
             GridLayoutView(
                 highlightedID: highlightedID,
                 model: items,
+                shouldHideSettings: shouldHideSettings,
                 onFavouriteClick: onFavourite,
                 onMenuClick: onMenuClick
             )
@@ -286,6 +319,7 @@ struct FilesLayoutContainer: View {
             ListLayoutView(
                 highlightedID: highlightedID,
                 model: items,
+                shouldHideSettings: shouldHideSettings,
                 onFavouriteClick: onFavourite,
                 onMenuClick: onMenuClick
             )
@@ -445,5 +479,129 @@ struct FilesNotificationOverlay: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Search
+struct FilesSearchEmptyView: View {
+    let isSearching: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(appIcon: .empty_seatch_image)
+                .padding(.bottom, 16)
+
+            Text(
+                isSearching
+                ? "No Results Found"
+                : "Search document and folders"
+            )
+            .appTextStyle(.bodyPrimary)
+            .foregroundStyle(.text(.secondary))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct FilesSearchResultsView: View {
+    let viewMode: FilesViewMode
+    let items: [FilesGridItem]
+    let highlightedID: UUID?
+
+    let onFavourite: (UUID, Bool) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .foregroundStyle(.bg(.main))
+                .frame(height: 62)
+
+            FilesLayoutContainer(
+                mode: viewMode,
+                items: items,
+                highlightedID: highlightedID,
+                shouldHideSettings: true,
+                onFavourite: onFavourite,
+                onMenuClick: { _, _ in }
+            )
+        }
+    }
+}
+
+struct FilesSearchBarView: View {
+    @Binding var text: String
+    let onClear: () -> Void
+
+    var body: some View {
+        SearchFieldFileView(text: $text) {
+            onClear()
+        }
+    }
+}
+
+struct SearchFieldFileView: View {
+    @Binding var text: String
+    @FocusState private var isFocused: Bool
+    
+    let onClose: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            textField
+            
+            closeutton
+        }
+        .onAppear {
+            isFocused = true
+        }
+    }
+    
+    private var textField: some View {
+        HStack(spacing: 8) {
+            Image(appIcon: .search)
+                .renderingMode(.template)
+                .foregroundStyle(.elements(.tertiary))
+            
+            ZStack(alignment: .leading) {
+                if text.isEmpty {
+                    Text("Search documents")
+                        .appTextStyle(.bodyPrimary)
+                        .foregroundStyle(.text(.tertiary))
+                }
+                
+                TextField("", text: $text)
+                    .appTextStyle(.bodyPrimary)
+                    .foregroundStyle(.text(.primary))
+                    .tint(.bg(.accent))
+                    .focused($isFocused)
+            }
+            
+            if !text.isEmpty {
+                Image(appIcon: .closeFill)
+                    .renderingMode(.template)
+                    .foregroundStyle(.elements(.tertiary))
+                    .onTapGesture {
+                        text = ""
+                    }
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 44)
+        .background(
+            Color.bg(.controlOnMain)
+                .cornerRadius(100)
+        )
+    }
+    
+    private var closeutton: some View {
+        AppButton(
+            config: AppButtonConfig(
+                content: .iconOnly(.close),
+                style: .secondary,
+                size: .m
+            )) {
+                isFocused = false
+                onClose()
+            }
     }
 }

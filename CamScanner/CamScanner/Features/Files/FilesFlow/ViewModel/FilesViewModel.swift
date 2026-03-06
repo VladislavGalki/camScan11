@@ -8,6 +8,9 @@ final class FilesViewModel: ObservableObject {
     @Published var viewMode: FilesViewMode = .grid
     @Published private(set) var items: [FilesGridItem] = []
     
+    @Published var isSearchLoading = false
+    @Published var searchText: String = ""
+    
     @Published var highlightedID: UUID?
     @Published var shouldShowNotification = false
     @Published var notificationOverlaystate: FilesNotificationOverlayState = .none
@@ -19,6 +22,7 @@ final class FilesViewModel: ObservableObject {
     private let documentStore = FileDocumentStore()
     private let faceIdService = FaceIDService.shared
     
+    private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
     init() {
@@ -28,6 +32,7 @@ final class FilesViewModel: ObservableObject {
     
     private func bootstrap() {
         subscribeFileDocuments()
+        subscribeSearch()
         documentStore.bootstrap(with: sortType)
     }
     
@@ -61,14 +66,28 @@ final class FilesViewModel: ObservableObject {
             }
             
             self.items = updatedItems
-            
-            if !updatedItems.isEmpty {
-                self.viewState = .success
-            } else {
-                self.viewState = .empty
+            self.isSearchLoading = false
+
+            if self.viewState == .search {
+                return
             }
+
+            self.viewState = !updatedItems.isEmpty ? .success : .empty
         }
         .store(in: &cancellables)
+    }
+    
+    private func subscribeSearch() {
+        searchCancellable = $searchText
+            .dropFirst()
+            .handleEvents(receiveOutput: { [weak self] _ in
+                self?.isSearchLoading = true
+            })
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] text in
+                self?.documentStore.search(text)
+            }
     }
     
     private func applyThumbnails(_ thumbs: [ThumbKey: UIImage]) {
@@ -165,6 +184,17 @@ final class FilesViewModel: ObservableObject {
 // MARK: - Public
 
 extension FilesViewModel {
+    func startSearch() {
+        items = []
+        searchText = ""
+        viewState = .search
+    }
+    
+    func clearSearch() {
+        viewState = items.isEmpty ? .empty : .success
+        documentStore.clearSearch()
+    }
+    
     func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
         guard let id else { return }
         
