@@ -21,6 +21,16 @@ struct AppRootView: View {
                 )
             }
             
+        // MARK: - Files
+            
+        case let r as FilesRoute:
+            switch r {
+            case let .openFolder(inputModel, onFolderDeleted):
+                return AnyView(
+                    FolderView(inputModel: inputModel, onFolderDeleted: onFolderDeleted)
+                )
+            }
+            
         // MARK: - Scan
             
         case let r as ScanFlowRoute:

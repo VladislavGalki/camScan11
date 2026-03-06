@@ -1,0 +1,100 @@
+import SwiftUI
+
+struct FilesNotificationOverlay: View {
+    let state: FilesNotificationOverlayState
+    
+    let selectedID: UUID?
+    let selectedMenuItem: FilesMenuItem?
+    
+    let viewModel: FilesViewModel
+    
+    let onClear: () -> Void
+    let onShowTabBar: () -> Void
+    
+    var body: some View {
+        if state != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+                
+                switch state {
+                case .deleteFile:
+                    DeleteDocumentView(
+                        onDelete: {
+                            viewModel.handleApplyFileDocumentMenuItem(
+                                id: selectedID,
+                                menuItem: selectedMenuItem
+                            )
+                            onClear()
+                        },
+                        onCancel: {
+                            onClear()
+                        }
+                    )
+                    .onDisappear {
+                        onShowTabBar()
+                    }
+                case .unlockDocument:
+                    UnlockDocumentView(
+                        documentTitle: viewModel.getTitleForItem(id: selectedID),
+                        onRemove: {
+                            viewModel.handleApplyFileDocumentMenuItem(
+                                id: selectedID,
+                                menuItem: selectedMenuItem
+                            )
+                            onClear()
+                        },
+                        onCancel: {
+                            onClear()
+                        }
+                    )
+                    .onDisappear {
+                        onShowTabBar()
+                    }
+                case .lock:
+                    LockDocumentView {
+                        await viewModel.handleFaceIdRequest()
+                    } onSuccess: { pin, viaFaceId in
+                        viewModel.hadleDocumentPinCreated(
+                            documentId: selectedID,
+                            pin: pin,
+                            viaFaceId: viaFaceId
+                        )
+                        
+                        onClear()
+                    } onClose: {
+                        onClear()
+                    }
+                case let .unlock(id):
+                    EnterPinView(
+                        documentTitle: viewModel.getTitleForItem(id: selectedID),
+                        validatePin: { pin in
+                            return viewModel.handleDocumentPinValidation(
+                                documentId: selectedID,
+                                pin: pin
+                            )
+                        },
+                        onSuccess: {
+                            switch selectedMenuItem {
+                            case .unlockDocument:
+                                viewModel.notificationOverlaystate = .unlockDocument(id)
+                                
+                            case .delete:
+                                viewModel.notificationOverlaystate = .deleteFile(id)
+                                
+                            default:
+                                onClear()
+                            }
+                        },
+                        onClose: {
+                            onShowTabBar()
+                            onClear()
+                        }
+                    )
+                case .none:
+                    EmptyView()
+                }
+            }
+        }
+    }
+}

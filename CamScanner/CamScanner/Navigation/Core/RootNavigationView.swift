@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct RootNavigationView<Root: View>: View {
+    @StateObject private var tabBar = TabBarController()
+
     let root: Root
     let destinationBuilder: (any Route) -> AnyView
     
@@ -20,5 +22,6 @@ struct RootNavigationView<Root: View>: View {
             destinationBuilder(route.base)
         }
         .environmentObject(router)
+        .environmentObject(tabBar)
     }
 }

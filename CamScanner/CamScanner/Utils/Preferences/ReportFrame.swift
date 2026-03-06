@@ -26,6 +26,11 @@ extension View {
         in coordinateSpace: CoordinateSpace = .global,
         onChange: @escaping (CGRect) -> Void
     ) -> some View {
-        modifier(ReportFrame(coordinateSpace: coordinateSpace, onChange: onChange))
+        modifier(
+            ReportFrame(
+                coordinateSpace: coordinateSpace,
+                onChange: onChange
+            )
+        )
     }
 }

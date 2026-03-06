@@ -71,6 +71,11 @@ final class FilesViewModel: ObservableObject {
             if self.viewState == .search {
                 return
             }
+            
+            if self.sortType == .starred || self.sortType == .locked {
+                self.viewState = .success
+                return
+            }
 
             self.viewState = !updatedItems.isEmpty ? .success : .empty
         }
@@ -160,24 +165,17 @@ final class FilesViewModel: ObservableObject {
         return nil
     }
     
-    private func processSuccessMenuItemSelection(menuItem: FilesMenuItem) {
+    private func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
         switch menuItem {
         case .share:
             break
-        case .move:
-            break
         case .unlockDocument:
-            notificationOverlaystate = .unlock
+            notificationOverlaystate = .unlock(id)
         case .delete:
-            notificationOverlaystate = .deleteFile
+            notificationOverlaystate = .deleteFile(id)
         default:
             break
         }
-    }
-    
-    private func showNotification(type: NotificationModel) {
-        notificationModel = type
-        shouldShowNotification = true
     }
 }
 
@@ -207,19 +205,19 @@ extension FilesViewModel {
                     
                     await MainActor.run {
                         if authentificated {
-                            processSuccessMenuItemSelection(menuItem: menuItem)
+                            processSuccessMenuItemSelection(id: id, menuItem: menuItem)
                         } else {
-                            notificationOverlaystate = .unlock
+                            notificationOverlaystate = .unlock(id)
                         }
                     }
                 } else {
                     await MainActor.run {
-                        notificationOverlaystate = .unlock
+                        notificationOverlaystate = .unlock(id)
                     }
                 }
             }
         } else {
-            processSuccessMenuItemSelection(menuItem: menuItem)
+            processSuccessMenuItemSelection(id: id, menuItem: menuItem)
         }
     }
     
@@ -323,5 +321,22 @@ extension FilesViewModel {
             case .folder(let folder): return folder.id == id && folder.isLocked
             }
         }
+    }
+    
+    func getFolderItem(id: UUID?) -> FileFolderItem? {
+        guard let id else { return nil }
+        
+        for item in items {
+            if case .folder(let folder) = item, folder.id == id {
+                return folder
+            }
+        }
+        
+        return nil
+    }
+    
+    func showNotification(type: NotificationModel) {
+        notificationModel = type
+        shouldShowNotification = true
     }
 }

@@ -1,7 +1,9 @@
+import Foundation
+
 enum FilesNotificationOverlayState: Equatable {
-    case deleteFile
-    case lock
-    case unlock
-    case unlockDocument
+    case deleteFile(UUID)
+    case lock(UUID)
+    case unlock(UUID)
+    case unlockDocument(UUID)
     case none
 }

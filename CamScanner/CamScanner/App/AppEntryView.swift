@@ -5,8 +5,7 @@ struct AppEntryView: View {
     @State private var selectedTab: AppTab = .home
     @State private var cameraButtonFrame: CGRect = .zero
     
-    @StateObject private var tabBar = TabBarController()
-    
+    @EnvironmentObject private var tabBar: TabBarController
     @EnvironmentObject private var router: Router
     
     init() {
@@ -23,7 +22,6 @@ struct AppEntryView: View {
 
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
-            .environmentObject(tabBar)
             .overlay(alignment: .bottom) {
                 if tabBar.isTabBarVisible {
                     CustomTabBar(

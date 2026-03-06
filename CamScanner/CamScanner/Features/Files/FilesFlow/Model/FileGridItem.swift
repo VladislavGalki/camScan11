@@ -19,7 +19,7 @@ enum FilesGridItem: Identifiable, Equatable {
     }
 }
 
-struct FileDocumentItem: Equatable {
+struct FileDocumentItem: Equatable, Hashable {
     let id: UUID
     let folderID: UUID?
     let title: String
@@ -39,11 +39,11 @@ struct FileDocumentItem: Equatable {
     var passwordSalt: Data?
 }
 
-struct FileFolderItem: Equatable {
+struct FileFolderItem: Equatable, Hashable {
     let id: UUID
     let title: String
     let createdAt: Date
-    let isLocked: Bool
+    var isLocked: Bool
     var lockViaFaceId: Bool = false
     let documentsCount: Int
     var previewDocuments: [FileDocumentItem]

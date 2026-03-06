@@ -5,8 +5,10 @@ struct ListLayoutView: View {
     var model: [FilesGridItem]
     var shouldHideSettings: Bool = false
 
-    var onFavouriteClick: ((UUID, Bool) -> Void?)
-    var onMenuClick: ((UUID, CGRect) -> Void)?
+    let onFolderClick: ((UUID) -> Void)?
+    let onDocumentClick: ((UUID) -> Void)?
+    let onFavouriteClick: ((UUID, Bool) -> Void?)
+    let onMenuClick: ((UUID, CGRect) -> Void)?
 
     var body: some View {
         ScrollView(.vertical) {
@@ -16,6 +18,8 @@ struct ListLayoutView: View {
                         item: model[index],
                         highlightedID: highlightedID,
                         shouldHideSettings: shouldHideSettings,
+                        onFolderClick: onFolderClick,
+                        onDocumentClick: onDocumentClick,
                         onFavouriteClick: onFavouriteClick,
                         onMenuClick: onMenuClick
                     )
@@ -43,8 +47,10 @@ struct ListItemRow: View {
     let highlightedID: UUID?
     let shouldHideSettings: Bool
 
-    var onFavouriteClick: ((UUID, Bool) -> Void?)
-    var onMenuClick: ((UUID, CGRect) -> Void)?
+    let onFolderClick: ((UUID) -> Void)?
+    let onDocumentClick: ((UUID) -> Void)?
+    let onFavouriteClick: ((UUID, Bool) -> Void?)
+    let onMenuClick: ((UUID, CGRect) -> Void)?
 
     var body: some View {
         switch item {
@@ -56,6 +62,9 @@ struct ListItemRow: View {
                 onFavouriteClick: onFavouriteClick,
                 onMenuClick: onMenuClick
             )
+            .onTapGesture {
+                onDocumentClick?(document.id)
+            }
         case let .folder(folder):
             ListFolderRow(
                 item: folder,
@@ -63,6 +72,9 @@ struct ListItemRow: View {
                 shouldHideSettings: shouldHideSettings,
                 onMenuClick: onMenuClick
             )
+            .onTapGesture {
+                onFolderClick?(folder.id)
+            }
         }
     }
 }

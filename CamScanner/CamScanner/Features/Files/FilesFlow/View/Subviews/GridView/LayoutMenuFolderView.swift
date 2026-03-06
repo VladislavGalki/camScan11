@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct LayoutMenuItemView: View {
+struct LayoutMenuFolderView: View {
     @Binding var showGridMenu: Bool
 
     let isItemLocked: Bool
@@ -8,12 +8,11 @@ struct LayoutMenuItemView: View {
     let onSelectMenuItem: (FilesMenuItem) -> Void
     let onClose: () -> Void
     
-    private let screen = UIScreen.main.bounds
     private let menuWidth: CGFloat = 200
     private let horizontalPadding: CGFloat = 16
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             Color.black
                 .opacity(showGridMenu ? 0.12 : 0)
                 .ignoresSafeArea()
@@ -25,19 +24,14 @@ struct LayoutMenuItemView: View {
                 }
 
             if showGridMenu {
-                AnchoredLayout(
-                    location: menuLocation,
-                    anchor: menuAnchor
-                ) {
-                    gridMenu
-                }
-                .transition(
-                    .asymmetric(
-                        insertion: .scale(scale: 0.95, anchor: menuAnchor)
-                            .combined(with: .opacity),
-                        removal: .opacity
+                gridMenu
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.95, anchor: .topTrailing)
+                                .combined(with: .opacity),
+                            removal: .opacity
+                        )
                     )
-                )
             }
         }
     }
@@ -64,6 +58,8 @@ struct LayoutMenuItemView: View {
         .cornerRadius(24)
         .appBorderModifier(.border(.primary), radius: 24)
         .shadow(color: .black.opacity(0.05), radius: 30)
+        .padding(.trailing, 16)
+        .offset(y: menuFrame.maxY + 56)
     }
 
     private func menuRow(
@@ -92,45 +88,26 @@ struct LayoutMenuItemView: View {
     
     private func imageForItem(_ item: FilesMenuItem) -> AppIcon {
         switch item {
-        case .share:
-            return .share
         case .rename:
             return .edit
         case .lock, .unlockDocument:
             return .lock
-        case .move:
-            return .move
         case .delete:
             return .trash
+        default:
+            return .edit
         }
     }
     
-    private var safeX: CGFloat {
-        let maxAllowedX = screen.width - horizontalPadding
-        let minAllowedX = menuWidth + horizontalPadding
-
-        return min(max(menuFrame.maxX, minAllowedX), maxAllowedX)
-    }
-    
-    private var showAbove: Bool {
-        menuFrame.midY > screen.height / 2
-    }
-
-    private var menuLocation: CGPoint {
-        CGPoint(
-            x: safeX,
-            y: showAbove
-                ? menuFrame.minY - 10
-                : menuFrame.maxY + 10
-        )
-    }
-
-    private var menuAnchor: UnitPoint {
-        showAbove ? .bottomTrailing : .topTrailing
-    }
-    
     private var visibleMenuItems: [FilesMenuItem] {
-        FilesMenuItem.allCases.filter {
+        let baseItems: [FilesMenuItem] = [
+            .rename,
+            .lock,
+            .unlockDocument,
+            .delete
+        ]
+
+        return baseItems.filter {
             switch $0 {
             case .lock: return !isItemLocked
             case .unlockDocument: return isItemLocked

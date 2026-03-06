@@ -5,8 +5,10 @@ struct GridLayoutView: View {
     var model: [FilesGridItem]
     var shouldHideSettings: Bool = false
 
-    var onFavouriteClick: ((UUID, Bool) -> Void?)
-    var onMenuClick: ((UUID, CGRect) -> Void)?
+    let onFolderClick: ((UUID) -> Void)?
+    let onDocumentClick: ((UUID) -> Void)?
+    let onFavouriteClick: ((UUID, Bool) -> Void?)
+    let onMenuClick: ((UUID, CGRect) -> Void)?
 
     private let columns = Array(
         repeating: GridItem(.flexible(), spacing: 26),
@@ -27,6 +29,9 @@ struct GridLayoutView: View {
                             onMenuClick: onMenuClick
                         )
                         .id(doc.id)
+                        .onTapGesture {
+                            onDocumentClick?(doc.id)
+                        }
                     case let .folder(folder):
                         GridFolderItemView(
                             item: folder,
@@ -35,6 +40,9 @@ struct GridLayoutView: View {
                             onMenuClick: onMenuClick
                         )
                         .id(folder.id)
+                        .onTapGesture {
+                            onFolderClick?(folder.id)
+                        }
                     }
                 }
             }
