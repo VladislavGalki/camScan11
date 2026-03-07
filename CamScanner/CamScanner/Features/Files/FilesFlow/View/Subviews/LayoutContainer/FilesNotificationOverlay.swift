@@ -67,24 +67,29 @@ struct FilesNotificationOverlay: View {
                     }
                 case let .unlock(id):
                     EnterPinView(
-                        documentTitle: viewModel.getTitleForItem(id: selectedID),
+                        documentTitle: viewModel.getTitleForItem(id: id),
                         validatePin: { pin in
                             return viewModel.handleDocumentPinValidation(
-                                documentId: selectedID,
+                                documentId: id,
                                 pin: pin
                             )
                         },
                         onSuccess: {
-                            switch selectedMenuItem {
-                            case .unlockDocument:
-                                viewModel.notificationOverlaystate = .unlockDocument(id)
-                            case .delete:
-                                viewModel.notificationOverlaystate = .deleteFile(id)
-                            case .share:
-                                viewModel.fileActiveSheet = .share(id)
-                                onShowTabBar()
-                                onClear()
-                            default:
+                            if let selectedMenuItem {
+                                switch selectedMenuItem {
+                                case .unlockDocument:
+                                    viewModel.notificationOverlaystate = .unlockDocument(id)
+                                case .delete:
+                                    viewModel.notificationOverlaystate = .deleteFile(id)
+                                case .share:
+                                    viewModel.fileActiveSheet = .share(id)
+                                    onShowTabBar()
+                                    onClear()
+                                default:
+                                    onClear()
+                                }
+                            } else {
+                                viewModel.executePendingAction()
                                 onClear()
                             }
                         },

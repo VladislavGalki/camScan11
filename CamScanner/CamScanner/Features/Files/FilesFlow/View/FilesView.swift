@@ -24,6 +24,11 @@ struct FilesView: View {
             .overlay(alignment: .top) { toastOverlay }
             .sheet(item: $viewModel.fileActiveSheet) { sheetView($0) }
             .coordinateSpace(name: "filesCoordinateSpace")
+            .onChange(of: viewModel.folderToOpen) { _, newValue in
+                guard let newValue else { return }
+                presentFolderView(newValue)
+                viewModel.folderToOpen = nil
+            }
     }
 }
 
@@ -74,9 +79,7 @@ private extension FilesView {
                 items: viewModel.items,
                 highlightedID: viewModel.highlightedID,
                 onFolderClick: { id in
-                    if !viewModel.isDocumentLocked(id: id) {
-                        presentFolderView(id)
-                    }
+                    viewModel.openFolderTapped(id: id)
                 },
                 onDocumentClick: { id in
                     print("DELETED HANDLE NOTIFICATION")
@@ -112,26 +115,8 @@ private extension FilesView {
                     items: viewModel.items,
                     highlightedID: viewModel.highlightedID,
                     onFolderClick: { id in
-                        if let folderItem = viewModel.getFolderItem(id: id) {
-                            router.push(
-                                FilesRoute.openFolder(
-                                    FolderInputModel(
-                                        folderItem: folderItem,
-                                        viewMode: viewModel.viewMode
-                                    ),
-                                    onFolderDeleted: {
-                                        router.pop()
-                                        
-                                        Task {
-                                            try await Task.sleep(for: .seconds(0.25))
-                                            viewModel.showNotification(type: .folderRemoved)
-                                        }
-                                    }
-                                )
-                            )
-                            
-                            viewModel.clearSearch()
-                        }
+                        viewModel.openFolderTapped(id: id)
+                        viewModel.clearSearch()
                     },
                     onDocumentClick: { _ in },
                     onFavourite: { id, isFavourite in

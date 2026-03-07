@@ -2,7 +2,9 @@ import Foundation
 import Combine
 import UIKit
 
+@MainActor
 final class FilesViewModel: ObservableObject {
+    @Published var folderToOpen: UUID?
     @Published var viewState: FileViewState = .empty
     @Published var sortType: FilesSortType = .recent
     @Published var viewMode: FilesViewMode = .grid
@@ -17,6 +19,9 @@ final class FilesViewModel: ObservableObject {
     @Published var notificationModel: NotificationModel?
     @Published var fileActiveSheet: FileActiveSheet?
     
+    private var pendingAction: FilesPendingAction?
+    
+    private let lockedActionExecutore = LockedActionExecutor.shared
     private let passwordCryptoService = PasswordCryptoService.shared
     private let documentRepository: DocumentRepository
     private let documentStore = FileDocumentStore()
@@ -124,15 +129,6 @@ final class FilesViewModel: ObservableObject {
         }
     }
     
-    private func isDocumentLockViaFaceId(id: UUID) -> Bool {
-        items.contains {
-            switch $0 {
-            case .document(let doc): return doc.id == id && doc.lockViaFaceId
-            case .folder(let folder): return folder.id == id && folder.lockViaFaceId
-            }
-        }
-    }
-    
     func typeForItem(id: UUID) -> FilesItemType? {
         items.first(where: { $0.id == id }).map {
             switch $0 {
@@ -193,31 +189,31 @@ extension FilesViewModel {
         documentStore.clearSearch()
     }
     
-    func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
-        guard let id else { return }
-        
-        let isDocumentLockedViaFaceId = isDocumentLockViaFaceId(id: id)
-        
-        if isDocumentLocked(id: id) {
-            Task {
-                if isDocumentLockedViaFaceId {
-                    let authentificated = await faceIdService.authenticateForUnlock()
-                    
-                    await MainActor.run {
-                        if authentificated {
-                            processSuccessMenuItemSelection(id: id, menuItem: menuItem)
-                        } else {
-                            notificationOverlaystate = .unlock(id)
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        notificationOverlaystate = .unlock(id)
-                    }
+    func openFolderTapped(id: UUID) {
+        Task {
+            let result = await LockedActionExecutor.shared.execute(
+                isLocked: isDocumentLocked(id: id),
+                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
+            )
+            
+            await MainActor.run {
+                if result.success {
+                    folderToOpen = id
+                } else if result.requiresPin {
+                    pendingAction = .openFolder(id)
+                    notificationOverlaystate = .unlock(id)
                 }
             }
-        } else {
-            processSuccessMenuItemSelection(id: id, menuItem: menuItem)
+        }
+    }
+    
+    func executePendingAction() {
+        guard let action = pendingAction else { return }
+        pendingAction = nil
+
+        switch action {
+        case .openFolder(let id):
+            folderToOpen = id
         }
     }
     
@@ -242,6 +238,25 @@ extension FilesViewModel {
             } catch {}
         default:
             return
+        }
+    }
+    
+    func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
+        guard let id else { return }
+        
+        Task {
+            let result = await LockedActionExecutor.shared.execute(
+                isLocked: isDocumentLocked(id: id),
+                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
+            )
+            
+            await MainActor.run {
+                if result.success {
+                    processSuccessMenuItemSelection(id: id, menuItem: menuItem)
+                } else if result.requiresPin {
+                    notificationOverlaystate = .unlock(id)
+                }
+            }
         }
     }
     
@@ -324,6 +339,15 @@ extension FilesViewModel {
             switch $0 {
             case .document(let doc): return doc.id == id && doc.isLocked
             case .folder(let folder): return folder.id == id && folder.isLocked
+            }
+        }
+    }
+    
+    private func isDocumentLockViaFaceId(id: UUID) -> Bool {
+        items.contains {
+            switch $0 {
+            case .document(let doc): return doc.id == id && doc.lockViaFaceId
+            case .folder(let folder): return folder.id == id && folder.lockViaFaceId
             }
         }
     }
