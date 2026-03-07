@@ -168,7 +168,7 @@ final class FilesViewModel: ObservableObject {
     private func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
         switch menuItem {
         case .share:
-            break
+            fileActiveSheet = .share(id)
         case .unlockDocument:
             notificationOverlaystate = .unlock(id)
         case .delete:
@@ -226,7 +226,7 @@ extension FilesViewModel {
         
         switch menuItem {
         case .share:
-            break
+            fileActiveSheet = .share(id)
         case .unlockDocument:
             do {
                 try documentRepository.removePassword(id: id)
@@ -310,6 +310,11 @@ extension FilesViewModel {
         }
         
         return ""
+    }
+    
+    func makeShareModel(id: UUID?) -> ShareInputModel? {
+        guard let id else { return nil }
+        return try? documentRepository.loadShareModel(id: id)
     }
     
     func isDocumentLocked(id: UUID?) -> Bool {

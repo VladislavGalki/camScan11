@@ -74,23 +74,8 @@ private extension FilesView {
                 items: viewModel.items,
                 highlightedID: viewModel.highlightedID,
                 onFolderClick: { id in
-                    if let folderItem = viewModel.getFolderItem(id: id) {
-                        router.push(
-                            FilesRoute.openFolder(
-                                FolderInputModel(
-                                    folderItem: folderItem,
-                                    viewMode: viewModel.viewMode
-                                ),
-                                onFolderDeleted: {
-                                    router.pop()
-                                    
-                                    Task {
-                                        try await Task.sleep(for: .seconds(0.25))
-                                        viewModel.showNotification(type: .folderRemoved)
-                                    }
-                                }
-                            )
-                        )
+                    if !viewModel.isDocumentLocked(id: id) {
+                        presentFolderView(id)
                     }
                 },
                 onDocumentClick: { id in
@@ -172,6 +157,28 @@ private extension FilesView {
             .padding(16)
         }
     }
+    
+    // MARK: Private
+    private func presentFolderView(_ id: UUID) {
+        if let folderItem = viewModel.getFolderItem(id: id) {
+            router.push(
+                FilesRoute.openFolder(
+                    FolderInputModel(
+                        folderItem: folderItem,
+                        viewMode: viewModel.viewMode
+                    ),
+                    onFolderDeleted: {
+                        router.pop()
+                        
+                        Task {
+                            try await Task.sleep(for: .seconds(0.25))
+                            viewModel.showNotification(type: .folderRemoved)
+                        }
+                    }
+                )
+            )
+        }
+    }
 }
 
 // MARK: - Overlays
@@ -235,7 +242,13 @@ private extension FilesView {
                 viewModel.handleFolderCreated(folderName: folderName)
             }
             .presentationCornerRadius(38)
-
+        case let .share(id):
+            if let shareInputModel = viewModel.makeShareModel(id: id) {
+                ShareView(inputModel: shareInputModel) {
+                    viewModel.fileActiveSheet = nil
+                }
+                .presentationCornerRadius(38)
+            }
         case .rename:
             RenameFolderView(
                 folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)
@@ -274,8 +287,15 @@ private extension FilesView {
             withAnimation(.easeInOut(duration: 0.15)) {
                 viewModel.notificationOverlaystate = .lock(UUID())
             }
-        case .move, .share:
+        case .move:
             break
+        case.share:
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.handleFileDocumentMenuItemSelected(
+                    id: selectedFileDocumentItemId,
+                    menuItem: menuItem
+                )
+            }
         }
     }
 }

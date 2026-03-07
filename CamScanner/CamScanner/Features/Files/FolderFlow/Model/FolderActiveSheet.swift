@@ -1,7 +1,7 @@
 import Foundation
 
 enum FolderActiveSheet: Identifiable {
-    case share
+    case share(UUID)
     case rename(String)
     case move
     

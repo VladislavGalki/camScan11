@@ -78,10 +78,12 @@ struct FilesNotificationOverlay: View {
                             switch selectedMenuItem {
                             case .unlockDocument:
                                 viewModel.notificationOverlaystate = .unlockDocument(id)
-                                
                             case .delete:
                                 viewModel.notificationOverlaystate = .deleteFile(id)
-                                
+                            case .share:
+                                viewModel.fileActiveSheet = .share(id)
+                                onShowTabBar()
+                                onClear()
                             default:
                                 onClear()
                             }

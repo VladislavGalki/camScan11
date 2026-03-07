@@ -68,10 +68,11 @@ struct FolderNotificationOverlay: View {
                             switch selectedMenuItem {
                             case .unlockDocument:
                                 viewModel.notificationOverlaystate = .unlockDocument(id)
-                                
                             case .delete:
                                 viewModel.notificationOverlaystate = .deleteFile(id)
-                                
+                            case .share:
+                                viewModel.folderActiveSheet = .share(id)
+                                onClear()
                             default:
                                 onClear()
                             }

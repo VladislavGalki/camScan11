@@ -115,7 +115,26 @@ struct FolderView: View {
     }
     
     var successView: some View {
-        EmptyView()
+        FilesLayoutContainer(
+            mode: viewModel.viewMode,
+            items: viewModel.items,
+            highlightedID: viewModel.highlightedID,
+            onFolderClick: { _ in },
+            onDocumentClick: { id in
+                print("DELETED HANDLE NOTIFICATION")
+            },
+            onFavourite: { id, isFavourite in
+                viewModel.handleDocumentFavourite(
+                    documentId: id,
+                    isFavourite: isFavourite
+                )
+            },
+            onMenuClick: { id, frame in
+                selectedFileDocumentItemId = id
+                menuFrame = frame
+                shouldShowMenuOverlay = true
+            }
+        )
     }
 }
 
@@ -124,8 +143,13 @@ private extension FolderView {
     @ViewBuilder
     func sheetView(_ sheet: FolderActiveSheet) -> some View {
         switch sheet {
-        case .share:
-            EmptyView()
+        case let .share(id):
+            if let shareInputModel = viewModel.makeShareModel(id: id) {
+                ShareView(inputModel: shareInputModel) {
+                    viewModel.folderActiveSheet = nil
+                }
+                .presentationCornerRadius(38)
+            }
         case let.rename(title):
             RenameFolderView(folderTitle: title) { newTitle in
                 viewModel.handleFileDocumentRenamed(selectedFileDocumentItemId, fileName: newTitle)
@@ -229,7 +253,15 @@ private extension FolderView {
             withAnimation(.easeInOut(duration: 0.15)) {
                 viewModel.notificationOverlaystate = .lock(selectedFileDocumentItemId)
             }
-        case .move, .share:
+        case .share:
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.handleFileDocumentMenuItemSelected(
+                    id: selectedFileDocumentItemId,
+                    menuItem: menuItem,
+                    type: .documents
+                )
+            }
+        case .move:
             break
         }
     }

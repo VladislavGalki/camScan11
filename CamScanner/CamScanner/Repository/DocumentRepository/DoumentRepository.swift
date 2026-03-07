@@ -416,3 +416,137 @@ extension DocumentRepository {
         return try context.fetch(folderRequest).first != nil
     }
 }
+
+// MARK: - Share
+extension DocumentRepository {
+    func loadShareModel(id: UUID) throws -> ShareInputModel {
+        if let document = try fetchDocument(id: id) {
+            return try buildShareModel(from: [document])
+        }
+
+        if let folder = try fetchFolder(id: id) {
+            let docs = (folder.documents as? Set<DocumentEntity>) ?? []
+            return try buildShareModel(from: Array(docs))
+        }
+
+        throw NSError(
+            domain: "DocumentRepository",
+            code: 5001,
+            userInfo: [NSLocalizedDescriptionKey: "Document or folder not found"]
+        )
+    }
+    
+    private func fetchDocument(id: UUID) throws -> DocumentEntity? {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        return try context.fetch(request).first
+    }
+
+    private func fetchFolder(id: UUID) throws -> FolderEntity? {
+        let request: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+        
+        return try context.fetch(request).first
+    }
+    
+    private func buildShareModel(from documents: [DocumentEntity]) throws -> ShareInputModel {
+        guard let first = documents.first else {
+            throw NSError(domain: "DocumentRepository", code: 5002)
+        }
+
+        let docType = DocumentTypeEnum(rawValue: first.documentTypeRaw ?? "") ?? .documents
+
+        var pages: [ScanPreviewModel] = []
+
+        for document in documents {
+
+            let frames = try loadFrames(for: document)
+
+            if docType == .documents || docType == .passport {
+
+                frames.forEach {
+                    pages.append(
+                        ScanPreviewModel(
+                            documentType: docType,
+                            frames: [$0]
+                        )
+                    )
+                }
+
+            } else {
+
+                pages.append(
+                    ScanPreviewModel(
+                        documentType: docType,
+                        frames: frames
+                    )
+                )
+
+            }
+        }
+
+        return ShareInputModel(
+            documentName: first.title,
+            documentType: docType,
+            pages: pages
+        )
+    }
+    
+    private func loadFrames(for document: DocumentEntity) throws -> [CapturedFrame] {
+        let pages = (document.pages as? Set<PageEntity>)?
+            .sorted { $0.index < $1.index } ?? []
+
+        return pages.compactMap { page in
+
+            guard
+                let originalPath = page.originalPath,
+                let originalImage = UIImage(
+                    contentsOfFile: FileStore.shared
+                        .url(forRelativePath: originalPath).path
+                )
+            else { return nil }
+
+            var frame = CapturedFrame()
+
+            frame.original = originalImage
+            frame.previewBase = originalImage
+            frame.displayBase = originalImage
+
+            if let quadData = page.quadData {
+                frame.quad = QuadCodec.decode(quadData)
+            }
+
+            frame.drawingData = page.drawingData
+
+            if let drawingPath = page.drawingBasePath,
+               let drawingImage = UIImage(
+                contentsOfFile: FileStore.shared
+                    .url(forRelativePath: drawingPath).path
+               ) {
+                frame.drawingBase = drawingImage
+            }
+
+            let filterType = DocumentFilterType(
+                rawValue: page.filterTypeRaw ?? ""
+            ) ?? .original
+
+            let state = FilterState(
+                type: filterType,
+                adjustment: CGFloat(page.filterAdjustment),
+                rotationAngle: CGFloat(page.rotationAngle)
+            )
+
+            frame.applyFilter(state)
+
+            frame.preview = FilterRenderer.shared.render(
+                image: originalImage,
+                state: state
+            )
+
+            return frame
+        }
+    }
+}

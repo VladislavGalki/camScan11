@@ -132,7 +132,7 @@ final class FolderViewModel: ObservableObject {
     private func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
         switch menuItem {
         case .share:
-            break
+            folderActiveSheet = .share(id)
         case .unlockDocument:
             notificationOverlaystate = .unlock(id)
         case .delete:
@@ -159,9 +159,13 @@ final class FolderViewModel: ObservableObject {
 
 // MARK: - Public
 extension FolderViewModel {
+    func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
+        do {
+            try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
+        } catch {}
+    }
+    
     func isDocumentLocked(id: UUID?) -> Bool {
-        
-        
         guard let id else { return false }
         
         return items.contains {
@@ -190,7 +194,7 @@ extension FolderViewModel {
         
         switch menuItem {
         case .share:
-            break
+            folderActiveSheet = .share(id)
         case .unlockDocument:
             do {
                 try documentRepository.removePassword(id: id)
@@ -273,5 +277,10 @@ extension FolderViewModel {
         } else {
             processSuccessMenuItemSelection(id: id, menuItem: menuItem)
         }
+    }
+    
+    func makeShareModel(id: UUID?) -> ShareInputModel? {
+        guard let id else { return nil }
+        return try? documentRepository.loadShareModel(id: id)
     }
 }

@@ -4,7 +4,10 @@ struct ShareView: View {
     @StateObject private var viewModel: ShareViewModel
     @EnvironmentObject private var router: Router
     
-    init(inputModel: ShareInputModel) {
+    private let onClose: (() -> Void)?
+    
+    init(inputModel: ShareInputModel, onClose: (() -> Void)? = nil) {
+        self.onClose = onClose
         _viewModel = StateObject(wrappedValue: ShareViewModel(inputModel: inputModel))
     }
     
@@ -77,7 +80,10 @@ struct ShareView: View {
                     style: .secondary,
                     size: .m
                 ),
-                action: { router.dismissSheet() }
+                action: {
+                    router.dismissSheet()
+                    onClose?()
+                }
             )
             
             Text(viewModel.documentName)
