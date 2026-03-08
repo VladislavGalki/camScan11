@@ -49,26 +49,10 @@ final class FilesViewModel: ObservableObject {
         .receive(on: DispatchQueue.main)
         .sink { [weak self] items, thumbs in
             guard let self else { return }
-            
-            var updatedItems = items
-            
-            updatedItems = updatedItems.map { item in
-                switch item {
-                case .document(var doc):
-                    doc.thumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 0)]
-                    doc.secondThumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 1)]
-                    return .document(doc)
-                    
-                case .folder(var folder):
-                    folder.previewDocuments = folder.previewDocuments.map { preview in
-                        var copy = preview
-                        copy.thumbnail = thumbs[ThumbKey(docID: preview.id, pageIndex: 0)]
-                        copy.secondThumbnail = thumbs[ThumbKey(docID: preview.id, pageIndex: 1)]
-                        return copy
-                    }
-                    return .folder(folder)
-                }
-            }
+            let updatedItems = applyThumbnails(
+                to: items,
+                thumbs: thumbs
+            )
             
             self.items = updatedItems
             self.isSearchLoading = false
@@ -100,23 +84,49 @@ final class FilesViewModel: ObservableObject {
             }
     }
     
-    private func applyThumbnails(_ thumbs: [ThumbKey: UIImage]) {
-        items = items.map { item in
+    private func applyThumbnails(
+        to items: [FilesGridItem],
+        thumbs: [ThumbKey: UIImage]
+    ) -> [FilesGridItem] {
+        items.map { item in
             switch item {
             case .document(var doc):
-                doc.thumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 0)]
-                doc.secondThumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 1)]
+                doc.thumbnail =
+                    thumbs[ThumbKey(docID: doc.id, pageIndex: 0)]
+
+                doc.secondThumbnail =
+                    thumbs[ThumbKey(docID: doc.id, pageIndex: 1)]
+
                 return .document(doc)
-                
             case .folder(var folder):
-                folder.previewDocuments = folder.previewDocuments.map { preview in
-                    var copy = preview
-                    copy.thumbnail = thumbs[ThumbKey(docID: preview.id, pageIndex: 0)]
-                    copy.secondThumbnail = thumbs[ThumbKey(docID: preview.id, pageIndex: 1)]
-                    return copy
-                }
+                folder.previewDocuments =
+                    folder.previewDocuments.map { preview in
+                        var copy = preview
+
+                        copy.thumbnail =
+                            thumbs[ThumbKey(docID: preview.id, pageIndex: 0)]
+
+                        copy.secondThumbnail =
+                            thumbs[ThumbKey(docID: preview.id, pageIndex: 1)]
+
+                        return copy
+                    }
+
                 return .folder(folder)
             }
+        }
+    }
+    
+    private func item(for id: UUID) -> FilesGridItem? {
+        items.first { $0.id == id }
+    }
+    
+    private func typeForItem(id: UUID) -> FilesItemType? {
+        guard let item = item(for: id) else { return nil }
+
+        switch item {
+        case .document: return .document
+        case .folder: return .folder
         }
     }
     
@@ -126,15 +136,6 @@ final class FilesViewModel: ObservableObject {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             highlightedID = nil
-        }
-    }
-    
-    func typeForItem(id: UUID) -> FilesItemType? {
-        items.first(where: { $0.id == id }).map {
-            switch $0 {
-            case .document: return .document
-            case .folder: return .folder
-            }
         }
     }
     
@@ -173,6 +174,29 @@ final class FilesViewModel: ObservableObject {
             break
         }
     }
+    
+    private func performLockedAction(
+        id: UUID,
+        onSuccess: @escaping () -> Void,
+        onFailure: @escaping () -> Void
+    ) {
+        Task {
+            let result = await lockedActionExecutore.execute(
+                isLocked: isDocumentLocked(id: id),
+                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
+            )
+
+            await MainActor.run {
+                if result.success {
+                    onSuccess()
+                } else if result.requiresPin {
+                    onFailure()
+                    notificationOverlaystate = .unlock(id)
+                }
+
+            }
+        }
+    }
 }
 
 // MARK: - Public
@@ -190,20 +214,10 @@ extension FilesViewModel {
     }
     
     func openFolderTapped(id: UUID) {
-        Task {
-            let result = await LockedActionExecutor.shared.execute(
-                isLocked: isDocumentLocked(id: id),
-                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
-            )
-            
-            await MainActor.run {
-                if result.success {
-                    folderToOpen = id
-                } else if result.requiresPin {
-                    pendingAction = .openFolder(id)
-                    notificationOverlaystate = .unlock(id)
-                }
-            }
+        performLockedAction(id: id) { [weak self] in
+            self?.folderToOpen = id
+        } onFailure: { [weak self] in
+            self?.pendingAction = .openFolder(id)
         }
     }
     
@@ -244,20 +258,9 @@ extension FilesViewModel {
     func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
         guard let id else { return }
         
-        Task {
-            let result = await LockedActionExecutor.shared.execute(
-                isLocked: isDocumentLocked(id: id),
-                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
-            )
-            
-            await MainActor.run {
-                if result.success {
-                    processSuccessMenuItemSelection(id: id, menuItem: menuItem)
-                } else if result.requiresPin {
-                    notificationOverlaystate = .unlock(id)
-                }
-            }
-        }
+        performLockedAction(id: id) { [weak self] in
+            self?.processSuccessMenuItemSelection(id: id, menuItem: menuItem)
+        } onFailure: {}
     }
     
     func handleFolderCreated(folderName: String) {
@@ -311,20 +314,19 @@ extension FilesViewModel {
     }
     
     func getTitleForItem(id: UUID?) -> String {
-        for item in items {
-            switch item {
-            case .document(let doc):
-                if doc.id == id {
-                    return doc.title
-                }
-            case .folder(let folder):
-                if folder.id == id {
-                    return folder.title
-                }
-            }
+        guard let id, let item = item(for: id) else { return "" }
+
+        switch item {
+        case .document(let doc):
+            return doc.title
+        case .folder(let folder):
+            return folder.title
         }
-        
-        return ""
+    }
+    
+    func getFolderItem(id: UUID?) -> FileFolderItem? {
+        guard let id, case .folder(let folder)? = item(for: id) else { return nil }
+        return folder
     }
     
     func makeShareModel(id: UUID?) -> ShareInputModel? {
@@ -333,35 +335,21 @@ extension FilesViewModel {
     }
     
     func isDocumentLocked(id: UUID?) -> Bool {
-        guard let id else { return false }
-        
-        return items.contains {
-            switch $0 {
-            case .document(let doc): return doc.id == id && doc.isLocked
-            case .folder(let folder): return folder.id == id && folder.isLocked
-            }
+        guard let id, let item = item(for: id) else { return false }
+
+        switch item {
+        case .document(let doc): return doc.isLocked
+        case .folder(let folder): return folder.isLocked
         }
     }
     
     private func isDocumentLockViaFaceId(id: UUID) -> Bool {
-        items.contains {
-            switch $0 {
-            case .document(let doc): return doc.id == id && doc.lockViaFaceId
-            case .folder(let folder): return folder.id == id && folder.lockViaFaceId
-            }
+        guard let item = item(for: id) else { return false }
+
+        switch item {
+        case .document(let doc): return doc.lockViaFaceId
+        case .folder(let folder): return folder.lockViaFaceId
         }
-    }
-    
-    func getFolderItem(id: UUID?) -> FileFolderItem? {
-        guard let id else { return nil }
-        
-        for item in items {
-            if case .folder(let folder) = item, folder.id == id {
-                return folder
-            }
-        }
-        
-        return nil
     }
     
     func showNotification(type: NotificationModel) {
