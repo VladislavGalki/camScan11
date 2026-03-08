@@ -117,17 +117,8 @@ final class FilesViewModel: ObservableObject {
         }
     }
     
-    private func item(for id: UUID) -> FilesGridItem? {
-        items.first { $0.id == id }
-    }
-    
     private func typeForItem(id: UUID) -> FilesItemType? {
-        guard let item = item(for: id) else { return nil }
-
-        switch item {
-        case .document: return .document
-        case .folder: return .folder
-        }
+        items.first { $0.id == id }?.itemType
     }
     
     private func setHighlitedDocument(_ id: UUID) {
@@ -140,26 +131,7 @@ final class FilesViewModel: ObservableObject {
     }
     
     private func getPasswordData(for id: UUID) -> (salt: Data, hash: Data)? {
-        for item in items {
-            switch item {
-                
-            case .document(let doc):
-                if doc.id == id,
-                   let salt = doc.passwordSalt,
-                   let hash = doc.passwordHash {
-                    return (salt, hash)
-                }
-                
-            case .folder(let folder):
-                if folder.id == id,
-                   let salt = folder.passwordSalt,
-                   let hash = folder.passwordHash {
-                    return (salt, hash)
-                }
-            }
-        }
-        
-        return nil
+        items.first { $0.id == id }?.passwordData
     }
     
     private func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
@@ -314,19 +286,13 @@ extension FilesViewModel {
     }
     
     func getTitleForItem(id: UUID?) -> String {
-        guard let id, let item = item(for: id) else { return "" }
-
-        switch item {
-        case .document(let doc):
-            return doc.title
-        case .folder(let folder):
-            return folder.title
-        }
+        guard let id, let item = items.first(where: { $0.id == id }) else { return "" }
+        return item.title
     }
     
     func getFolderItem(id: UUID?) -> FileFolderItem? {
-        guard let id, case .folder(let folder)? = item(for: id) else { return nil }
-        return folder
+        guard let id else { return nil }
+        return items.first { $0.id == id }?.folder
     }
     
     func makeShareModel(id: UUID?) -> ShareInputModel? {
@@ -335,21 +301,12 @@ extension FilesViewModel {
     }
     
     func isDocumentLocked(id: UUID?) -> Bool {
-        guard let id, let item = item(for: id) else { return false }
-
-        switch item {
-        case .document(let doc): return doc.isLocked
-        case .folder(let folder): return folder.isLocked
-        }
+        guard let id else { return false }
+        return items.first { $0.id == id }?.isLocked ?? false
     }
     
     private func isDocumentLockViaFaceId(id: UUID) -> Bool {
-        guard let item = item(for: id) else { return false }
-
-        switch item {
-        case .document(let doc): return doc.lockViaFaceId
-        case .folder(let folder): return folder.lockViaFaceId
-        }
+        items.first { $0.id == id }?.isFaceIDEnabled ?? false
     }
     
     func showNotification(type: NotificationModel) {
