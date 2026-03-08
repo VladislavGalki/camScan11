@@ -144,6 +144,7 @@ struct LockDocumentView: View {
             firstPin = pin
             pin = ""
             step = .confirm
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         } else {
             if firstPin == pin {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)

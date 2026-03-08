@@ -87,6 +87,17 @@ final class FileDocumentStore: NSObject {
         rebuild()
     }
     
+    // MARK: - Find documents
+    
+    func getDocumentItems(inFolder folderID: UUID) throws -> [FileDocumentItem] {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "folder.id == %@", folderID as CVarArg)
+        
+        let documents = try context.fetch(request)
+
+        return documents.map { mapToDocument($0) }
+    }
+    
     // MARK: - FRC Setup
     
     private func configureFRC() {

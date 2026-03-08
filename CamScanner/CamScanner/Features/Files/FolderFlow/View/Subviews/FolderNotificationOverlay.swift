@@ -81,8 +81,11 @@ struct FolderNotificationOverlay: View {
                             onClear()
                         }
                     )
-                case .none:
+                case .none, .multipleUnlock(_):
                     EmptyView()
+                        .onAppear {
+                            onClear()
+                        }
                 }
             }
         }

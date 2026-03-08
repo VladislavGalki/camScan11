@@ -82,9 +82,9 @@ struct FilesNotificationOverlay: View {
                                 case .delete:
                                     viewModel.notificationOverlaystate = .deleteFile(id)
                                 case .share:
-                                    viewModel.fileActiveSheet = .share(id)
-                                    onShowTabBar()
                                     onClear()
+                                    onShowTabBar()
+                                    viewModel.processSuccessMenuItemSelection(id: id, menuItem: selectedMenuItem)
                                 default:
                                     onClear()
                                 }
@@ -97,6 +97,22 @@ struct FilesNotificationOverlay: View {
                             onShowTabBar()
                             onClear()
                         }
+                    )
+                case let .multipleUnlock(items):
+                    MultipleUnlockPinView(
+                        viewModel: MultipleUnlockPinViewModel(
+                            items: items,
+                            validatePin: { id, pin in
+                                viewModel.handleDocumentPinValidation(
+                                    documentId: id,
+                                    pin: pin
+                                )
+                            },
+                            onFinished: { unlockedIDs in
+                                viewModel.fileActiveSheet = .multipleShare(unlockedIDs)
+                                onClear()
+                            }
+                        )
                     )
                 case .none:
                     EmptyView()

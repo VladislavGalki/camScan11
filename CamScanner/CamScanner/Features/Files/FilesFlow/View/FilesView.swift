@@ -234,6 +234,13 @@ private extension FilesView {
                 }
                 .presentationCornerRadius(38)
             }
+        case let .multipleShare(ids):
+            if let shareInputModel = viewModel.makeShareModel(ids: ids) {
+                ShareView(inputModel: shareInputModel) {
+                    viewModel.fileActiveSheet = nil
+                }
+                .presentationCornerRadius(38)
+            }
         case .rename:
             RenameFolderView(
                 folderTitle: viewModel.getTitleForItem(id: selectedFileDocumentItemId)

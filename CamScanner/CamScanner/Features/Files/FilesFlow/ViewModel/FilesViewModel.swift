@@ -21,6 +21,8 @@ final class FilesViewModel: ObservableObject {
     
     private var pendingAction: FilesPendingAction?
     
+    var once = true
+    
     private let lockedActionExecutore = LockedActionExecutor.shared
     private let passwordCryptoService = PasswordCryptoService.shared
     private let documentRepository: DocumentRepository
@@ -67,6 +69,19 @@ final class FilesViewModel: ObservableObject {
             }
 
             self.viewState = !updatedItems.isEmpty ? .success : .empty
+            
+//            if self.once {
+//                self.once = false
+//                try? self.documentRepository.moveDocumentsToFolder(
+//                    ids: [
+//                        UUID(uuidString: "E3031468-002F-4F27-88A0-D2C564F7881D")!,
+//                        UUID(uuidString: "C7748CEA-9AE8-46BE-9DFE-D73D5EB28B89")!,
+//                        UUID(uuidString: "A0F64EF9-D776-4F0E-8650-2F52C9C6760E")!,
+//                        UUID(uuidString: "DD3153A3-FD13-4E96-BBA5-EF3E3DC2AEB2")!
+//                    ],
+//                    toFolder: UUID(uuidString: "FED3F105-B769-4CB8-B4AF-B5F05ECF7D12")!
+//                )
+//            }
         }
         .store(in: &cancellables)
     }
@@ -131,13 +146,30 @@ final class FilesViewModel: ObservableObject {
     }
     
     private func getPasswordData(for id: UUID) -> (salt: Data, hash: Data)? {
-        items.first { $0.id == id }?.passwordData
+        try? documentRepository.getPasswordData(for: id)
     }
     
-    private func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
+    func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
         switch menuItem {
         case .share:
-            fileActiveSheet = .share(id)
+            let documentType = typeForItem(id: id)
+            if documentType == .folder,
+               let items = try? documentStore.getDocumentItems(inFolder: id),
+               !items.isEmpty {
+                if items.contains(where: { $0.isLocked }) {
+                    let queue = items.map {
+                        UnlockQueueItem(id: $0.id, title: $0.title, isLocked: $0.isLocked)
+                    }
+                    
+                    notificationOverlaystate = .multipleUnlock(queue)
+                } else {
+                    fileActiveSheet = .share(id)
+                }
+            }
+            
+            if documentType == .document {
+                fileActiveSheet = .share(id)
+            }
         case .unlockDocument:
             notificationOverlaystate = .unlock(id)
         case .delete:
@@ -298,6 +330,10 @@ extension FilesViewModel {
     func makeShareModel(id: UUID?) -> ShareInputModel? {
         guard let id else { return nil }
         return try? documentRepository.loadShareModel(id: id)
+    }
+    
+    func makeShareModel(ids: [UUID]) -> ShareInputModel? {
+        try? documentRepository.loadShareModel(ids: ids)
     }
     
     func isDocumentLocked(id: UUID?) -> Bool {

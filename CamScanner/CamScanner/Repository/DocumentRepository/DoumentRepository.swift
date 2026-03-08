@@ -291,6 +291,22 @@ extension DocumentRepository {
         }
     }
     
+    func getPasswordData(for id: UUID) throws -> (salt: Data, hash: Data)? {
+        if let doc = try fetchDocument(id: id),
+           let salt = doc.passwordSalt,
+           let hash = doc.passwordHash {
+            return (salt, hash)
+        }
+
+        if let folder = try fetchFolder(id: id),
+           let salt = folder.passwordSalt,
+           let hash = folder.passwordHash {
+            return (salt, hash)
+        }
+
+        return nil
+    }
+    
     private func configureDocumentFileName(createAt: Date?, documentType: String?) -> String {
         guard let createAt else { return "Document" }
         
@@ -342,6 +358,33 @@ extension DocumentRepository {
         try context.save()
         
         return folderID
+    }
+    
+    func moveDocumentsToFolder(ids: [UUID], toFolder folderID: UUID) throws {
+        guard !ids.isEmpty else { return }
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id == %@", folderID as CVarArg)
+        folderRequest.fetchLimit = 1
+
+        guard let folder = try context.fetch(folderRequest).first else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 6001,
+                userInfo: [NSLocalizedDescriptionKey: "Folder not found"]
+            )
+        }
+
+        let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentRequest.predicate = NSPredicate(format: "id IN %@", ids)
+
+        let documents = try context.fetch(documentRequest)
+
+        for doc in documents {
+            doc.folder = folder
+        }
+
+        try context.save()
     }
     
     func renameDocument(id: UUID, newTitle: String) throws {
@@ -436,6 +479,23 @@ extension DocumentRepository {
         )
     }
     
+    func loadShareModel(ids: [UUID]) throws -> ShareInputModel {
+        guard !ids.isEmpty else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 5002,
+                userInfo: [NSLocalizedDescriptionKey: "No documents provided"]
+            )
+        }
+
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id IN %@", ids)
+
+        let documents = try context.fetch(request)
+
+        return try buildShareModel(from: documents)
+    }
+    
     private func fetchDocument(id: UUID) throws -> DocumentEntity? {
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
@@ -458,15 +518,11 @@ extension DocumentRepository {
         }
 
         let docType = DocumentTypeEnum(rawValue: first.documentTypeRaw ?? "") ?? .documents
-
         var pages: [ScanPreviewModel] = []
 
         for document in documents {
-
             let frames = try loadFrames(for: document)
-
             if docType == .documents || docType == .passport {
-
                 frames.forEach {
                     pages.append(
                         ScanPreviewModel(
@@ -475,9 +531,7 @@ extension DocumentRepository {
                         )
                     )
                 }
-
             } else {
-
                 pages.append(
                     ScanPreviewModel(
                         documentType: docType,
@@ -500,9 +554,8 @@ extension DocumentRepository {
             .sorted { $0.index < $1.index } ?? []
 
         return pages.compactMap { page in
-
             guard
-                let originalPath = page.originalPath,
+                let originalPath = page.imagePath,
                 let originalImage = UIImage(
                     contentsOfFile: FileStore.shared
                         .url(forRelativePath: originalPath).path
@@ -512,14 +565,6 @@ extension DocumentRepository {
             var frame = CapturedFrame()
 
             frame.original = originalImage
-            frame.previewBase = originalImage
-            frame.displayBase = originalImage
-
-            if let quadData = page.quadData {
-                frame.quad = QuadCodec.decode(quadData)
-            }
-
-            frame.drawingData = page.drawingData
 
             if let drawingPath = page.drawingBasePath,
                let drawingImage = UIImage(
@@ -527,6 +572,12 @@ extension DocumentRepository {
                     .url(forRelativePath: drawingPath).path
                ) {
                 frame.drawingBase = drawingImage
+            }
+
+            frame.drawingData = page.drawingData
+
+            if let quadData = page.quadData {
+                frame.quad = QuadCodec.decode(quadData)
             }
 
             let filterType = DocumentFilterType(
@@ -540,12 +591,21 @@ extension DocumentRepository {
             )
 
             frame.applyFilter(state)
+            frame.previewBase = frame.preview ?? originalImage
 
-            frame.preview = FilterRenderer.shared.render(
-                image: originalImage,
-                state: state
-            )
+            if let base = frame.previewBase {
+                frame.previewBase = ImageCompressionService.shared.compress(
+                    base,
+                    maxDimension: 1200,
+                    quality: 0.90
+                )
+            }
 
+            frame.displayBase = frame.previewBase
+            frame.preview = frame.displayBase
+
+            print("previewBase == original", frame.previewBase === frame.original)
+            
             return frame
         }
     }
