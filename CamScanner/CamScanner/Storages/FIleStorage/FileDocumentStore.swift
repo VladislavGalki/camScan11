@@ -446,7 +446,6 @@ extension FileDocumentStore {
                 let thumb = img?.downscaled(maxDimension: 364)
                 
                 DispatchQueue.main.async {
-                    
                     var dict = self.thumbnailsSubject.value
                     dict[key] = thumb
                     

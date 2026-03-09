@@ -70,7 +70,7 @@ extension DocumentRepository {
         doc.documentTypeRaw = documentType.rawValue
         doc.pageCount = Int16(frames.count)
         doc.folder = folder
-        doc.title = configureDocumentFileName(createAt: doc.createdAt, documentType: doc.documentTypeRaw)
+        doc.title = configureDocumentFileName(createAt: doc.createdAt, documentType: documentType.title)
         
         for (index, frame) in frames.enumerated() {
             guard

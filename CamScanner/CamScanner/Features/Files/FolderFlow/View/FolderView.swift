@@ -34,6 +34,7 @@ struct FolderView: View {
             .overlay { dotsOverlay }
             .overlay(alignment: .top) { toastOverlay }
             .sheet(item: $viewModel.folderActiveSheet) { sheetView($0) }
+            .coordinateSpace(name: "filesCoordinateSpace")
     }
     
     private var contentView: some View {
