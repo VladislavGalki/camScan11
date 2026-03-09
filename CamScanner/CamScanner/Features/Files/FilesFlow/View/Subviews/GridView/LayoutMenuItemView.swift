@@ -4,6 +4,7 @@ struct LayoutMenuItemView: View {
     @Binding var showGridMenu: Bool
 
     let isItemLocked: Bool
+    let canMoved: Bool
     let menuFrame: CGRect
     let onSelectMenuItem: (FilesMenuItem) -> Void
     let onClose: () -> Void
@@ -130,13 +131,15 @@ struct LayoutMenuItemView: View {
     }
     
     private var visibleMenuItems: [FilesMenuItem] {
-        FilesMenuItem.allCases.filter {
-            switch $0 {
-            case .lock: return !isItemLocked
-            case .unlockDocument: return isItemLocked
-            default: return true
+        FilesMenuItem.allCases
+            .filter { canMoved ? $0 != .move : true }
+            .filter {
+                switch $0 {
+                case .lock: return !isItemLocked
+                case .unlockDocument: return isItemLocked
+                default: return true
+                }
             }
-        }
     }
     
     private func closeMenu() {

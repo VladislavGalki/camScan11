@@ -48,7 +48,6 @@ struct FolderView: View {
             }
         }
         .navigationBarBackButtonHidden()
-
         .background(
             Color.bg(.main)
                 .ignoresSafeArea()
@@ -155,8 +154,11 @@ private extension FolderView {
                 viewModel.handleFileDocumentRenamed(selectedFileDocumentItemId, fileName: newTitle)
             }
             .presentationCornerRadius(38)
-        case .move:
-            EmptyView()
+        case let .move(inputModel):
+            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
+                viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+            }
+            .presentationCornerRadius(38)
         }
     }
 }
@@ -167,6 +169,7 @@ private extension FolderView {
         FilesMenuOverlay(
             isVisible: $shouldShowMenuOverlay,
             isLocked: viewModel.isDocumentLocked(id: selectedFileDocumentItemId),
+            canMoved: false,
             frame: menuFrame,
             onSelect: handleMenuSelection,
             onClose: {}
@@ -262,7 +265,7 @@ private extension FolderView {
                 )
             }
         case .move:
-            break
+            viewModel.handleMoveDocument(id: selectedFileDocumentItemId)
         }
     }
 }

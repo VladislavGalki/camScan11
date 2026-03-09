@@ -3,7 +3,8 @@ import SwiftUI
 struct FilesLayoutContainer: View {
     let mode: FilesViewMode
     let items: [FilesGridItem]
-    let highlightedID: UUID?
+    var highlightedID: UUID?
+    var shouldHideAllSettings: Bool = false
     var shouldHideSettings: Bool = false
 
     let onFolderClick: ((UUID) -> Void)?
@@ -17,6 +18,7 @@ struct FilesLayoutContainer: View {
             GridLayoutView(
                 highlightedID: highlightedID,
                 model: items,
+                shouldHideAllSettings: shouldHideAllSettings,
                 shouldHideSettings: shouldHideSettings,
                 onFolderClick: onFolderClick,
                 onDocumentClick: onDocumentClick,
@@ -27,6 +29,7 @@ struct FilesLayoutContainer: View {
             ListLayoutView(
                 highlightedID: highlightedID,
                 model: items,
+                shouldHideAllSettings: shouldHideAllSettings,
                 shouldHideSettings: shouldHideSettings,
                 onFolderClick: onFolderClick,
                 onDocumentClick: onDocumentClick,

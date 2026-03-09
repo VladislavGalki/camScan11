@@ -3,7 +3,7 @@ import Foundation
 enum FolderActiveSheet: Identifiable {
     case share(UUID)
     case rename(String)
-    case move
+    case move(MoveDocumentInputModel)
     
     var id: String {
         switch self {

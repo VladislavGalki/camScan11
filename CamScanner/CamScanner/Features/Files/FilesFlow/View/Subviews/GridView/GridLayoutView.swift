@@ -3,6 +3,7 @@ import SwiftUI
 struct GridLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
+    var shouldHideAllSettings: Bool = false
     var shouldHideSettings: Bool = false
 
     let onFolderClick: ((UUID) -> Void)?
@@ -24,25 +25,25 @@ struct GridLayoutView: View {
                         GridDocumentItemView(
                             item: doc,
                             highlightedID: highlightedID,
+                            shouldHideAllSettings: shouldHideAllSettings,
                             shouldHideSettings: shouldHideSettings,
+                            onDocumentClick: onDocumentClick,
                             onFavouriteClick: onFavouriteClick,
                             onMenuClick: onMenuClick
                         )
                         .id(doc.id)
-                        .onTapGesture {
-                            onDocumentClick?(doc.id)
-                        }
+                        .contentShape(Rectangle())
                     case let .folder(folder):
                         GridFolderItemView(
                             item: folder,
                             highlightedID: highlightedID,
+                            shouldHideAllSettings: shouldHideAllSettings,
                             shouldHideSettings: shouldHideSettings,
+                            onFolderClick: onFolderClick,
                             onMenuClick: onMenuClick
                         )
                         .id(folder.id)
-                        .onTapGesture {
-                            onFolderClick?(folder.id)
-                        }
+                        .contentShape(Rectangle())
                     }
                 }
             }
@@ -55,15 +56,16 @@ struct GridLayoutView: View {
 struct GridDocumentItemView: View {
     let item: FileDocumentItem
     let highlightedID: UUID?
+    let shouldHideAllSettings: Bool
     let shouldHideSettings: Bool
 
+    let onDocumentClick: ((UUID) -> Void)?
     var onFavouriteClick: ((UUID, Bool) -> Void?)
     var onMenuClick: ((UUID, CGRect) -> Void)?
 
     private let cardHeight: CGFloat = 150
 
     var body: some View {
-
         VStack(alignment: .leading, spacing: 8) {
             GridDocumentBackground(item: item)
                 .frame(height: cardHeight)
@@ -71,7 +73,9 @@ struct GridDocumentItemView: View {
                     GridDocumentPreview(item: item)
                 }
                 .overlay(alignment: .top) {
-                    header
+                    if !shouldHideAllSettings {
+                        header
+                    }
                 }
                 .cornerRadius(8)
                 .appBorderModifier(.border(.primary), radius: 8)
@@ -81,6 +85,9 @@ struct GridDocumentItemView: View {
         }
         .drawingGroup()
         .background(highlight)
+        .onTapGesture {
+            onDocumentClick?(item.id)
+        }
     }
 
     private var header: some View {
@@ -108,7 +115,6 @@ struct GridDocumentItemView: View {
                             size: .s
                         ),
                         action: {
-
                             let frame = geo.frame(in: .named("filesCoordinateSpace"))
                             onMenuClick?(item.id, frame)
                         }
@@ -163,7 +169,7 @@ struct GridDocumentBackground: View {
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.02),
+                                Color.black.opacity(0.12),
                                 Color.black.opacity(0)
                             ],
                             startPoint: .top,
@@ -193,7 +199,7 @@ struct GridDocumentPreview: View {
                 if let image = item.thumbnail {
                     Image(uiImage: image)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                 }
             case .idCard, .driverLicense:
                 VStack(spacing: 6) {
@@ -201,12 +207,14 @@ struct GridDocumentPreview: View {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 54, height: 34)
+                            .scaledToFit()
                     }
 
                     if let image = item.secondThumbnail {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 54, height: 34)
+                            .scaledToFit()
                     }
                 }
             case .passport:
@@ -214,6 +222,7 @@ struct GridDocumentPreview: View {
                     Image(uiImage: image)
                         .resizable()
                         .frame(width: 64, height: 87)
+                        .scaledToFit()
                 }
             default:
                 EmptyView()
@@ -270,8 +279,10 @@ struct GridDocumentLockSkeleton: View {
 struct GridFolderItemView: View {
     let item: FileFolderItem
     let highlightedID: UUID?
+    let shouldHideAllSettings: Bool
     let shouldHideSettings: Bool
 
+    let onFolderClick: ((UUID) -> Void)?
     var onMenuClick: ((UUID, CGRect) -> Void)?
 
     private let cardHeight: CGFloat = 150
@@ -284,7 +295,7 @@ struct GridFolderItemView: View {
                     GridFolderOverlay(item: item)
                 }
                 .overlay(alignment: .topLeading) {
-                    if !shouldHideSettings {
+                    if !(shouldHideSettings || shouldHideAllSettings) {
                         GeometryReader { geo in
                             AppButton(
                                 config: AppButtonConfig(
@@ -317,6 +328,9 @@ struct GridFolderItemView: View {
         .padding(8)
         .background(highlight)
         .drawingGroup()
+        .onTapGesture {
+            onFolderClick?(item.id)
+        }
     }
 
     private var highlight: some View {
@@ -341,33 +355,29 @@ struct GridFolderOverlay: View {
             Image(appIcon: .lock_image)
         } else {
             if !item.previewDocuments.isEmpty {
-                GeometryReader { geo in
-                    let size = geo.size.width / 2
-                    
-                    VStack(spacing: 8) {
-                        HStack(spacing: 12) {
-                            if let first = item.previewDocuments[safe: 0] {
-                                GridFolderPreviewCell(document: first, size: size)
-                            }
-
-                            if let second = item.previewDocuments[safe: 1] {
-                                GridFolderPreviewCell(document: second, size: size)
-                            }
+                VStack(spacing: 8) {
+                    HStack(spacing: 12) {
+                        if let first = item.previewDocuments[safe: 0] {
+                            GridFolderPreviewCell(document: first)
                         }
 
-                        HStack(spacing: 12) {
-                            if let first = item.previewDocuments[safe: 2] {
-                                GridFolderPreviewCell(document: first, size: size)
-                            }
-
-                            if let second = item.previewDocuments[safe: 3] {
-                                GridFolderPreviewCell(document: second, size: size)
-                            }
+                        if let second = item.previewDocuments[safe: 1] {
+                            GridFolderPreviewCell(document: second)
                         }
                     }
-                    .padding(.top, 30)
-                    .padding([.horizontal, .bottom], 12)
+
+                    HStack(spacing: 12) {
+                        if let first = item.previewDocuments[safe: 2] {
+                            GridFolderPreviewCell(document: first)
+                        }
+                        
+                        if let second = item.previewDocuments[safe: 3] {
+                            GridFolderPreviewCell(document: second)
+                        }
+                    }
                 }
+                .padding(.top, 30)
+                .padding([.horizontal, .bottom], 12)
                 .clipped()
             }
         }
@@ -376,14 +386,15 @@ struct GridFolderOverlay: View {
 
 struct GridFolderPreviewCell: View {
     let document: FileDocumentItem
-    let size: CGFloat
 
     var body: some View {
-        GridDocumentBackground(item: document)
+        Rectangle()
+            .foregroundStyle(.bg(.surface))
             .cornerRadius(4)
             .overlay {
                 GridFolderPreviewImage(document: document)
             }
+            .frame(width: 35, height: 50)
     }
 }
 
@@ -408,11 +419,13 @@ struct GridFolderPreviewImage: View {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.3)
+                            .scaledToFit()
                     }
                     if let image = document.secondThumbnail {
                         Image(uiImage: image)
                             .resizable()
                             .frame(width: 18, height: 11.3)
+                            .scaledToFit()
                     }
                 }
             case .passport:
@@ -420,6 +433,7 @@ struct GridFolderPreviewImage: View {
                     Image(uiImage: image)
                         .resizable()
                         .frame(width: 21, height: 29)
+                        .scaledToFit()
                 }
             default:
                 EmptyView()

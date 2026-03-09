@@ -69,19 +69,6 @@ final class FilesViewModel: ObservableObject {
             }
 
             self.viewState = !updatedItems.isEmpty ? .success : .empty
-            
-//            if self.once {
-//                self.once = false
-//                try? self.documentRepository.moveDocumentsToFolder(
-//                    ids: [
-//                        UUID(uuidString: "E3031468-002F-4F27-88A0-D2C564F7881D")!,
-//                        UUID(uuidString: "C7748CEA-9AE8-46BE-9DFE-D73D5EB28B89")!,
-//                        UUID(uuidString: "A0F64EF9-D776-4F0E-8650-2F52C9C6760E")!,
-//                        UUID(uuidString: "DD3153A3-FD13-4E96-BBA5-EF3E3DC2AEB2")!
-//                    ],
-//                    toFolder: UUID(uuidString: "FED3F105-B769-4CB8-B4AF-B5F05ECF7D12")!
-//                )
-//            }
         }
         .store(in: &cancellables)
     }
@@ -130,10 +117,6 @@ final class FilesViewModel: ObservableObject {
                 return .folder(folder)
             }
         }
-    }
-    
-    private func typeForItem(id: UUID) -> FilesItemType? {
-        items.first { $0.id == id }?.itemType
     }
     
     private func setHighlitedDocument(_ id: UUID) {
@@ -267,6 +250,17 @@ extension FilesViewModel {
         } onFailure: {}
     }
     
+    func handleMoveDocument(id: UUID?) {
+        guard let id else { return }
+        
+        fileActiveSheet = .move(
+            MoveDocumentInputModel(
+                viewMode: viewMode,
+                folderId: nil,
+                documentIDs: [id])
+        )
+    }
+    
     func handleFolderCreated(folderName: String) {
         do {
             let documentId = try documentRepository.createFolder(title: folderName)
@@ -291,6 +285,13 @@ extension FilesViewModel {
     func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
         do {
             try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
+        } catch {}
+    }
+    
+    func handleDocumentMoved(documentIds: [UUID], folderId: UUID?) {
+        do {
+            try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
+            fileActiveSheet = nil
         } catch {}
     }
     
@@ -334,6 +335,10 @@ extension FilesViewModel {
     
     func makeShareModel(ids: [UUID]) -> ShareInputModel? {
         try? documentRepository.loadShareModel(ids: ids)
+    }
+    
+    func typeForItem(id: UUID?) -> FilesItemType? {
+        items.first { $0.id == id }?.itemType
     }
     
     func isDocumentLocked(id: UUID?) -> Bool {

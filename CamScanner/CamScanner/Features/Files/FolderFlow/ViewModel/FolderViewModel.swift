@@ -159,6 +159,24 @@ final class FolderViewModel: ObservableObject {
 
 // MARK: - Public
 extension FolderViewModel {
+    func handleMoveDocument(id: UUID?) {
+        guard let id else { return }
+        
+        folderActiveSheet = .move(
+            MoveDocumentInputModel(
+                viewMode: viewMode,
+                folderId: folderItem.id,
+                documentIDs: [id])
+        )
+    }
+    
+    func handleDocumentMoved(documentIds: [UUID], folderId: UUID?) {
+        do {
+            try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
+            folderActiveSheet = nil
+        } catch {}
+    }
+    
     func handleDocumentFavourite(documentId: UUID, isFavourite: Bool) {
         do {
             try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)

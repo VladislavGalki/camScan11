@@ -172,6 +172,7 @@ private extension FilesView {
         FilesMenuOverlay(
             isVisible: $shouldShowMenuOverlay,
             isLocked: viewModel.isDocumentLocked(id: selectedFileDocumentItemId),
+            canMoved: viewModel.typeForItem(id: selectedFileDocumentItemId) == .folder,
             frame: menuFrame,
             onSelect: handleMenuSelection,
             onClose: showTabBar
@@ -254,6 +255,11 @@ private extension FilesView {
                 clearOverlayState()
             }
             .presentationCornerRadius(38)
+        case let .move(inputModel):
+            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
+                viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+            }
+            .presentationCornerRadius(38)
         }
     }
 }
@@ -280,7 +286,7 @@ private extension FilesView {
                 viewModel.notificationOverlaystate = .lock(UUID())
             }
         case .move:
-            break
+            viewModel.handleMoveDocument(id: selectedFileDocumentItemId)
         case.share:
             withAnimation(.easeInOut(duration: 0.15)) {
                 viewModel.handleFileDocumentMenuItemSelected(

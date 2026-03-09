@@ -4,6 +4,7 @@ enum FileActiveSheet: Identifiable {
     case createFolder
     case share(UUID)
     case multipleShare([UUID])
+    case move(MoveDocumentInputModel)
     case rename
     
     var id: String {
@@ -12,6 +13,7 @@ enum FileActiveSheet: Identifiable {
         case .share: return "ShareSheet"
         case .multipleShare: return "MultipleShareSheet"
         case .rename: return "RenameSheet"
+        case .move: return "MoveSheet"
         }
     }
 }

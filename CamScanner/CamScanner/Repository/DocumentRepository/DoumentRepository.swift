@@ -18,63 +18,36 @@ final class DocumentRepository {
     
     // MARK: - LOAD
     
-    func loadDocument(id: UUID) throws -> [CapturedFrame] {
-        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        request.fetchLimit = 1
-        
-        guard let document = try context.fetch(request).first else {
+    func fetchFolders() -> [FolderEntity] {
+        let request: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "lastViewed", ascending: false)
+        ]
+
+        do {
+            return try context.fetch(request)
+        } catch {
             return []
         }
-        
-        let pages = (document.pages as? Set<PageEntity>)?
-            .sorted { $0.index < $1.index } ?? []
-        
-        return pages.compactMap { page in
-            guard
-                let originalPath = page.originalPath,
-                let originalImage = UIImage(
-                    contentsOfFile: FileStore.shared.url(forRelativePath: originalPath).path
-                )
-            else { return nil }
-            
-            var frame = CapturedFrame()
-            
-            frame.original = originalImage
-            frame.previewBase = originalImage
-            frame.displayBase = originalImage
-            
-            if let quadData = page.quadData {
-                frame.quad = QuadCodec.decode(quadData)
-            }
-            
-            frame.drawingData = page.drawingData
-            
-            if let drawingPath = page.drawingBasePath,
-               let drawingImage = UIImage(
-                contentsOfFile: FileStore.shared.url(forRelativePath: drawingPath).path
-               ) {
-                frame.drawingBase = drawingImage
-            }
-            
-            let filterType = DocumentFilterType(
-                rawValue: page.filterTypeRaw ?? ""
-            ) ?? .original
-            
-            let state = FilterState(
-                type: filterType,
-                adjustment: CGFloat(page.filterAdjustment),
-                rotationAngle: CGFloat(page.rotationAngle)
-            )
-            
-            frame.applyFilter(state)
-            
-            frame.preview = FilterRenderer.shared.render(
-                image: originalImage,
-                state: state
-            )
-            
-            return frame
+    }
+    
+    func fetchDocuments(in folderId: UUID) -> [DocumentEntity] {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+
+        request.predicate = NSPredicate(
+            format: "folder.id == %@",
+            folderId as CVarArg
+        )
+
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "lastViewed", ascending: false)
+        ]
+
+        do {
+            return try context.fetch(request)
+        } catch {
+            return []
         }
     }
 }
@@ -360,25 +333,31 @@ extension DocumentRepository {
         return folderID
     }
     
-    func moveDocumentsToFolder(ids: [UUID], toFolder folderID: UUID) throws {
+    func moveDocumentsToFolder(ids: [UUID], toFolder folderID: UUID?) throws {
         guard !ids.isEmpty else { return }
-
-        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
-        folderRequest.predicate = NSPredicate(format: "id == %@", folderID as CVarArg)
-        folderRequest.fetchLimit = 1
-
-        guard let folder = try context.fetch(folderRequest).first else {
-            throw NSError(
-                domain: "DocumentRepository",
-                code: 6001,
-                userInfo: [NSLocalizedDescriptionKey: "Folder not found"]
-            )
-        }
 
         let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         documentRequest.predicate = NSPredicate(format: "id IN %@", ids)
 
         let documents = try context.fetch(documentRequest)
+
+        var folder: FolderEntity?
+
+        if let folderID {
+            let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+            folderRequest.predicate = NSPredicate(format: "id == %@", folderID as CVarArg)
+            folderRequest.fetchLimit = 1
+
+            guard let fetchedFolder = try context.fetch(folderRequest).first else {
+                throw NSError(
+                    domain: "DocumentRepository",
+                    code: 6001,
+                    userInfo: [NSLocalizedDescriptionKey: "Folder not found"]
+                )
+            }
+
+            folder = fetchedFolder
+        }
 
         for doc in documents {
             doc.folder = folder

@@ -3,6 +3,7 @@ import SwiftUI
 struct ListLayoutView: View {
     let highlightedID: UUID?
     var model: [FilesGridItem]
+    var shouldHideAllSettings: Bool = false
     var shouldHideSettings: Bool = false
 
     let onFolderClick: ((UUID) -> Void)?
@@ -17,6 +18,7 @@ struct ListLayoutView: View {
                     ListItemRow(
                         item: model[index],
                         highlightedID: highlightedID,
+                        shouldHideAllSettings: shouldHideAllSettings,
                         shouldHideSettings: shouldHideSettings,
                         onFolderClick: onFolderClick,
                         onDocumentClick: onDocumentClick,
@@ -45,6 +47,7 @@ struct ListLayoutView: View {
 struct ListItemRow: View {
     let item: FilesGridItem
     let highlightedID: UUID?
+    let shouldHideAllSettings: Bool
     let shouldHideSettings: Bool
 
     let onFolderClick: ((UUID) -> Void)?
@@ -58,10 +61,12 @@ struct ListItemRow: View {
             ListDocumentRow(
                 item: document,
                 highlightedID: highlightedID,
+                shouldHideAllSettings: shouldHideAllSettings,
                 shouldHideSettings: shouldHideSettings,
                 onFavouriteClick: onFavouriteClick,
                 onMenuClick: onMenuClick
             )
+            .contentShape(Rectangle())
             .onTapGesture {
                 onDocumentClick?(document.id)
             }
@@ -69,9 +74,11 @@ struct ListItemRow: View {
             ListFolderRow(
                 item: folder,
                 highlightedID: highlightedID,
+                shouldHideAllSettings: shouldHideAllSettings,
                 shouldHideSettings: shouldHideSettings,
                 onMenuClick: onMenuClick
             )
+            .contentShape(Rectangle())
             .onTapGesture {
                 onFolderClick?(folder.id)
             }
@@ -82,6 +89,7 @@ struct ListItemRow: View {
 struct ListDocumentRow: View {
     let item: FileDocumentItem
     let highlightedID: UUID?
+    let shouldHideAllSettings: Bool
     let shouldHideSettings: Bool
 
     var onFavouriteClick: ((UUID, Bool) -> Void?)
@@ -101,43 +109,47 @@ struct ListDocumentRow: View {
                 Text(item.title)
                     .appTextStyle(.bodySecondary)
                     .foregroundStyle(.text(.primary))
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(item.pageCount) \(item.pageCount > 1 ? "Pages" : "Page")")
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, 7)
 
             Spacer()
 
             HStack(spacing: 12) {
-                AppButton(
-                    config: AppButtonConfig(
-                        content: .iconOnly(item.isFavourite ? .starFill : .star),
-                        style: .secondary,
-                        size: .s,
-                        extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
-                    ),
-                    action: {
-                        onFavouriteClick(item.id, !item.isFavourite)
-                    }
-                )
+                if !shouldHideAllSettings {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(item.isFavourite ? .starFill : .star),
+                            style: .secondary,
+                            size: .s,
+                            extraTitleColor: item.isFavourite ? .elements(.warning) : .elements(.accent)
+                        ),
+                        action: {
+                            onFavouriteClick(item.id, !item.isFavourite)
+                        }
+                    )
 
-                if !shouldHideSettings {
-                    GeometryReader { geo in
-                        AppButton(
-                            config: AppButtonConfig(
-                                content: .iconOnly(.dots),
-                                style: .secondary,
-                                size: .s
-                            ),
-                            action: {
-                                let frame = geo.frame(in: .named("filesCoordinateSpace"))
-                                onMenuClick?(item.id, frame)
-                            }
-                        )
+                    if !shouldHideSettings {
+                        GeometryReader { geo in
+                            AppButton(
+                                config: AppButtonConfig(
+                                    content: .iconOnly(.dots),
+                                    style: .secondary,
+                                    size: .s
+                                ),
+                                action: {
+                                    let frame = geo.frame(in: .named("filesCoordinateSpace"))
+                                    onMenuClick?(item.id, frame)
+                                }
+                            )
+                        }
+                        .frame(width: 28, height: 28)
                     }
-                    .frame(width: 28, height: 28)
                 }
             }
         }
@@ -256,7 +268,7 @@ struct ListDocumentLock: View {
                 line(26.33)
                 line(19.33)
             }
-            .padding(.leading, 4.67)
+            .padding([.leading, .bottom], 4.67)
         }
     }
 
@@ -280,6 +292,7 @@ struct ListDocumentLock: View {
 struct ListFolderRow: View {
     let item: FileFolderItem
     let highlightedID: UUID?
+    let shouldHideAllSettings: Bool
     let shouldHideSettings: Bool
 
     var onMenuClick: ((UUID, CGRect) -> Void)?
@@ -299,16 +312,16 @@ struct ListFolderRow: View {
                 Text(item.title)
                     .appTextStyle(.bodySecondary)
                     .foregroundStyle(.text(.primary))
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(item.documentsCount) Documents")
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, 7)
 
-            Spacer()
-
-            if !shouldHideSettings {
+            if !(shouldHideSettings || shouldHideAllSettings) {
                 GeometryReader { geo in
                     AppButton(
                         config: AppButtonConfig(
@@ -325,6 +338,8 @@ struct ListFolderRow: View {
                 .frame(width: 28, height: 28)
             }
         }
+        .frame(maxWidth: .infinity)
+        .clipShape(Rectangle())
         .padding(.vertical, 9)
         .background(highlight)
     }
