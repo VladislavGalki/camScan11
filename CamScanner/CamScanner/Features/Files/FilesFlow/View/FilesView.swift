@@ -18,16 +18,24 @@ struct FilesView: View {
 
     var body: some View {
         contentView
+            .overlay(alignment: .top) { toastOverlay }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if viewModel.isSelectable {
+                    selectableBottomBar
+                }
+            }
             .overlay { menuOverlay }
             .overlay { notificationOverlay }
             .overlay { dotsOverlay }
-            .overlay(alignment: .top) { toastOverlay }
             .sheet(item: $viewModel.fileActiveSheet) { sheetView($0) }
             .coordinateSpace(name: "filesCoordinateSpace")
             .onChange(of: viewModel.folderToOpen) { _, newValue in
                 guard let newValue else { return }
                 presentFolderView(newValue)
                 viewModel.folderToOpen = nil
+            }
+            .onChange(of: viewModel.isSelectable) { _, newValue in
+                tabBar.isTabBarVisible = !newValue
             }
     }
 }
@@ -59,29 +67,44 @@ private extension FilesView {
 
     var successView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FilesNavigationBarView(
-                onDotsTap: {
-                    hideTabBar()
-                    shouldShowDotsOverlay = true
-                },
-                onSearchTap: {
-                    viewModel.startSearch()
-                },
-                onDotsFrame: { frame in
-                    if dotsFrame == .zero {
-                        dotsFrame = frame
+            if !viewModel.isSelectable {
+                FilesNavigationBarView(
+                    onDotsTap: {
+                        hideTabBar()
+                        shouldShowDotsOverlay = true
+                    },
+                    onSearchTap: {
+                        viewModel.startSearch()
+                    },
+                    onDotsFrame: { frame in
+                        if dotsFrame == .zero {
+                            dotsFrame = frame
+                        }
                     }
-                }
-            )
+                )
+            } else {
+                selectableNavigationView
+            }
 
             FilesLayoutContainer(
                 mode: viewModel.viewMode,
                 items: viewModel.items,
                 highlightedID: viewModel.highlightedID,
+                shouldHideAllSettings: viewModel.isSelectable,
                 onFolderClick: { id in
+                    if viewModel.isSelectable {
+                        viewModel.handleDocumentSelected(id: id)
+                        return
+                    }
+                    
                     viewModel.openFolderTapped(id: id)
                 },
                 onDocumentClick: { id in
+                    if viewModel.isSelectable {
+                        viewModel.handleDocumentSelected(id: id)
+                        return
+                    }
+                    
                     print("DELETED HANDLE NOTIFICATION")
                 },
                 onFavourite: { id, isFavourite in
@@ -100,6 +123,133 @@ private extension FilesView {
         }
         .background(Color.bg(.main))
         .ignoresSafeArea(edges: .top)
+    }
+    
+    private var selectableNavigationView: some View {
+        Rectangle()
+            .foregroundStyle(.bg(.main))
+            .frame(height: 128)
+            .overlay(alignment: .bottom) {
+                HStack(spacing: 10) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.close),
+                            style: .secondary,
+                            size: .m
+                        ),
+                        action: {
+                            withAnimation {
+                                viewModel.isSelectable = false
+                                viewModel.handleClearSelection()
+                            } completion: {
+                                tabBar.isTabBarVisible = true
+                            }
+                        }
+                    )
+                    
+                    Spacer(minLength: 0)
+                    
+                    Text("Select All")
+                        .appTextStyle(.bodyPrimary)
+                        .foregroundStyle(.text(.accent))
+                        .onTapGesture {
+                            viewModel.handleSelectAll()
+                        }
+                }
+                .overlay {
+                    Text("\(viewModel.selectedIDs.count) selected")
+                        .appTextStyle(.topBarTitle)
+                        .foregroundStyle(.text(.primary))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+    }
+    
+    private var selectableBottomBar: some View {
+        HStack(spacing: 0) {
+            selectableBottomBarItem(title: "Move", icon: .move)
+            selectableBottomBarItem(title: "Share", icon: .share)
+            selectableBottomBarItem(title: "Merge", icon: .merge)
+            selectableBottomBarItem(title: "Delete", icon: .trash, destructive: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 12)
+        .background(
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+                .ignoresSafeArea(edges: .bottom)
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+    
+    private func selectableBottomBarItem(
+        title: String,
+        icon: AppIcon,
+        destructive: Bool = false
+    ) -> some View {
+        let isEmpty = viewModel.selectedIDs.isEmpty
+        
+        let buttonType: FilesSelectableMenuItem? = {
+            switch icon {
+            case .move:
+                return .move
+            case .share:
+                return .share
+            case .merge:
+                return .merge
+            case .trash:
+                return .delete
+            default:
+                return nil
+            }
+        }()
+
+        let iconStyle: Color = {
+            if isEmpty {
+                return destructive
+                ? .elements(.destructiveDisabled)
+                : .elements(.disabled)
+            } else {
+                return destructive
+                ? .elements(.destructive)
+                : .elements(.secondary)
+            }
+        }()
+
+        let textStyle: Color = {
+            if isEmpty {
+                return destructive
+                ? .text(.destructiveDisabled)
+                : .text(.disabled)
+            } else {
+                return destructive
+                ? .text(.destructive)
+                : .text(.secondary)
+            }
+        }()
+
+        return VStack(spacing: 4) {
+            Image(appIcon: icon)
+                .renderingMode(.template)
+                .foregroundStyle(iconStyle)
+
+            Text(title)
+                .appTextStyle(.tabBar)
+                .foregroundStyle(textStyle)
+
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 54)
+        .onTapGesture {
+            if !isEmpty {
+                viewModel.handleSelectableMenuItem(menuItem: buttonType)
+            }
+        }
     }
     
     private var searchView: some View {
@@ -188,9 +338,18 @@ private extension FilesView {
             onCreateFolder: {
                 viewModel.fileActiveSheet = .createFolder
             },
+            onSelectFiles: {
+                withAnimation {
+                    viewModel.isSelectable = true
+                }
+            },
             onSort: { viewModel.handleFilesSortType(type: $0) },
             onViewMode: { viewModel.viewMode = $0 },
-            onDisappear: showTabBar
+            onDisappear: {
+                if !viewModel.isSelectable {
+                    showTabBar()
+                }
+            }
         )
     }
 
@@ -282,6 +441,8 @@ private extension FilesView {
         case .rename:
             viewModel.fileActiveSheet = .rename
         case .lock:
+            tabBar.isTabBarVisible = false
+            
             withAnimation(.easeInOut(duration: 0.15)) {
                 viewModel.notificationOverlaystate = .lock(UUID())
             }
@@ -309,6 +470,10 @@ private extension FilesView {
     }
 
     func clearOverlayState() {
+        if selectedMenuItem == .lock && !viewModel.isSelectable {
+            tabBar.isTabBarVisible = true
+        }
+        
         selectedFileDocumentItemId = nil
         selectedMenuItem = nil
         viewModel.notificationOverlaystate = .none

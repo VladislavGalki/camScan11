@@ -21,3 +21,10 @@ enum FilesMenuItem: CaseIterable, Identifiable {
         }
     }
 }
+
+enum FilesSelectableMenuItem {
+    case move
+    case share
+    case merge
+    case delete
+}

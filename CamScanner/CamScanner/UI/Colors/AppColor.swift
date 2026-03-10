@@ -69,6 +69,7 @@ enum AppColor: Hashable {
         case onOverlay
         
         case destructive
+        case destructiveDisabled
         
         case navigationDefault
         case navigationActive
@@ -88,6 +89,7 @@ enum AppColor: Hashable {
         case warning
         
         case destructive
+        case destructiveDisabled
         
         case onAccent
         case onAccentDisabled
@@ -267,6 +269,9 @@ private extension AppColor {
         case .text(.destructive):
             return .sRGB01(1, 0.21960784, 0.23529412, 1)
             
+        case .text(.destructiveDisabled):
+            return .sRGB01(1.000, 0.639, 0.643, 1)
+            
         case .text(.navigationDefault):
             return .sRGB01(0.40392157, 0.40392157, 0.40392157, 1)
             
@@ -299,6 +304,9 @@ private extension AppColor {
             
         case .elements(.destructive):
             return .sRGB01(1, 0.21960784, 0.23529412, 1)
+            
+        case .elements(.destructiveDisabled):
+            return .sRGB01(1.000, 0.639, 0.643, 1)
             
         case .elements(.onAccent):
             return .sRGB01(1, 1, 1, 1)

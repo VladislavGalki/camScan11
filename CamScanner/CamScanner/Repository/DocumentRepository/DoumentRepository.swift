@@ -588,4 +588,49 @@ extension DocumentRepository {
             return frame
         }
     }
+    
+    func saveMockDocument(
+        documentType: DocumentTypeEnum = .documents,
+        pages: Int = 3
+    ) throws -> UUID {
+
+        let frames = MockFrameFactory.makeFrames(count: pages)
+
+        return try saveDocument(
+            documentType: documentType,
+            frames: frames,
+            folder: nil
+        )
+    }
+}
+
+
+enum MockFrameFactory {
+
+    static func makeFrames(count: Int = 3) -> [CapturedFrame] {
+        var frames: [CapturedFrame] = []
+
+        for i in 1...count {
+
+            guard
+                let image = UIImage(named: "folder_image")
+            else { continue }
+
+            let frame = CapturedFrame(
+                preview: image,
+                previewBase: image,
+                displayBase: image,
+                original: nil,
+                quad: nil,
+                drawingData: nil,
+                drawingBase: nil,
+                filteredBase: nil,
+                filterAdjustments: [:]
+            )
+
+            frames.append(frame)
+        }
+
+        return frames
+    }
 }

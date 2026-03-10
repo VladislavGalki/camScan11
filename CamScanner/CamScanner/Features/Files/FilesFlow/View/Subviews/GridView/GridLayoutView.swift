@@ -85,6 +85,7 @@ struct GridDocumentItemView: View {
         }
         .drawingGroup()
         .background(highlight)
+        .background(selectedHilight)
         .onTapGesture {
             onDocumentClick?(item.id)
         }
@@ -152,6 +153,20 @@ struct GridDocumentItemView: View {
         .cornerRadius(8)
         .padding(-8)
         .animation(.easeIn, value: highlightedID == item.id)
+    }
+    
+    private var selectedHilight: some View {
+        Color(
+            UIColor(
+                red: 0/255,
+                green: 136/255,
+                blue: 255/255,
+                alpha: item.isSelected ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .padding(-8)
+        .animation(.easeIn, value: item.isSelected)
     }
 }
 
@@ -327,6 +342,7 @@ struct GridFolderItemView: View {
         }
         .padding(8)
         .background(highlight)
+        .background(selectedHilight)
         .drawingGroup()
         .onTapGesture {
             onFolderClick?(item.id)
@@ -344,6 +360,19 @@ struct GridFolderItemView: View {
         )
         .cornerRadius(8)
         .animation(.easeIn, value: highlightedID == item.id)
+    }
+    
+    private var selectedHilight: some View {
+        Color(
+            UIColor(
+                red: 0/255,
+                green: 136/255,
+                blue: 255/255,
+                alpha: item.isSelected ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .animation(.easeIn, value: item.isSelected)
     }
 }
 

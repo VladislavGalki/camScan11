@@ -109,7 +109,7 @@ struct FilesNotificationOverlay: View {
                                 )
                             },
                             onFinished: { unlockedIDs in
-                                viewModel.fileActiveSheet = .multipleShare(unlockedIDs)
+                                viewModel.handleMultipleUnlockAction(ids: unlockedIDs)
                                 onClear()
                             }
                         )

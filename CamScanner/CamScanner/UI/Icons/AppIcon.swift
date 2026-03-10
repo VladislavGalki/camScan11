@@ -46,6 +46,7 @@ public enum AppIcon: String, CaseIterable {
     case lock = "lock"
     case edit = "edit"
     case move = "move"
+    case merge = "merge"
     
     // MARK: - Fill
     case homeFill = "home_fill"

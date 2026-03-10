@@ -8,6 +8,7 @@ struct FilesDotsOverlay: View {
     let viewMode: FilesViewMode
 
     let onCreateFolder: () -> Void
+    let onSelectFiles: () -> Void
     let onSort: (FilesSortType) -> Void
     let onViewMode: (FilesViewMode) -> Void
     let onDisappear: () -> Void
@@ -20,7 +21,7 @@ struct FilesDotsOverlay: View {
                 sortType: sortType,
                 viewMode: viewMode,
                 onCreateFolder: onCreateFolder,
-                onSelectFiles: {},
+                onSelectFiles: onSelectFiles,
                 onSortChange: onSort,
                 onViewModeChange: onViewMode
             )

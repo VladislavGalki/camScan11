@@ -98,6 +98,35 @@ final class FileDocumentStore: NSObject {
         return documents.map { mapToDocument($0) }
     }
     
+    func fetchUnlockQueueItems(for selectedIDs: Set<UUID>) throws -> [UnlockQueueItem] {
+        guard !selectedIDs.isEmpty else { return [] }
+
+        let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentRequest.predicate = NSPredicate(format: "id IN %@", selectedIDs as NSSet)
+        
+        let directDocuments = try context.fetch(documentRequest)
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id IN %@", selectedIDs as NSSet)
+        
+        let folders = try context.fetch(folderRequest)
+        
+        let documentsInFoldersRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentsInFoldersRequest.predicate = NSPredicate(format: "folder IN %@", folders)
+        
+        let documentsInFolders = try context.fetch(documentsInFoldersRequest)
+        let allDocuments = Array(Set(directDocuments + documentsInFolders))
+        
+        let documentItems = allDocuments.map {
+            UnlockQueueItem(
+                id: $0.id ?? UUID(),
+                title: $0.title,
+                isLocked: $0.isLocked
+            )
+        }
+        
+        return documentItems
+    }
+    
     // MARK: - FRC Setup
     
     private func configureFRC() {

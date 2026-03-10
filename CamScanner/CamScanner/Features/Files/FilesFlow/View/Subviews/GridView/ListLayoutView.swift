@@ -155,6 +155,7 @@ struct ListDocumentRow: View {
         }
         .padding(.vertical, 9)
         .background(highlight)
+        .background(selectedHilight)
     }
 
     private var highlight: some View {
@@ -169,6 +170,20 @@ struct ListDocumentRow: View {
         .cornerRadius(8)
         .padding(.horizontal, -16)
         .animation(.easeIn, value: highlightedID == item.id)
+    }
+    
+    private var selectedHilight: some View {
+        Color(
+            UIColor(
+                red: 0/255,
+                green: 136/255,
+                blue: 255/255,
+                alpha: item.isSelected ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .padding(.horizontal, -16)
+        .animation(.easeIn, value: item.isSelected)
     }
 }
 
@@ -342,6 +357,7 @@ struct ListFolderRow: View {
         .clipShape(Rectangle())
         .padding(.vertical, 9)
         .background(highlight)
+        .background(selectedHilight)
     }
 
     private var highlight: some View {
@@ -356,5 +372,19 @@ struct ListFolderRow: View {
         .cornerRadius(8)
         .padding(.horizontal, -16)
         .animation(.easeIn, value: highlightedID == item.id)
+    }
+    
+    private var selectedHilight: some View {
+        Color(
+            UIColor(
+                red: 0/255,
+                green: 136/255,
+                blue: 255/255,
+                alpha: item.isSelected ? 0.1 : 0
+            )
+        )
+        .cornerRadius(8)
+        .padding(.horizontal, -16)
+        .animation(.easeIn, value: item.isSelected)
     }
 }

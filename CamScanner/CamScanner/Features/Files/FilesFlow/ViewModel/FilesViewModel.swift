@@ -10,6 +10,9 @@ final class FilesViewModel: ObservableObject {
     @Published var viewMode: FilesViewMode = .grid
     @Published private(set) var items: [FilesGridItem] = []
     
+    @Published var selectedIDs: Set<UUID> = []
+    @Published var isSelectable: Bool = false
+    
     @Published var isSearchLoading = false
     @Published var searchText: String = ""
     
@@ -20,6 +23,7 @@ final class FilesViewModel: ObservableObject {
     @Published var fileActiveSheet: FileActiveSheet?
     
     private var pendingAction: FilesPendingAction?
+    private var selectableMenuAction: FilesSelectableMenuItem?
     
     var once = true
     
@@ -144,6 +148,7 @@ final class FilesViewModel: ObservableObject {
                         UnlockQueueItem(id: $0.id, title: $0.title, isLocked: $0.isLocked)
                     }
                     
+                    selectableMenuAction = .share
                     notificationOverlaystate = .multipleUnlock(queue)
                 } else {
                     fileActiveSheet = .share(id)
@@ -200,6 +205,69 @@ extension FilesViewModel {
         documentStore.clearSearch()
     }
     
+    func handleDocumentSelected(id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+
+        items = items.map { item in
+            switch item {
+            case .document(var doc):
+                if doc.id == id {
+                    doc.isSelected.toggle()
+                }
+                
+                return .document(doc)
+            case .folder(var folder):
+                if folder.id == id {
+                    folder.isSelected.toggle()
+                }
+                
+                return .folder(folder)
+            }
+        }
+    }
+    
+    func handleClearSelection() {
+        selectedIDs.removeAll()
+
+        items = items.map {
+            switch $0 {
+            case .document(var doc):
+                doc.isSelected = false
+                return .document(doc)
+            case .folder(var folder):
+                folder.isSelected = false
+                return .folder(folder)
+            }
+        }
+    }
+    
+    func handleSelectAll() {
+        let ids: [UUID] = items.compactMap {
+            switch $0 {
+            case .document(let doc): return doc.id
+            case .folder(let folder): return folder.id
+            }
+        }
+        
+        selectedIDs = Set(ids)
+        
+        items = items.map { item in
+            switch item {
+            case .document(var doc):
+                doc.isSelected = true
+                return .document(doc)
+                
+            case .folder(var folder):
+                folder.isSelected = true
+                return .folder(folder)
+            }
+        }
+    }
+    
     func openFolderTapped(id: UUID) {
         performLockedAction(id: id) { [weak self] in
             self?.folderToOpen = id
@@ -230,8 +298,6 @@ extension FilesViewModel {
                 showNotification(type: .pinRemoved)
                 setHighlitedDocument(id)
             } catch {}
-        case .move:
-            break
         case .delete:
             do {
                 try documentRepository.deleteDocument(id: id)
@@ -240,6 +306,42 @@ extension FilesViewModel {
         default:
             return
         }
+    }
+    
+    func handleMultipleUnlockAction(ids: [UUID]) {
+        switch selectableMenuAction {
+        case .share:
+            fileActiveSheet = .multipleShare(ids)
+        case .move:
+            fileActiveSheet = .move(
+                MoveDocumentInputModel(viewMode: viewMode, folderId: nil, documentIDs: ids)
+            )
+        case .delete:
+            break
+        case .merge:
+            break
+        default:
+            break
+        }
+        
+        isSelectable = false
+        selectableMenuAction = nil
+        handleClearSelection()
+    }
+    
+    func handleSelectableMenuItem(menuItem: FilesSelectableMenuItem?) {
+        guard let menuItem else { return }
+        selectableMenuAction = menuItem
+        
+        do {
+            let items = try documentStore.fetchUnlockQueueItems(for: selectedIDs)
+            
+            if items.contains(where: { $0.isLocked }) {
+                notificationOverlaystate = .multipleUnlock(items)
+            } else {
+                handleMultipleUnlockAction(ids: items.map { $0.id })
+            }
+        } catch {}
     }
     
     func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
