@@ -124,7 +124,15 @@ final class FileDocumentStore: NSObject {
             )
         }
         
-        return documentItems
+        let folderItems = folders.map {
+            UnlockQueueItem(
+                id: $0.id ?? UUID(),
+                title: $0.title ?? "",
+                isLocked: $0.isLocked
+            )
+        }
+        
+        return folderItems + documentItems
     }
     
     // MARK: - FRC Setup

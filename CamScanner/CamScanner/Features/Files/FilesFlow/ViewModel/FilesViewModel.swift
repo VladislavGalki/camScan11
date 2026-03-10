@@ -189,6 +189,19 @@ final class FilesViewModel: ObservableObject {
             }
         }
     }
+    
+    func removeFolderFromSelectdIds(ids: [UUID]) -> [UUID] {
+        let folderIDs = Set(
+            items.compactMap {
+                if case .folder(let folder) = $0 {
+                    return folder.id
+                }
+                return nil
+            }
+        )
+        
+        return ids.filter { !folderIDs.contains($0) }
+    }
 }
 
 // MARK: - Public
@@ -309,12 +322,14 @@ extension FilesViewModel {
     }
     
     func handleMultipleUnlockAction(ids: [UUID]) {
+        let updatedIds = removeFolderFromSelectdIds(ids: ids)
+        
         switch selectableMenuAction {
         case .share:
-            fileActiveSheet = .multipleShare(ids)
+            fileActiveSheet = .multipleShare(updatedIds)
         case .move:
             fileActiveSheet = .move(
-                MoveDocumentInputModel(viewMode: viewMode, folderId: nil, documentIDs: ids)
+                MoveDocumentInputModel(viewMode: viewMode, folderId: nil, documentIDs: updatedIds)
             )
         case .delete:
             break
