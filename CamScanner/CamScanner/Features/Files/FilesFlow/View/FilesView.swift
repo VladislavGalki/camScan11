@@ -419,6 +419,11 @@ private extension FilesView {
                 viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
             }
             .presentationCornerRadius(38)
+        case let .merge(inputModel):
+            MergeDocumentsView(inputModel: inputModel) {
+                viewModel.fileActiveSheet = nil
+            }
+            .presentationCornerRadius(38)
         }
     }
 }

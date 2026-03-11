@@ -25,8 +25,6 @@ final class FilesViewModel: ObservableObject {
     private var pendingAction: FilesPendingAction?
     private var selectableMenuAction: FilesSelectableMenuItem?
     
-    var once = true
-    
     private let lockedActionExecutore = LockedActionExecutor.shared
     private let passwordCryptoService = PasswordCryptoService.shared
     private let documentRepository: DocumentRepository
@@ -331,14 +329,12 @@ extension FilesViewModel {
             fileActiveSheet = .move(
                 MoveDocumentInputModel(viewMode: viewMode, folderId: nil, documentIDs: updatedIds)
             )
-            
-            isSelectable = false
-            selectableMenuAction = nil
-            handleClearSelection()
         case .delete:
             notificationOverlaystate = .multipleDelete(ids)
         case .merge:
-            break
+            if let documents = try? documentStore.fetchDocumentItems(for: updatedIds) {
+                fileActiveSheet = .merge(MergeDocumentsInputModel(items: documents))
+            }
         default:
             break
         }
@@ -410,6 +406,7 @@ extension FilesViewModel {
             try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
             fileActiveSheet = nil
             showNotification(type: .multipleMoved(documentIds.isEmpty ? 1 : documentIds.count))
+            handleClearSelection()
         } catch {}
     }
     

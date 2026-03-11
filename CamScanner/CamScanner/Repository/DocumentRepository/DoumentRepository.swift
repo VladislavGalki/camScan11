@@ -128,6 +128,63 @@ extension DocumentRepository {
         return docID
     }
     
+    @discardableResult
+    func mergeDocuments(
+        ids: [UUID],
+        folder: FolderEntity? = nil
+    ) throws -> UUID {
+        guard !ids.isEmpty else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 7001,
+                userInfo: [NSLocalizedDescriptionKey: "No documents to merge"]
+            )
+        }
+
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
+
+        let fetchedDocuments = try context.fetch(request)
+
+        let documentsByID: [UUID: DocumentEntity] = Dictionary(
+            uniqueKeysWithValues: fetchedDocuments.compactMap { document in
+                guard let id = document.id else { return nil }
+                return (id, document)
+            }
+        )
+
+        let orderedDocuments: [DocumentEntity] = ids.compactMap { documentsByID[$0] }
+
+        guard !orderedDocuments.isEmpty else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 7002,
+                userInfo: [NSLocalizedDescriptionKey: "Documents not found"]
+            )
+        }
+
+        var mergedFrames: [CapturedFrame] = []
+
+        for document in orderedDocuments {
+            let frames = try loadFrames(for: document)
+            mergedFrames.append(contentsOf: frames)
+        }
+
+        guard !mergedFrames.isEmpty else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 7003,
+                userInfo: [NSLocalizedDescriptionKey: "No frames to merge"]
+            )
+        }
+
+        return try saveDocument(
+            documentType: .documents,
+            frames: mergedFrames,
+            folder: folder
+        )
+    }
+    
     func setDocumentFavourite(id: UUID, isFavourite: Bool) throws {
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
