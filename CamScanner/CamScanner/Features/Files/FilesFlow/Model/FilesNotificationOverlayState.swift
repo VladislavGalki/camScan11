@@ -5,6 +5,7 @@ enum FilesNotificationOverlayState: Equatable {
     case lock(UUID)
     case unlock(UUID)
     case multipleUnlock([UnlockQueueItem])
+    case multipleDelete([UUID])
     case unlockDocument(UUID)
     case none
 }

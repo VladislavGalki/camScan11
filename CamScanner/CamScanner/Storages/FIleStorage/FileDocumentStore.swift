@@ -135,6 +135,35 @@ final class FileDocumentStore: NSObject {
         return folderItems + documentItems
     }
     
+    func fetchDocumentItems(for selectedIDs: Set<UUID>) throws -> [FileDocumentItem] {
+        guard !selectedIDs.isEmpty else { return [] }
+
+        let ids = selectedIDs as NSSet
+
+        let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentRequest.predicate = NSPredicate(format: "id IN %@", ids)
+        let directDocuments = try context.fetch(documentRequest)
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id IN %@", ids)
+        let folders = try context.fetch(folderRequest)
+
+        let documentsInFolders: [DocumentEntity]
+        if folders.isEmpty {
+            documentsInFolders = []
+        } else {
+            let nestedDocumentsRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+            nestedDocumentsRequest.predicate = NSPredicate(format: "folder IN %@", folders)
+            documentsInFolders = try context.fetch(nestedDocumentsRequest)
+        }
+
+        let allDocuments = Array(Set(directDocuments + documentsInFolders))
+
+        return allDocuments
+            .sorted { $0.lastViewed > $1.lastViewed }
+            .map { mapToDocument($0) }
+    }
+    
     // MARK: - FRC Setup
     
     private func configureFRC() {

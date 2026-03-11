@@ -264,6 +264,46 @@ extension DocumentRepository {
         }
     }
     
+    func deleteItems(ids: [UUID]) throws {
+        guard !ids.isEmpty else { return }
+
+        let idSet = Set(ids)
+
+        let documentRequest: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        documentRequest.predicate = NSPredicate(format: "id IN %@", Array(idSet))
+
+        let documents = try context.fetch(documentRequest)
+
+        for document in documents {
+            if let docID = document.id {
+                FileStore.shared.deleteDocumentFolder(docID: docID)
+            }
+
+            context.delete(document)
+        }
+
+        let folderRequest: NSFetchRequest<FolderEntity> = FolderEntity.fetchRequest()
+        folderRequest.predicate = NSPredicate(format: "id IN %@", Array(idSet))
+
+        let folders = try context.fetch(folderRequest)
+
+        for folder in folders {
+            if let documents = folder.documents as? Set<DocumentEntity> {
+                for doc in documents {
+                    if let docID = doc.id {
+                        FileStore.shared.deleteDocumentFolder(docID: docID)
+                    }
+
+                    context.delete(doc)
+                }
+            }
+
+            context.delete(folder)
+        }
+
+        try context.save()
+    }
+    
     func getPasswordData(for id: UUID) throws -> (salt: Data, hash: Data)? {
         if let doc = try fetchDocument(id: id),
            let salt = doc.passwordSalt,
@@ -496,11 +536,15 @@ extension DocumentRepository {
             throw NSError(domain: "DocumentRepository", code: 5002)
         }
 
-        let docType = DocumentTypeEnum(rawValue: first.documentTypeRaw ?? "") ?? .documents
         var pages: [ScanPreviewModel] = []
 
         for document in documents {
+            let docType = DocumentTypeEnum(
+                rawValue: document.documentTypeRaw ?? ""
+            ) ?? .documents
+
             let frames = try loadFrames(for: document)
+
             if docType == .documents || docType == .passport {
                 frames.forEach {
                     pages.append(
@@ -517,13 +561,16 @@ extension DocumentRepository {
                         frames: frames
                     )
                 )
-
             }
         }
 
+        let firstType = DocumentTypeEnum(
+            rawValue: first.documentTypeRaw ?? ""
+        ) ?? .documents
+
         return ShareInputModel(
             documentName: first.title,
-            documentType: docType,
+            documentType: firstType,
             pages: pages
         )
     }

@@ -6,6 +6,7 @@ enum NotificationModel {
     case fileRemoved
     case pinCreated
     case pinRemoved
+    case multipleMoved(Int)
     
     var title: String {
         switch self {
@@ -19,6 +20,9 @@ enum NotificationModel {
             return "PIN created"
         case .pinRemoved:
             return "PIN removed"
+        case let .multipleMoved(count):
+            let stringCount = count == 1 ? "1 item" : "\(count) items"
+            return "\(stringCount) moved"
         }
     }
 }

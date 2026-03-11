@@ -331,17 +331,17 @@ extension FilesViewModel {
             fileActiveSheet = .move(
                 MoveDocumentInputModel(viewMode: viewMode, folderId: nil, documentIDs: updatedIds)
             )
+            
+            isSelectable = false
+            selectableMenuAction = nil
+            handleClearSelection()
         case .delete:
-            break
+            notificationOverlaystate = .multipleDelete(ids)
         case .merge:
             break
         default:
             break
         }
-        
-        isSelectable = false
-        selectableMenuAction = nil
-        handleClearSelection()
     }
     
     func handleSelectableMenuItem(menuItem: FilesSelectableMenuItem?) {
@@ -409,6 +409,7 @@ extension FilesViewModel {
         do {
             try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
             fileActiveSheet = nil
+            showNotification(type: .multipleMoved(documentIds.isEmpty ? 1 : documentIds.count))
         } catch {}
     }
     
@@ -433,6 +434,18 @@ extension FilesViewModel {
             salt: documentData.salt,
             hash: documentData.hash
         )
+    }
+    
+    func handleMultipleDelete(documensIds: [UUID]) {
+        do {
+            try documentRepository.deleteItems(ids: documensIds)
+            
+            isSelectable = false
+            selectableMenuAction = nil
+            handleClearSelection()
+        } catch {
+            print(error)
+        }
     }
     
     func getTitleForItem(id: UUID?) -> String {

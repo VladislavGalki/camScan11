@@ -34,6 +34,16 @@ struct FilesNotificationOverlay: View {
                     .onDisappear {
                         onShowTabBar()
                     }
+                case let .multipleDelete(ids):
+                    MultipleDeleteView(
+                        onDelete: {
+                            viewModel.handleMultipleDelete(documensIds: ids)
+                            onClear()
+                        },
+                        onCancel: {
+                            onClear()
+                        }
+                    )
                 case .unlockDocument:
                     UnlockDocumentView(
                         documentTitle: viewModel.getTitleForItem(id: selectedID),
@@ -109,8 +119,11 @@ struct FilesNotificationOverlay: View {
                                 )
                             },
                             onFinished: { unlockedIDs in
-                                viewModel.handleMultipleUnlockAction(ids: unlockedIDs)
                                 onClear()
+                                
+                                if !unlockedIDs.isEmpty {
+                                    viewModel.handleMultipleUnlockAction(ids: unlockedIDs)
+                                }
                             }
                         )
                     )
