@@ -55,6 +55,7 @@ final class PreviewCarouselController: UIViewController {
     // MARK: Public
     
     func update(_ newModels: [ScanPreviewModel]) {
+        guard newModels != models else { return }
         models = newModels
         collectionView.reloadData()
     }
@@ -106,22 +107,21 @@ private extension PreviewCarouselController {
     }
     
     func updateHorizontalInsets() {
-        guard collectionView.collectionViewLayout is UICollectionViewFlowLayout else { return }
-
-        let cardWidth: CGFloat = cardWidth
         let inset = (collectionView.bounds.width - cardWidth) / 2
 
-        collectionView.contentInset = UIEdgeInsets(
-            top: 0,
-            left: inset,
-            bottom: 0,
-            right: inset
-        )
+        guard collectionView.contentInset.left != inset ||
+              collectionView.contentInset.right != inset else { return }
+
+        collectionView.contentInset.left = inset
+        collectionView.contentInset.right = inset
     }
 
     func updateVerticalInsets() {
         let height = cardHeight()
         let inset = max(0, (collectionView.bounds.height - height) / 2)
+
+        guard collectionView.contentInset.top != inset ||
+              collectionView.contentInset.bottom != inset else { return }
 
         collectionView.contentInset.top = inset
         collectionView.contentInset.bottom = inset
@@ -255,17 +255,25 @@ extension PreviewCarouselController: UICollectionViewDelegateFlowLayout {
     ) {
         guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
 
-        let cardWidth: CGFloat = cardWidth
-        let spacing = layout.minimumLineSpacing
-        let fullWidth = cardWidth + spacing
+        let fullWidth = cardWidth + layout.minimumLineSpacing
+        let offset = scrollView.contentOffset.x + scrollView.contentInset.left
 
-        let offset = targetContentOffset.pointee.x + scrollView.contentInset.left
-        let index = round(offset / fullWidth)
+        let currentIndex = offset / fullWidth
+        let targetIndex: CGFloat
 
-        let newOffset = index * fullWidth - scrollView.contentInset.left
+        if velocity.x > 0.2 {
+            targetIndex = ceil(currentIndex)
+        } else if velocity.x < -0.2 {
+            targetIndex = floor(currentIndex)
+        } else {
+            targetIndex = round(currentIndex)
+        }
+
+        let clampedIndex = max(0, min(targetIndex, CGFloat(collectionView.numberOfItems(inSection: 0) - 1)))
+        let newOffset = clampedIndex * fullWidth - scrollView.contentInset.left
+
         targetContentOffset.pointee.x = newOffset
-
-        onPageChanged(Int(index))
+        onPageChanged(Int(clampedIndex))
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

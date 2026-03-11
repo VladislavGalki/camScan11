@@ -9,6 +9,10 @@ struct PreviewCarouselRepresentable: UIViewControllerRepresentable {
     var onRotatePage: (Int) -> Void
     var onAddTapped: () -> Void
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
     func makeUIViewController(context: Context) -> PreviewCarouselController {
         PreviewCarouselController(
             models: models,
@@ -23,6 +27,18 @@ struct PreviewCarouselRepresentable: UIViewControllerRepresentable {
         
         if let actionBottomBarAction {
             vc.handleBottomBarAction(actionBottomBarAction)
+            
+            DispatchQueue.main.async {
+                self.actionBottomBarAction = nil
+            }
+        }
+    }
+
+    final class Coordinator {
+        let parent: PreviewCarouselRepresentable
+
+        init(_ parent: PreviewCarouselRepresentable) {
+            self.parent = parent
         }
     }
 }
