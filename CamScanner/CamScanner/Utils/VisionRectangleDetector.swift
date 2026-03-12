@@ -30,25 +30,16 @@ enum VisionRectangleDetector {
 
                 completion(biggest.applying(transform))
             })
-
-            rectDetectRequest.minimumConfidence = 0.35
-            rectDetectRequest.maximumObservations = 8
-
-            rectDetectRequest.minimumAspectRatio = 0.4
-            rectDetectRequest.maximumAspectRatio = 3.0
-
-            rectDetectRequest.quadratureTolerance = 30
-            rectDetectRequest.minimumSize = 0.08
-
-            rectDetectRequest.regionOfInterest = CGRect(
-                x: 0.05,
-                y: 0.1,
-                width: 0.9,
-                height: 0.8
-            )
+            
+            rectDetectRequest.minimumConfidence = 0.5
+            rectDetectRequest.maximumObservations = 3
+            rectDetectRequest.minimumAspectRatio = 0.3
             
             rectDetectRequest.preferBackgroundProcessing = true
-            rectDetectRequest.revision = VNDetectRectanglesRequest.supportedRevisions.max()!
+            
+            if let latestRevision = VNDetectRectanglesRequest.supportedRevisions.max() {
+                rectDetectRequest.revision = latestRevision
+            }
 
             return rectDetectRequest
         }()
@@ -69,19 +60,12 @@ enum VisionRectangleDetector {
     ///   - pixelBuffer: The pixelBuffer to detect rectangles on.
     ///   - completion: The biggest rectangle on the CVPixelBuffer
     static func rectangle(forPixelBuffer pixelBuffer: CVPixelBuffer, completion: @escaping ((Quadrilateral?) -> Void)) {
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-
-        let processed = ImagePreprocessor.enhance(ciImage)
-
-        let handler = VNImageRequestHandler(
-            ciImage: processed,
-            options: [:]
-        )
+        let imageRequestHandler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
 
         VisionRectangleDetector.completeImageRequest(
-            for: handler,
-            width: processed.extent.width,
-            height: processed.extent.height,
+            for: imageRequestHandler,
+            width: CGFloat(CVPixelBufferGetWidth(pixelBuffer)),
+            height: CGFloat(CVPixelBufferGetHeight(pixelBuffer)),
             completion: completion
         )
     }
@@ -92,16 +76,12 @@ enum VisionRectangleDetector {
     ///   - image: The image to detect rectangles on.
     /// - Returns: The biggest rectangle detected on the image.
     static func rectangle(forImage image: CIImage, completion: @escaping ((Quadrilateral?) -> Void)) {
-        let processedImage = ImagePreprocessor.enhance(image)
+        let imageRequestHandler = VNImageRequestHandler(ciImage: image, options: [:])
 
-        let imageRequestHandler = VNImageRequestHandler(
-            ciImage: processedImage,
-            options: [:]
-        )
-        
         VisionRectangleDetector.completeImageRequest(
             for: imageRequestHandler, width: image.extent.width,
-            height: image.extent.height, completion: completion)
+            height: image.extent.height, completion: completion
+        )
     }
 
     static func rectangle(
@@ -109,102 +89,12 @@ enum VisionRectangleDetector {
         orientation: CGImagePropertyOrientation,
         completion: @escaping ((Quadrilateral?) -> Void)
     ) {
-        let processed = ImagePreprocessor.enhance(image)
-        let handler = VNImageRequestHandler(
-            ciImage: processed,
-            orientation: orientation,
-            options: [:]
-        )
-
-        let orientedImage = processed.oriented(orientation)
+        let imageRequestHandler = VNImageRequestHandler(ciImage: image, orientation: orientation, options: [:])
+        let orientedImage = image.oriented(orientation)
 
         VisionRectangleDetector.completeImageRequest(
-            for: handler,
-            width: orientedImage.extent.width,
-            height: orientedImage.extent.height,
-            completion: completion
-        )
-    }
-}
-
-enum ImagePreprocessor {
-    static func enhance(_ image: CIImage) -> CIImage {
-        // grayscale
-        let gray = CIFilter.colorControls()
-        gray.inputImage = image
-        gray.saturation = 0
-        gray.contrast = 1.8
-        gray.brightness = 0
-
-        guard let grayImage = gray.outputImage else {
-            return image
-        }
-
-        // blur
-        let blur = CIFilter.gaussianBlur()
-        blur.inputImage = grayImage
-        blur.radius = 1.3
-
-        guard let blurred = blur.outputImage else {
-            return grayImage
-        }
-
-        // edges
-        let edges = CIFilter.edges()
-        edges.inputImage = blurred
-        edges.intensity = 1.2
-
-        return edges.outputImage ?? blurred
-    }
-}
-
-
-final class RectangleSmoother {
-
-    private let historyLimit = 6
-    private var history: [Quadrilateral] = []
-
-    func smooth(_ quad: Quadrilateral?) -> Quadrilateral? {
-
-        guard let quad else {
-            history.removeAll()
-            return nil
-        }
-
-        history.append(quad)
-
-        if history.count > historyLimit {
-            history.removeFirst()
-        }
-
-        return averageQuad()
-    }
-
-    private func averageQuad() -> Quadrilateral {
-
-        let count = CGFloat(history.count)
-
-        let topLeft = history.reduce(CGPoint.zero) {
-            CGPoint(x: $0.x + $1.topLeft.x, y: $0.y + $1.topLeft.y)
-        }
-
-        let topRight = history.reduce(CGPoint.zero) {
-            CGPoint(x: $0.x + $1.topRight.x, y: $0.y + $1.topRight.y)
-        }
-
-        let bottomRight = history.reduce(CGPoint.zero) {
-            CGPoint(x: $0.x + $1.bottomRight.x, y: $0.y + $1.bottomRight.y)
-        }
-
-        let bottomLeft = history.reduce(CGPoint.zero) {
-            CGPoint(x: $0.x + $1.bottomLeft.x, y: $0.y + $1.bottomLeft.y)
-        }
-
-        return Quadrilateral(
-            topLeft: CGPoint(x: topLeft.x / count, y: topLeft.y / count),
-            topRight: CGPoint(x: topRight.x / count, y: topRight.y / count),
-            bottomRight: CGPoint(x: bottomRight.x / count, y: bottomRight.y / count),
-            bottomLeft: CGPoint(x: bottomLeft.x / count, y: bottomLeft.y / count)
+            for: imageRequestHandler, width: orientedImage.extent.width,
+            height: orientedImage.extent.height, completion: completion
         )
     }
 }
