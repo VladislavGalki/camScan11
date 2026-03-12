@@ -39,9 +39,9 @@ final class ScanPreviewViewModel: ObservableObject {
     }
 
     // MARK: - Public
-    
+
     var documentType: DocumentTypeEnum {
-        inputModel.documentType
+        inputModel.pageGroups.first?.documentType ?? .documents
     }
 
     var currentFrame: CapturedFrame? {
@@ -75,35 +75,41 @@ final class ScanPreviewViewModel: ObservableObject {
     }
     
     func buildOutputModel() -> ScanPreviewInputModel {
-        var pages: [DocumentTypeEnum: [CapturedFrame]] = [:]
-        for page in scanPreviewModel {
-            let type = page.documentType
-            let frames = page.frames
-            pages[type, default: []].append(contentsOf: frames)
-        }
-
-        return ScanPreviewInputModel(
-            documentType: inputModel.documentType,
-            pages: pages
+        ScanPreviewInputModel(
+            pageGroups: scanPreviewModel.map {
+                PreviewPageGroup(
+                    documentType: $0.documentType,
+                    frames: $0.frames
+                )
+            }
         )
     }
     
     func buildOutputClearModel() -> ScanPreviewInputModel {
-        ScanPreviewInputModel(documentType: documentType, pages: [:])
+        ScanPreviewInputModel(pageGroups: [])
     }
     
     func saveDocument() throws {
-        let frames = scanPreviewModel.flatMap { $0.frames }
+        let pages = scanPreviewModel.flatMap { page in
+            page.frames.map {
+                DocumentPagePayload(
+                    frame: $0,
+                    sourceDocumentType: page.documentType
+                )
+            }
+        }
 
-        guard !frames.isEmpty else {
+        guard !pages.isEmpty else {
             onFinish(buildOutputClearModel())
             return
         }
 
         do {
+            let displayType = scanPreviewModel.first?.documentType ?? .documents
+
             let docID = try documentRepository.saveDocument(
-                documentType: documentType,
-                frames: frames
+                documentType: displayType,
+                pages: pages
             )
 
             print("Document saved:", docID)
@@ -466,55 +472,11 @@ final class ScanPreviewViewModel: ObservableObject {
     // MARK: - Bootstrap
 
     private func bootstrap() {
-        var result: [ScanPreviewModel] = []
-
-        inputModel.pages.forEach { entry in
-            let type = entry.key
-            let frames = entry.value.filter { $0.preview != nil }
-            
-            let updatedFrames = frames.map { frame -> CapturedFrame in
-                var copy = frame
-                if copy.previewBase == nil {
-                    copy.previewBase =
-                        copy.drawingBase ??
-                        copy.original ??
-                        copy.preview
-                }
-                
-                if let base = copy.previewBase {
-                    copy.previewBase = ImageCompressionService.shared.compress(
-                        base,
-                        maxDimension: 1200,
-                        quality: 0.90
-                    )
-                }
-
-                if copy.displayBase == nil {
-                    copy.displayBase = copy.previewBase
-                }
-
-                copy.preview = copy.displayBase
-
-                return copy
-            }
-
-            if type == .documents || type == .passport {
-                updatedFrames.forEach { frame in
-                    result.append(
-                        ScanPreviewModel(
-                            documentType: type,
-                            frames: [frame]
-                        )
-                    )
-                }
-            } else {
-                result.append(
-                    ScanPreviewModel(
-                        documentType: type,
-                        frames: updatedFrames
-                    )
-                )
-            }
+        let result = inputModel.pageGroups.map { group in
+            ScanPreviewModel(
+                documentType: group.documentType,
+                frames: preparedFrames(group.frames)
+            )
         }
 
         scanPreviewModel = result
@@ -564,5 +526,49 @@ final class ScanPreviewViewModel: ObservableObject {
         documentFileName = "\(dateString) \(typeString)"
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
+    }
+}
+
+// MARK: - Helpers
+extension ScanPreviewViewModel {
+    func makeCropperInputModel() -> ScanCropperInputModel {
+        ScanCropperInputModel(
+            pageGroups: scanPreviewModel.map {
+                PreviewPageGroup(
+                    documentType: $0.documentType,
+                    frames: $0.frames
+                )
+            }
+        )
+    }
+    
+    private func preparedFrames(_ frames: [CapturedFrame]) -> [CapturedFrame] {
+        let validFrames = frames.filter { $0.preview != nil }
+
+        return validFrames.map { frame in
+            var copy = frame
+
+            if copy.previewBase == nil {
+                copy.previewBase =
+                    copy.drawingBase ??
+                    copy.original ??
+                    copy.preview
+            }
+
+            if let base = copy.previewBase {
+                copy.previewBase = ImageCompressionService.shared.compress(
+                    base,
+                    maxDimension: 1200,
+                    quality: 0.90
+                )
+            }
+
+            if copy.displayBase == nil {
+                copy.displayBase = copy.previewBase
+            }
+
+            copy.preview = copy.displayBase
+            return copy
+        }
     }
 }

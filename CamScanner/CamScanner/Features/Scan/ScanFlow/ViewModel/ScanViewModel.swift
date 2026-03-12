@@ -39,6 +39,8 @@ final class ScanViewModel: ObservableObject {
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
     
+    private let documentRepository = DocumentRepository.shared
+    
     private var cameraCancellables = Set<AnyCancellable>()
     private var selectedDocumentsCancellable = Set<AnyCancellable>()
     
@@ -394,91 +396,113 @@ final class ScanViewModel: ObservableObject {
     }
     
     // MARK: - Build input/output preview
-    
     func buildPreviewInputModel() -> ScanPreviewInputModel? {
         let documentType = ui.selectedDocumentType
-        
+
         func normalized(_ frames: [CapturedFrame]) -> [CapturedFrame] {
             frames.map {
                 var f = $0
-                
+
                 if f.previewBase == nil {
                     f.previewBase = f.drawingBase ?? f.preview
                 }
-                
+
                 if f.displayBase == nil {
                     f.displayBase = f.previewBase
                 }
-                
+
                 if f.filterHistory.states.isEmpty {
                     f.filterHistory = FilterHistory(
                         states: [FilterState()],
                         currentIndex: 0
                     )
                 }
-                
+
                 return f
             }
         }
-        
+
         switch documentType {
         case .qrCode:
             return nil
-            
+
         case .documents:
-            return ScanPreviewInputModel(
-                documentType: documentType,
-                pages: [
-                    documentType : normalized(scanResult)
-                ]
-            )
+            let groups = normalized(scanResult).map {
+                PreviewPageGroup(
+                    documentType: .documents,
+                    frames: [$0]
+                )
+            }
+
+            return ScanPreviewInputModel(pageGroups: groups)
+
         case .passport:
-            return ScanPreviewInputModel(
-                documentType: documentType,
-                pages: [
-                    documentType : normalized(passportResult)
-                ]
-            )
+            let groups = normalized(passportResult).map {
+                PreviewPageGroup(
+                    documentType: .passport,
+                    frames: [$0]
+                )
+            }
+
+            return ScanPreviewInputModel(pageGroups: groups)
+
         case .idCard:
             var frames: [CapturedFrame] = [idResult.front]
-            
+
             if let back = idResult.back {
                 frames.append(back)
             }
-            
-            return ScanPreviewInputModel(
-                documentType: documentType,
-                pages: [
-                    documentType : normalized(frames)
-                ]
-            )
+
+            let groups = [
+                PreviewPageGroup(
+                    documentType: .idCard,
+                    frames: normalized(frames)
+                )
+            ]
+
+            return ScanPreviewInputModel(pageGroups: groups)
+
         case .driverLicense:
             var frames: [CapturedFrame] = [idResult.front]
-            
+
             if let back = idResult.back {
                 frames.append(back)
             }
-            
-            return ScanPreviewInputModel(
-                documentType: documentType,
-                pages: [
-                    documentType : normalized(frames)
-                ]
-            )
+
+            let groups = [
+                PreviewPageGroup(
+                    documentType: .driverLicense,
+                    frames: normalized(frames)
+                )
+            ]
+
+            return ScanPreviewInputModel(pageGroups: groups)
         }
     }
     
     func buildOutputPreview(_ model: ScanPreviewInputModel) {
-        let frames = model.pages[model.documentType] ?? []
-        
-        switch model.documentType {
+        let groups = model.pageGroups
+
+        guard let firstType = groups.first?.documentType else {
+            scanResult = []
+            passportResult = []
+            resetIdFlowForNewType(ui.selectedDocumentType)
+            return
+        }
+
+        switch firstType {
         case .documents:
-            scanResult = frames
+            scanResult = groups.flatMap(\.frames)
+
         case .passport:
-            passportResult = frames
+            passportResult = groups.flatMap(\.frames)
+
         case .idCard, .driverLicense:
+            let frames = groups.flatMap(\.frames)
+
             idResult.front = frames.first ?? CapturedFrame()
             idResult.back = frames.count > 1 ? frames[1] : nil
+
         case .qrCode:
             break
         }

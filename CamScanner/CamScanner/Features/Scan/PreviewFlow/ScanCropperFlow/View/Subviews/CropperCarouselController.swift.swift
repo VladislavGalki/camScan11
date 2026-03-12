@@ -2,15 +2,11 @@ import UIKit
 
 final class CropperCarouselController: UIViewController {
 
-    // MARK: Constants
-
     private let cardWidth: CGFloat = 322
     private let maxCardHeight: CGFloat = 456
     private let spacing: CGFloat = 16
 
-    // MARK: Data
-
-    private var models: [ScanPreviewModel]
+    private var models: [CropperPageItem]
     private var collectionView: UICollectionView!
 
     private var currentIndex: Int = 0
@@ -18,10 +14,8 @@ final class CropperCarouselController: UIViewController {
     private let onPageChanged: (Int) -> Void
     private var onQuadChanged: ((Int, Quadrilateral) -> Void)?
 
-    // MARK: Init
-
     init(
-        models: [ScanPreviewModel],
+        models: [CropperPageItem],
         onPageChanged: @escaping (Int) -> Void,
         onQuadChanged: @escaping (Int, Quadrilateral) -> Void
     ) {
@@ -48,7 +42,7 @@ final class CropperCarouselController: UIViewController {
 
     // MARK: Public
 
-    func update(_ newModels: [ScanPreviewModel]) {
+    func update(_ newModels: [CropperPageItem]) {
         if newModels != models {
             models = newModels
             collectionView.reloadData()
@@ -159,7 +153,7 @@ extension CropperCarouselController: UICollectionViewDataSource {
                 self?.onQuadChanged?(indexPath.item, quad)
             }
         )
-        
+
         return cell
     }
 }

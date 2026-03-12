@@ -6,7 +6,7 @@ final class CropperPageCell: UICollectionViewCell {
 
     private weak var parentVC: UIViewController?
     private var cropController: DocumentCropperViewController?
-    
+
     var onQuadChanged: ((Quadrilateral) -> Void)?
 
     override func prepareForReuse() {
@@ -22,7 +22,7 @@ final class CropperPageCell: UICollectionViewCell {
     }
 
     func configure(
-        model: ScanPreviewModel,
+        model: CropperPageItem,
         parent: UIViewController,
         isEditable: Bool,
         onQuadChanged: ((Quadrilateral) -> Void)? = nil
@@ -30,8 +30,9 @@ final class CropperPageCell: UICollectionViewCell {
         parentVC = parent
         self.onQuadChanged = onQuadChanged
 
-        guard let frame = model.frames.first,
-              let image = frame.original ?? frame.preview else { return }
+        let frame = model.frame
+
+        guard let image = frame.original ?? frame.preview else { return }
 
         let controller = DocumentCropperViewController(
             cropperModel: DocumentCropperModel(
@@ -39,13 +40,13 @@ final class CropperPageCell: UICollectionViewCell {
                 autoQuad: frame.quad
             )
         )
-        
+
         controller.onQuadChanged = { [weak self] quad in
             self?.onQuadChanged?(quad)
         }
 
         cropController = controller
-        
+
         controller.setEditable(isEditable)
         controller.setBackgroundColor(UIColor(.bg(.main)))
 
@@ -63,7 +64,7 @@ final class CropperPageCell: UICollectionViewCell {
 
         controller.didMove(toParent: parent)
     }
-    
+
     func setEditable(_ editable: Bool) {
         cropController?.setEditable(editable)
     }

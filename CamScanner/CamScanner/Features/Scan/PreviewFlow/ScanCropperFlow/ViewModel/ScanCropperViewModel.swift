@@ -5,7 +5,7 @@ final class ScanCropperViewModel: ObservableObject {
 
     // MARK: Published
 
-    @Published var pages: [ScanPreviewModel] = []
+    @Published var pages: [CropperPageItem] = []
     @Published var notificationState: ScanCropperNotificationState = .none
     @Published var cropSelectedType: CropSelectedType = .autoCrop
     @Published var shouldShowApplyToAllButton: Bool = false
@@ -15,9 +15,9 @@ final class ScanCropperViewModel: ObservableObject {
 
     private let cropRenderer: CropRenderer
     private let input: ScanCropperInputModel
-    private var initialQuads: [UUID : Quadrilateral?] = [:]
+    private var initialQuads: [UUID: Quadrilateral?] = [:]
     private var quadHistories: [Int: ScanCropperQuadHistory] = [:]
-    
+
     private let onFinish: (ScanPreviewInputModel) -> Void
 
     // MARK: Init
@@ -30,44 +30,33 @@ final class ScanCropperViewModel: ObservableObject {
         self.cropRenderer = cropRenderer
         self.input = input
         self.onFinish = onFinish
-        
+
         bootstrap()
         captureInitialQuads()
         bootstrapQuadHistories()
     }
     
     private func bootstrap() {
-        var result: [ScanPreviewModel] = []
-        
-        input.pages.forEach { entry in
-            let type = entry.documentType
-            let frames = entry.frames.filter { $0.preview != nil }
-
-            frames.forEach { frame in
-                result.append(
-                    ScanPreviewModel(
-                        documentType: type,
-                        frames: [frame]
-                    )
+        pages = input.pageGroups.flatMap { group in
+            group.frames.map { frame in
+                CropperPageItem(
+                    id: frame.id,
+                    documentType: group.documentType,
+                    frame: frame
                 )
-
             }
         }
-
-        pages = result
     }
     
     private func captureInitialQuads() {
         pages.forEach { page in
-            page.frames.forEach { frame in
-                initialQuads[frame.id] = frame.quad
-            }
+            initialQuads[page.id] = page.frame.quad
         }
     }
     
     private func bootstrapQuadHistories() {
         for index in pages.indices {
-            guard let quad = pages[index].frames.first?.quad else { continue }
+            guard let quad = pages[index].frame.quad else { continue }
             quadHistories[index] = ScanCropperQuadHistory(initial: quad)
         }
     }
@@ -76,7 +65,7 @@ final class ScanCropperViewModel: ObservableObject {
 
     var currentFrame: CapturedFrame? {
         guard pages.indices.contains(selectedIndex) else { return nil }
-        return pages[selectedIndex].frames.first
+        return pages[selectedIndex].frame
     }
 
     // MARK: Page selection
@@ -102,7 +91,9 @@ final class ScanCropperViewModel: ObservableObject {
         index: Int,
         cropperModel: DocumentCropperModel
     ) {
-        guard pages.indices.contains(index), let quad = cropperModel.autoQuad else { return }
+        guard pages.indices.contains(index),
+              let quad = cropperModel.autoQuad
+        else { return }
 
         if quadHistories[index] == nil {
             quadHistories[index] = ScanCropperQuadHistory(initial: quad)
@@ -113,13 +104,9 @@ final class ScanCropperViewModel: ObservableObject {
         )
 
         var page = pages[index]
-        page.frames = page.frames.map { frame in
-            var f = frame
-            f.preview = cropperModel.image
-            f.quad = quad
-            f.drawingBase = nil
-            return f
-        }
+        page.frame.preview = cropperModel.image
+        page.frame.quad = quad
+        page.frame.drawingBase = nil
 
         pages[index] = page
     }
@@ -130,26 +117,20 @@ final class ScanCropperViewModel: ObservableObject {
         guard pages.indices.contains(selectedIndex) else { return }
         cropSelectedType = .autoCrop
         shouldShowApplyToAllButton = true
+
         var page = pages[selectedIndex]
-        
-        page.frames = page.frames.map { frame in
-            var f = frame
-            
-            guard let quad = initialQuads[f.id], let quad else { return f }
 
-            if quadHistories[selectedIndex] == nil {
-                quadHistories[selectedIndex] = ScanCropperQuadHistory(initial: quad)
-            }
+        guard let quad = initialQuads[page.id] ?? nil else { return }
 
-            quadHistories[selectedIndex]?.push(
-                ScanCropperQuadState(quad: quad)
-            )
-
-            f.quad = quad
-
-            return f
+        if quadHistories[selectedIndex] == nil {
+            quadHistories[selectedIndex] = ScanCropperQuadHistory(initial: quad)
         }
 
+        quadHistories[selectedIndex]?.push(
+            ScanCropperQuadState(quad: quad)
+        )
+
+        page.frame.quad = quad
         pages[selectedIndex] = page
     }
 
@@ -157,34 +138,27 @@ final class ScanCropperViewModel: ObservableObject {
         guard pages.indices.contains(selectedIndex) else { return }
         cropSelectedType = .expand
         shouldShowApplyToAllButton = true
-        
+
         var page = pages[selectedIndex]
 
-        page.frames = page.frames.map { frame in
-            var f = frame
+        guard let image = page.frame.original ?? page.frame.preview else { return }
 
-            guard let image = f.original ?? f.preview else { return f }
+        let quad = Quadrilateral(
+            topLeft: .zero,
+            topRight: CGPoint(x: image.size.width, y: 0),
+            bottomRight: CGPoint(x: image.size.width, y: image.size.height),
+            bottomLeft: CGPoint(x: 0, y: image.size.height)
+        )
 
-            let quad = Quadrilateral(
-                topLeft: .zero,
-                topRight: CGPoint(x: image.size.width, y: 0),
-                bottomRight: CGPoint(x: image.size.width, y: image.size.height),
-                bottomLeft: CGPoint(x: 0, y: image.size.height)
-            )
-
-            if quadHistories[selectedIndex] == nil {
-                quadHistories[selectedIndex] = ScanCropperQuadHistory(initial: quad)
-            }
-
-            quadHistories[selectedIndex]?.push(
-                ScanCropperQuadState(quad: quad)
-            )
-
-            f.quad = quad
-
-            return f
+        if quadHistories[selectedIndex] == nil {
+            quadHistories[selectedIndex] = ScanCropperQuadHistory(initial: quad)
         }
 
+        quadHistories[selectedIndex]?.push(
+            ScanCropperQuadState(quad: quad)
+        )
+
+        page.frame.quad = quad
         pages[selectedIndex] = page
     }
     
@@ -203,26 +177,18 @@ final class ScanCropperViewModel: ObservableObject {
         }
 
         var page = pages[index]
-
-        page.frames = page.frames.map { frame in
-            var f = frame
-            f.quad = quad
-            return f
-        }
-
+        page.frame.quad = quad
         pages[index] = page
     }
     
     func undoQuad() {
         shouldShowApplyToAllButton = false
+
         guard pages.indices.contains(selectedIndex),
               var history = quadHistories[selectedIndex]
-        else {
-            return
-        }
+        else { return }
 
         history.undo()
-
         quadHistories[selectedIndex] = history
 
         applyQuad(
@@ -230,17 +196,15 @@ final class ScanCropperViewModel: ObservableObject {
             to: selectedIndex
         )
     }
-    
+
     func redoQuad() {
         shouldShowApplyToAllButton = false
+
         guard pages.indices.contains(selectedIndex),
               var history = quadHistories[selectedIndex]
-        else {
-            return
-        }
+        else { return }
 
         history.redo()
-
         quadHistories[selectedIndex] = history
 
         applyQuad(
@@ -251,38 +215,30 @@ final class ScanCropperViewModel: ObservableObject {
     
     func applyToAllQuads() {
         shouldShowApplyToAllButton = false
-        
+
         switch cropSelectedType {
         case .expand:
             for index in pages.indices {
                 var page = pages[index]
 
-                page.frames = page.frames.map { frame in
-                    var f = frame
-                    
-                    guard let image = f.original ?? f.preview else { return f }
+                guard let image = page.frame.original ?? page.frame.preview else { continue }
 
-                    f.quad = Quadrilateral(
-                        topLeft: .zero,
-                        topRight: CGPoint(x: image.size.width, y: 0),
-                        bottomRight: CGPoint(x: image.size.width, y: image.size.height),
-                        bottomLeft: CGPoint(x: 0, y: image.size.height)
-                    )
-                    return f
-                }
+                page.frame.quad = Quadrilateral(
+                    topLeft: .zero,
+                    topRight: CGPoint(x: image.size.width, y: 0),
+                    bottomRight: CGPoint(x: image.size.width, y: image.size.height),
+                    bottomLeft: CGPoint(x: 0, y: image.size.height)
+                )
+
                 pages[index] = page
             }
+
         case .autoCrop:
             for index in pages.indices {
                 var page = pages[index]
-                page.frames = page.frames.map { frame in
-                    var f = frame
 
-                    if let initialQuad = initialQuads[f.id] {
-                        f.quad = initialQuad
-                    }
-
-                    return f
+                if let initialQuad = initialQuads[page.id] ?? nil {
+                    page.frame.quad = initialQuad
                 }
 
                 pages[index] = page
@@ -292,13 +248,7 @@ final class ScanCropperViewModel: ObservableObject {
     
     private func applyQuad(_ quad: Quadrilateral, to index: Int) {
         var page = pages[index]
-
-        page.frames = page.frames.map {
-            var f = $0
-            f.quad = quad
-            return f
-        }
-
+        page.frame.quad = quad
         pages[index] = page
     }
 
@@ -311,39 +261,65 @@ final class ScanCropperViewModel: ObservableObject {
     
     private func applyCrop() {
         var updatedPages = pages
-            for pageIndex in updatedPages.indices {
-                updatedPages[pageIndex].frames =
-                updatedPages[pageIndex].frames.map { frame in
-                    var f = frame
 
-                    guard let quad = f.quad, let baseImage = f.original ?? f.preview else { return f }
-                    guard let cropped = cropRenderer.crop(image: baseImage, quad: quad ) else { return f }
+        for index in updatedPages.indices {
+            var page = updatedPages[index]
 
-                    f.preview = cropped
-                    f.displayBase = cropped
-                    f.previewBase = cropped
-                    f.drawingBase = nil
-                    f.drawingData = nil
+            guard let quad = page.frame.quad,
+                  let baseImage = page.frame.original ?? page.frame.preview,
+                  let cropped = cropRenderer.crop(image: baseImage, quad: quad)
+            else { continue }
 
-                    return f
-                }
-            }
+            page.frame.preview = cropped
+            page.frame.displayBase = cropped
+            page.frame.previewBase = cropped
+            page.frame.drawingBase = nil
+            page.frame.drawingData = nil
 
-            pages = updatedPages
+            updatedPages[index] = page
+        }
+
+        pages = updatedPages
     }
     
     func buildOutputModel() -> ScanPreviewInputModel {
-        var pagesDict: [DocumentTypeEnum: [CapturedFrame]] = [:]
+        ScanPreviewInputModel(
+            pageGroups: makePageGroups(from: pages)
+        )
+    }
+}
 
-        for page in pages {
-            let type = page.documentType
-            let frames = page.frames
-            pagesDict[type, default: []].append(contentsOf: frames)
+private extension ScanCropperViewModel {
+    func makePageGroups(from items: [CropperPageItem]) -> [PreviewPageGroup] {
+        guard !items.isEmpty else { return [] }
+
+        var result: [PreviewPageGroup] = []
+        var currentType = items[0].documentType
+        var currentFrames: [CapturedFrame] = [items[0].frame]
+
+        for item in items.dropFirst() {
+            if item.documentType == currentType {
+                currentFrames.append(item.frame)
+            } else {
+                result.append(
+                    PreviewPageGroup(
+                        documentType: currentType,
+                        frames: currentFrames
+                    )
+                )
+
+                currentType = item.documentType
+                currentFrames = [item.frame]
+            }
         }
 
-        return ScanPreviewInputModel(
-            documentType: input.documentType,
-            pages: pagesDict
+        result.append(
+            PreviewPageGroup(
+                documentType: currentType,
+                frames: currentFrames
+            )
         )
+
+        return result
     }
 }

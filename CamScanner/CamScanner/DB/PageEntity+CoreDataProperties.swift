@@ -20,6 +20,8 @@ extension PageEntity {
     @NSManaged public var filterAdjustment: Double
     @NSManaged public var rotationAngle: Double
 
+    @NSManaged public var sourceDocumentTypeRaw: String
+    
     @NSManaged public var document: DocumentEntity?
 }
 

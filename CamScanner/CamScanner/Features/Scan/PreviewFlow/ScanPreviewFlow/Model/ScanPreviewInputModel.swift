@@ -1,6 +1,11 @@
 import Foundation
 
-struct ScanPreviewInputModel: Equatable, Hashable {
+struct PreviewPageGroup: Identifiable, Equatable, Hashable {
+    let id = UUID()
     let documentType: DocumentTypeEnum
-    let pages: [DocumentTypeEnum : [CapturedFrame]]
+    let frames: [CapturedFrame]
+}
+
+struct ScanPreviewInputModel: Equatable, Hashable {
+    let pageGroups: [PreviewPageGroup]
 }
