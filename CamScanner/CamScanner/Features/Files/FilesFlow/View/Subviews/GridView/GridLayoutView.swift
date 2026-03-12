@@ -178,7 +178,7 @@ struct GridDocumentBackground: View {
             Rectangle()
                 .foregroundStyle(.bg(.surface))
         } else {
-            switch item.documentType {
+            switch item.previewDocumentType {
             case .documents:
                 Rectangle()
                     .foregroundStyle(
@@ -209,7 +209,7 @@ struct GridDocumentPreview: View {
             GridDocumentLockSkeleton()
                 .padding(.bottom, 14)
         } else {
-            switch item.documentType {
+            switch item.previewDocumentType {
             case .documents:
                 if let image = item.thumbnail {
                     Image(uiImage: image)
@@ -435,7 +435,7 @@ struct GridFolderPreviewImage: View {
             GridFolderLockSkeleton()
                 .padding(.bottom, 4.67)
         } else {
-            switch document.documentType {
+            switch document.previewDocumentType {
             case .documents:
                 if let image = document.thumbnail {
                     Image(uiImage: image)

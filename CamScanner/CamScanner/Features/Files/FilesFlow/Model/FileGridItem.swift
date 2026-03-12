@@ -30,6 +30,10 @@ struct FileDocumentItem: Equatable, Hashable {
     var lockViaFaceId: Bool = false
     let isFavourite: Bool
     let sizeInBytes: Int64
+
+    let isMerged: Bool
+    let previewDocumentType: DocumentTypeEnum
+
     let firstPagePath: String?
     let secondPagePath: String?
     var thumbnail: UIImage?

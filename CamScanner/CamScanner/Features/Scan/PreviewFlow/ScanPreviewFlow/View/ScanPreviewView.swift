@@ -204,10 +204,8 @@ struct ScanPreviewView: View {
                 .onTapGesture {
                     router.push(
                         ScanRoute.scanCropper(
-                            ScanCropperInputModel(
-                                pages: viewModel.scanPreviewModel,
-                                documentType: viewModel.documentType
-                            ), onFinish: { outputModel in
+                            viewModel.makeCropperInputModel(),
+                            onFinish: { outputModel in
                                 viewModel.applyCropOutput(outputModel)
                             }
                         )

@@ -50,6 +50,54 @@ final class DocumentRepository {
             return []
         }
     }
+    
+    func loadPreviewInputModel(id: UUID) throws -> ScanPreviewInputModel {
+        guard let document = try fetchDocument(id: id) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8001,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let pageGroups = try makePreviewPageGroups(for: document)
+
+        return ScanPreviewInputModel(
+            pageGroups: pageGroups
+        )
+    }
+    
+    func loadPreviewInputModel(ids: [UUID]) throws -> ScanPreviewInputModel {
+        guard !ids.isEmpty else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8002,
+                userInfo: [NSLocalizedDescriptionKey: "No documents provided"]
+            )
+        }
+
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
+
+        let fetchedDocuments = try context.fetch(request)
+
+        let documentsByID: [UUID: DocumentEntity] = Dictionary(
+            uniqueKeysWithValues: fetchedDocuments.compactMap { document in
+                guard let id = document.id else { return nil }
+                return (id, document)
+            }
+        )
+
+        let orderedDocuments = ids.compactMap { documentsByID[$0] }
+
+        let pageGroups = try orderedDocuments.flatMap {
+            try makePreviewPageGroups(for: $0)
+        }
+
+        return ScanPreviewInputModel(
+            pageGroups: pageGroups
+        )
+    }
 }
 
 // MARK: Documents
@@ -60,19 +108,46 @@ extension DocumentRepository {
         frames: [CapturedFrame],
         folder: FolderEntity? = nil
     ) throws -> UUID {
+        let pages = frames.map {
+            DocumentPagePayload(
+                frame: $0,
+                sourceDocumentType: documentType
+            )
+        }
+
+        return try saveDocument(
+            documentType: documentType,
+            pages: pages,
+            folder: folder,
+            containerType: .regular
+        )
+    }
+    
+    @discardableResult
+    func saveDocument(
+        documentType: DocumentTypeEnum,
+        pages: [DocumentPagePayload],
+        folder: FolderEntity? = nil,
+        containerType: DocumentContainerType = .regular
+    ) throws -> UUID {
         let docID = UUID()
-        
+
         let doc = DocumentEntity(context: context)
         doc.id = docID
-        
         doc.createdAt = Date()
         doc.lastViewed = Date()
         doc.documentTypeRaw = documentType.rawValue
-        doc.pageCount = Int16(frames.count)
+        doc.containerTypeRaw = containerType.rawValue
+        doc.pageCount = Int16(pages.count)
         doc.folder = folder
-        doc.title = configureDocumentFileName(createAt: doc.createdAt, documentType: documentType.title)
-        
-        for (index, frame) in frames.enumerated() {
+        doc.title = configureDocumentFileName(
+            createAt: doc.createdAt,
+            documentType: documentType.title
+        )
+
+        for (index, payload) in pages.enumerated() {
+            let frame = payload.frame
+
             guard
                 let original = frame.original,
                 let preview = frame.preview
@@ -97,9 +172,9 @@ extension DocumentRepository {
             let page = PageEntity(context: context)
             page.id = pageID
             page.index = Int16(index)
-
             page.imagePath = FileStore.shared.relativePath(fromAbsolute: displayURL)
             page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
+            page.sourceDocumentTypeRaw = payload.sourceDocumentType.rawValue
 
             page.quadData = frame.quad.flatMap { QuadCodec.encode($0) }
             page.drawingData = frame.drawingData
@@ -117,7 +192,6 @@ extension DocumentRepository {
             page.filterTypeRaw = frame.currentFilter.type.rawValue
             page.filterAdjustment = Double(frame.currentFilter.adjustment)
             page.rotationAngle = Double(frame.currentFilter.rotationAngle)
-
             page.document = doc
         }
 
@@ -163,25 +237,34 @@ extension DocumentRepository {
             )
         }
 
-        var mergedFrames: [CapturedFrame] = []
+        var mergedPages: [DocumentPagePayload] = []
 
         for document in orderedDocuments {
-            let frames = try loadFrames(for: document)
-            mergedFrames.append(contentsOf: frames)
+            let loadedPages = try loadPages(for: document)
+
+            let pages = loadedPages.map {
+                DocumentPagePayload(
+                    frame: $0.frame,
+                    sourceDocumentType: $0.sourceDocumentType
+                )
+            }
+
+            mergedPages.append(contentsOf: pages)
         }
 
-        guard !mergedFrames.isEmpty else {
+        guard !mergedPages.isEmpty else {
             throw NSError(
                 domain: "DocumentRepository",
                 code: 7003,
-                userInfo: [NSLocalizedDescriptionKey: "No frames to merge"]
+                userInfo: [NSLocalizedDescriptionKey: "No pages to merge"]
             )
         }
 
         return try saveDocument(
             documentType: .documents,
-            frames: mergedFrames,
-            folder: folder
+            pages: mergedPages,
+            folder: folder,
+            containerType: .merged
         )
     }
     
@@ -565,11 +648,20 @@ extension DocumentRepository {
         }
 
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        request.predicate = NSPredicate(format: "id IN %@", ids)
+        request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
 
-        let documents = try context.fetch(request)
+        let fetchedDocuments = try context.fetch(request)
 
-        return try buildShareModel(from: documents)
+        let documentsByID: [UUID: DocumentEntity] = Dictionary(
+            uniqueKeysWithValues: fetchedDocuments.compactMap { document in
+                guard let id = document.id else { return nil }
+                return (id, document)
+            }
+        )
+
+        let orderedDocuments = ids.compactMap { documentsByID[$0] }
+
+        return try buildShareModel(from: orderedDocuments)
     }
     
     private func fetchDocument(id: UUID) throws -> DocumentEntity? {
@@ -593,32 +685,15 @@ extension DocumentRepository {
             throw NSError(domain: "DocumentRepository", code: 5002)
         }
 
-        var pages: [ScanPreviewModel] = []
+        let pageGroups = try documents.flatMap {
+            try makePreviewPageGroups(for: $0)
+        }
 
-        for document in documents {
-            let docType = DocumentTypeEnum(
-                rawValue: document.documentTypeRaw ?? ""
-            ) ?? .documents
-
-            let frames = try loadFrames(for: document)
-
-            if docType == .documents || docType == .passport {
-                frames.forEach {
-                    pages.append(
-                        ScanPreviewModel(
-                            documentType: docType,
-                            frames: [$0]
-                        )
-                    )
-                }
-            } else {
-                pages.append(
-                    ScanPreviewModel(
-                        documentType: docType,
-                        frames: frames
-                    )
-                )
-            }
+        let pages = pageGroups.map {
+            ScanPreviewModel(
+                documentType: $0.documentType,
+                frames: $0.frames
+            )
         }
 
         let firstType = DocumentTypeEnum(
@@ -633,8 +708,16 @@ extension DocumentRepository {
     }
     
     private func loadFrames(for document: DocumentEntity) throws -> [CapturedFrame] {
+        try loadPages(for: document).map(\.frame)
+    }
+    
+    private func loadPages(for document: DocumentEntity) throws -> [LoadedDocumentPage] {
         let pages = (document.pages as? Set<PageEntity>)?
             .sorted { $0.index < $1.index } ?? []
+
+        let fallbackType = DocumentTypeEnum(
+            rawValue: document.documentTypeRaw ?? ""
+        ) ?? .documents
 
         return pages.compactMap { page in
             guard
@@ -646,13 +729,12 @@ extension DocumentRepository {
             else { return nil }
 
             var frame = CapturedFrame()
-
             frame.original = originalImage
 
             if let drawingPath = page.drawingBasePath,
                let drawingImage = UIImage(
-                contentsOfFile: FileStore.shared
-                    .url(forRelativePath: drawingPath).path
+                    contentsOfFile: FileStore.shared
+                        .url(forRelativePath: drawingPath).path
                ) {
                 frame.drawingBase = drawingImage
             }
@@ -687,54 +769,196 @@ extension DocumentRepository {
             frame.displayBase = frame.previewBase
             frame.preview = frame.displayBase
 
-            print("previewBase == original", frame.previewBase === frame.original)
-            
-            return frame
+            let sourceType = DocumentTypeEnum(
+                rawValue: page.sourceDocumentTypeRaw
+            ) ?? fallbackType
+
+            return LoadedDocumentPage(
+                frame: frame,
+                sourceDocumentType: sourceType
+            )
         }
-    }
-    
-    func saveMockDocument(
-        documentType: DocumentTypeEnum = .documents,
-        pages: Int = 3
-    ) throws -> UUID {
-
-        let frames = MockFrameFactory.makeFrames(count: pages)
-
-        return try saveDocument(
-            documentType: documentType,
-            frames: frames,
-            folder: nil
-        )
     }
 }
 
+// MARK: - Helpers
+extension DocumentRepository {
+    private func containerType(for document: DocumentEntity) -> DocumentContainerType {
+        DocumentContainerType(
+            rawValue: document.containerTypeRaw
+        ) ?? .regular
+    }
+    
+    private func makeRegularPreviewModels(
+        pages: [LoadedDocumentPage],
+        fallbackType: DocumentTypeEnum
+    ) -> [ScanPreviewModel] {
+        guard !pages.isEmpty else { return [] }
 
-enum MockFrameFactory {
+        let docType = pages.first?.sourceDocumentType ?? fallbackType
 
-    static func makeFrames(count: Int = 3) -> [CapturedFrame] {
-        var frames: [CapturedFrame] = []
+        switch docType {
+        case .documents, .passport:
+            return pages.map {
+                ScanPreviewModel(
+                    documentType: $0.sourceDocumentType,
+                    frames: [$0.frame]
+                )
+            }
 
-        for i in 1...count {
+        case .idCard, .driverLicense:
+            return [
+                ScanPreviewModel(
+                    documentType: docType,
+                    frames: pages.map(\.frame)
+                )
+            ]
+        case .qrCode:
+            return []
+        }
+    }
+    
+    private func makeMergedPreviewModels(
+        pages: [LoadedDocumentPage]
+    ) -> [ScanPreviewModel] {
+        guard !pages.isEmpty else { return [] }
 
-            guard
-                let image = UIImage(named: "folder_image")
-            else { continue }
+        var result: [ScanPreviewModel] = []
+        var index = 0
 
-            let frame = CapturedFrame(
-                preview: image,
-                previewBase: image,
-                displayBase: image,
-                original: nil,
-                quad: nil,
-                drawingData: nil,
-                drawingBase: nil,
-                filteredBase: nil,
-                filterAdjustments: [:]
-            )
+        while index < pages.count {
+            let current = pages[index]
 
-            frames.append(frame)
+            switch current.sourceDocumentType {
+            case .documents, .passport:
+                result.append(
+                    ScanPreviewModel(
+                        documentType: current.sourceDocumentType,
+                        frames: [current.frame]
+                    )
+                )
+                index += 1
+
+            case .idCard, .driverLicense:
+                var frames: [CapturedFrame] = [current.frame]
+
+                if index + 1 < pages.count,
+                   pages[index + 1].sourceDocumentType == current.sourceDocumentType {
+                    frames.append(pages[index + 1].frame)
+                    index += 2
+                } else {
+                    index += 1
+                }
+
+                result.append(
+                    ScanPreviewModel(
+                        documentType: current.sourceDocumentType,
+                        frames: frames
+                    )
+                )
+            case .qrCode:
+                return []
+            }
         }
 
-        return frames
+        return result
+    }
+    
+    private func makePreviewPageGroups(
+        for document: DocumentEntity
+    ) throws -> [PreviewPageGroup] {
+        let pages = try loadPages(for: document)
+        let containerType = containerType(for: document)
+        let fallbackType = DocumentTypeEnum(
+            rawValue: document.documentTypeRaw ?? ""
+        ) ?? .documents
+
+        switch containerType {
+        case .regular:
+            return makeRegularPreviewPageGroups(
+                pages: pages,
+                fallbackType: fallbackType
+            )
+
+        case .merged:
+            return makeMergedPreviewPageGroups(
+                pages: pages
+            )
+        }
+    }
+    
+    private func makeRegularPreviewPageGroups(
+        pages: [LoadedDocumentPage],
+        fallbackType: DocumentTypeEnum
+    ) -> [PreviewPageGroup] {
+        guard !pages.isEmpty else { return [] }
+
+        let docType = pages.first?.sourceDocumentType ?? fallbackType
+
+        switch docType {
+        case .documents, .passport:
+            return pages.map {
+                PreviewPageGroup(
+                    documentType: $0.sourceDocumentType,
+                    frames: [$0.frame]
+                )
+            }
+
+        case .idCard, .driverLicense:
+            return [
+                PreviewPageGroup(
+                    documentType: docType,
+                    frames: pages.map(\.frame)
+                )
+            ]
+        case .qrCode:
+            return []
+        }
+    }
+    
+    private func makeMergedPreviewPageGroups(
+        pages: [LoadedDocumentPage]
+    ) -> [PreviewPageGroup] {
+        guard !pages.isEmpty else { return [] }
+
+        var result: [PreviewPageGroup] = []
+        var index = 0
+
+        while index < pages.count {
+            let current = pages[index]
+
+            switch current.sourceDocumentType {
+            case .documents, .passport:
+                result.append(
+                    PreviewPageGroup(
+                        documentType: current.sourceDocumentType,
+                        frames: [current.frame]
+                    )
+                )
+                index += 1
+
+            case .idCard, .driverLicense:
+                var frames: [CapturedFrame] = [current.frame]
+
+                if index + 1 < pages.count,
+                   pages[index + 1].sourceDocumentType == current.sourceDocumentType {
+                    frames.append(pages[index + 1].frame)
+                    index += 2
+                } else {
+                    index += 1
+                }
+
+                result.append(
+                    PreviewPageGroup(
+                        documentType: current.sourceDocumentType,
+                        frames: frames
+                    )
+                )
+            case .qrCode:
+                return []
+            }
+        }
+
+        return result
     }
 }

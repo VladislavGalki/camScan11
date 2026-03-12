@@ -12,6 +12,7 @@ extension DocumentEntity {
     @NSManaged public var createdAt: Date
     @NSManaged public var lastViewed: Date
     @NSManaged public var documentTypeRaw: String?
+    @NSManaged public var containerTypeRaw: String
     @NSManaged public var pageCount: Int16
     @NSManaged public var isLocked: Bool
     @NSManaged public var isFavourite: Bool

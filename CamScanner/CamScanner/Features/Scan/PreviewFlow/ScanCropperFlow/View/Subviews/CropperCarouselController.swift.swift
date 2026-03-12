@@ -2,15 +2,11 @@ import UIKit
 
 final class CropperCarouselController: UIViewController {
 
-    // MARK: Constants
-
     private let cardWidth: CGFloat = 322
     private let maxCardHeight: CGFloat = 456
     private let spacing: CGFloat = 16
 
-    // MARK: Data
-
-    private var models: [ScanPreviewModel]
+    private var models: [CropperPageItem]
     private var collectionView: UICollectionView!
 
     private var currentIndex: Int = 0
@@ -18,10 +14,8 @@ final class CropperCarouselController: UIViewController {
     private let onPageChanged: (Int) -> Void
     private var onQuadChanged: ((Int, Quadrilateral) -> Void)?
 
-    // MARK: Init
-
     init(
-        models: [ScanPreviewModel],
+        models: [CropperPageItem],
         onPageChanged: @escaping (Int) -> Void,
         onQuadChanged: @escaping (Int, Quadrilateral) -> Void
     ) {
@@ -48,7 +42,7 @@ final class CropperCarouselController: UIViewController {
 
     // MARK: Public
 
-    func update(_ newModels: [ScanPreviewModel]) {
+    func update(_ newModels: [CropperPageItem]) {
         if newModels != models {
             models = newModels
             collectionView.reloadData()
@@ -73,21 +67,21 @@ private extension CropperCarouselController {
     }
 
     func updateHorizontalInsets() {
-        guard collectionView.collectionViewLayout is UICollectionViewFlowLayout else { return }
-
         let inset = (collectionView.bounds.width - cardWidth) / 2
 
-        collectionView.contentInset = UIEdgeInsets(
-            top: 0,
-            left: inset,
-            bottom: 0,
-            right: inset
-        )
+        guard collectionView.contentInset.left != inset ||
+              collectionView.contentInset.right != inset else { return }
+
+        collectionView.contentInset.left = inset
+        collectionView.contentInset.right = inset
     }
 
     func updateVerticalInsets() {
         let height = cardHeight()
         let inset = max(0, (collectionView.bounds.height - height) / 2)
+
+        guard collectionView.contentInset.top != inset ||
+              collectionView.contentInset.bottom != inset else { return }
 
         collectionView.contentInset.top = inset
         collectionView.contentInset.bottom = inset
@@ -159,7 +153,7 @@ extension CropperCarouselController: UICollectionViewDataSource {
                 self?.onQuadChanged?(indexPath.item, quad)
             }
         )
-        
+
         return cell
     }
 }
@@ -182,30 +176,40 @@ extension CropperCarouselController {
         withVelocity velocity: CGPoint,
         targetContentOffset: UnsafeMutablePointer<CGPoint>
     ) {
-
         guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
 
         let fullWidth = cardWidth + layout.minimumLineSpacing
+        let offset = scrollView.contentOffset.x + scrollView.contentInset.left
 
-        let offset = targetContentOffset.pointee.x + scrollView.contentInset.left
-        let index = round(offset / fullWidth)
+        let currentPage = offset / fullWidth
+        let targetIndex: CGFloat
 
-        let newOffset = index * fullWidth - scrollView.contentInset.left
+        if velocity.x > 0.2 {
+            targetIndex = ceil(currentPage)
+        } else if velocity.x < -0.2 {
+            targetIndex = floor(currentPage)
+        } else {
+            targetIndex = round(currentPage)
+        }
+
+        let clampedIndex = max(
+            0,
+            min(targetIndex, CGFloat(collectionView.numberOfItems(inSection: 0) - 1))
+        )
+
+        let newOffset = clampedIndex * fullWidth - scrollView.contentInset.left
         targetContentOffset.pointee.x = newOffset
 
-        let intIndex = Int(index)
-
-        currentIndex = intIndex
-        onPageChanged(intIndex)
+        self.currentIndex = Int(clampedIndex)
+        onPageChanged(Int(clampedIndex))
         updateEditableStates()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         let fullWidth = cardWidth + spacing
         let offset = scrollView.contentOffset.x + scrollView.contentInset.left
-
         let rawIndex = Int(round(offset / fullWidth))
-        let clampedIndex = min(rawIndex, models.count - 1)
+        let clampedIndex = max(0, min(rawIndex, models.count - 1))
 
         currentIndex = clampedIndex
     }

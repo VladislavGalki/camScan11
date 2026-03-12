@@ -44,33 +44,13 @@ final class ShareViewModel: ObservableObject {
     }
     
     private func covertInputModel() -> [SharePreviewModel] {
-        var result: [SharePreviewModel] = []
-
-        inputModel.pages.forEach { entry in
-            let type = entry.documentType
-
-            if type == .documents {
-                entry.frames.forEach { frame in
-                    result.append(
-                        SharePreviewModel(
-                            documentType: type,
-                            frames: [frame],
-                            isSelected: true
-                        )
-                    )
-                }
-            } else {
-                result.append(
-                    SharePreviewModel(
-                        documentType: type,
-                        frames: entry.frames,
-                        isSelected: true
-                    )
-                )
-            }
+        inputModel.pages.map {
+            SharePreviewModel(
+                documentType: $0.documentType,
+                frames: $0.frames,
+                isSelected: true
+            )
         }
-
-        return result
     }
     
     private func updateShareCount() {

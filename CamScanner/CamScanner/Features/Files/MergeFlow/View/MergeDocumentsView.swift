@@ -2,6 +2,8 @@ import SwiftUI
 
 struct MergeDocumentsView: View {
     @StateObject private var viewModel: MergeDocumentsViewModel
+    
+    @State private var showNotificationOverlay = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -23,6 +25,11 @@ struct MergeDocumentsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bg(.main))
+        .overlay {
+            if showNotificationOverlay {
+                notificationDeleteFileView
+            }
+        }
     }
 
     private var navigationView: some View {
@@ -47,9 +54,12 @@ struct MergeDocumentsView: View {
                     size: .m
                 ),
                 action: {
-                    viewModel.handleMergeAction()
+                    withAnimation {
+                        showNotificationOverlay = true
+                    }
                 }
             )
+            .appButtonEnabled(viewModel.items.count > 1)
         }
         .overlay {
             VStack(spacing: 0) {
@@ -88,5 +98,73 @@ struct MergeDocumentsView: View {
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .background(Color.bg(.main))
+    }
+    
+    private var notificationDeleteFileView: some View {
+        ZStack {
+            Color.black.opacity(0.24)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                Text("Keep original files after merging?")
+                    .multilineTextAlignment(.center)
+                    .appTextStyle(.itemTitle)
+                    .foregroundStyle(.text(.primary))
+                    .padding(.bottom, 24)
+
+                VStack(spacing: 10) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Keep original files"),
+                            style: .secondary,
+                            size: .l,
+                            isFullWidth: true
+                        ),
+                        action: {
+                            withAnimation {
+                                showNotificationOverlay = false
+                            }
+                            
+                            viewModel.handleMergeAction()
+                        }
+                    )
+                    
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Remove original files"),
+                            style: .secondary,
+                            size: .l,
+                            extraTitleColor: .text(.destructive),
+                            isFullWidth: true
+                        ),
+                        action: {
+                            withAnimation {
+                                showNotificationOverlay = false
+                            }
+                            
+                            viewModel.handleMergeAction(shouldRemoveOriginal: true)
+                        }
+                    )
+
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Cancel"),
+                            style: .secondary,
+                            size: .l,
+                            isFullWidth: true
+                        ),
+                        action: {
+                            showNotificationOverlay = false
+                        }
+                    )
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .foregroundStyle(.bg(.surface))
+            )
+            .frame(maxWidth: 300)
+        }
     }
 }

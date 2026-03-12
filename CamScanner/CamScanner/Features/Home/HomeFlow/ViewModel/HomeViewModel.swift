@@ -73,6 +73,8 @@ final class HomeViewModel: ObservableObject {
                 id: id,
                 title: document.title,
                 documentType: docType,
+                previewDocumentType: previewDocumentType(for: document),
+                isMerged: isMergedDocument(document),
                 thumbnail: nil,
                 secondThumbnail: nil,
                 firstPageImagePath: p0,
@@ -83,7 +85,8 @@ final class HomeViewModel: ObservableObject {
                 createdAt: document.createdAt,
                 lastViewedAt: document.lastViewed
             )
-        }.sorted { $0.lastViewedAt > $1.lastViewedAt }
+        }
+        .sorted { $0.lastViewedAt > $1.lastViewedAt }
 
         recentModel = mappedDocuments
     }
@@ -98,5 +101,41 @@ final class HomeViewModel: ObservableObject {
             ExploreToolModel(type: .watermart, icon: .watermarkImage, title: "Watermark"),
             ExploreToolModel(type: .cloudStorage, icon: .cloudImage, title: "Cloud Storage")
         ]
+    }
+}
+
+//MARK: - Helpers
+extension HomeViewModel {
+    private func previewDocumentType(for document: DocumentEntity) -> DocumentTypeEnum {
+        let defaultType = DocumentTypeEnum(
+            rawValue: document.documentTypeRaw ?? ""
+        ) ?? .documents
+
+        let containerType = DocumentContainerType(
+            rawValue: document.containerTypeRaw
+        ) ?? .regular
+
+        guard containerType == .merged else {
+            return defaultType
+        }
+
+        let pages = (document.pages as? Set<PageEntity>)?
+            .sorted { $0.index < $1.index } ?? []
+
+        guard let firstPage = pages.first else {
+            return defaultType
+        }
+
+        return DocumentTypeEnum(
+            rawValue: firstPage.sourceDocumentTypeRaw
+        ) ?? defaultType
+    }
+
+    private func isMergedDocument(_ document: DocumentEntity) -> Bool {
+        let containerType = DocumentContainerType(
+            rawValue: document.containerTypeRaw
+        ) ?? .regular
+
+        return containerType == .merged
     }
 }

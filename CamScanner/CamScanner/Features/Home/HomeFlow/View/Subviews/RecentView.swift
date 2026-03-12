@@ -68,6 +68,7 @@ struct RecentView: View {
                     ),
                     action: {}
                 )
+                .allowsHitTesting(false)
             }
             .frame(width: itemSize.width, height: itemSize.height)
             .cornerRadius(16, corners: .allCorners)
@@ -138,7 +139,7 @@ struct RecentView: View {
     
     @ViewBuilder
     private func itemImageView(for item: RecentDocumentModel) -> some View {
-        switch item.documentType {
+        switch item.previewDocumentType {
         case .documents:
             if let image = item.thumbnail {
                 Image(uiImage: image)

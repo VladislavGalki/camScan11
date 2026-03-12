@@ -23,11 +23,16 @@ final class MergeDocumentsViewModel: ObservableObject {
         items.move(fromOffsets: source, toOffset: destination)
     }
 
-    func handleMergeAction() {
+    func handleMergeAction(shouldRemoveOriginal: Bool = false) {
         let orderedIDs = items.map(\.id)
         
         do {
             try documentsReposotory.mergeDocuments(ids: orderedIDs)
+            
+            if shouldRemoveOriginal {
+                try documentsReposotory.deleteItems(ids: orderedIDs)
+            }
+            
             onMerge()
         } catch {}
     }

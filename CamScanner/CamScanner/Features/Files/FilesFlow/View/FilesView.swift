@@ -421,6 +421,7 @@ private extension FilesView {
             .presentationCornerRadius(38)
         case let .merge(inputModel):
             MergeDocumentsView(inputModel: inputModel) {
+                viewModel.handleClearSelection()
                 viewModel.fileActiveSheet = nil
             }
             .presentationCornerRadius(38)

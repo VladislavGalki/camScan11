@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct CropperCarouselRepresentable: UIViewControllerRepresentable {
-    var models: [ScanPreviewModel]
+    var models: [CropperPageItem]
     var onPageChanged: (Int) -> Void
     var onQuadChanged: (Int, Quadrilateral) -> Void
-    
+
     init(
-        models: [ScanPreviewModel],
+        models: [CropperPageItem],
         onPageChanged: @escaping (Int) -> Void,
         onQuadChanged: @escaping (Int, Quadrilateral) -> Void
     ) {
@@ -14,7 +14,7 @@ struct CropperCarouselRepresentable: UIViewControllerRepresentable {
         self.onPageChanged = onPageChanged
         self.onQuadChanged = onQuadChanged
     }
-    
+
     func makeUIViewController(context: Context) -> CropperCarouselController {
         CropperCarouselController(
             models: models,
