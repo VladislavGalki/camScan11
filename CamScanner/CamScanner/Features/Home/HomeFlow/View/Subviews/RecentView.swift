@@ -68,6 +68,7 @@ struct RecentView: View {
                     ),
                     action: {}
                 )
+                .allowsHitTesting(false)
             }
             .frame(width: itemSize.width, height: itemSize.height)
             .cornerRadius(16, corners: .allCorners)

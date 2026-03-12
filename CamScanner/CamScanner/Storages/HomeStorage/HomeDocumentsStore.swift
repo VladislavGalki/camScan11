@@ -43,7 +43,7 @@ final class HomeDocumentsStore: NSObject {
     private func bootstrap() {
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         request.sortDescriptors = [
-            NSSortDescriptor(key: "createdAt", ascending: false)
+            NSSortDescriptor(key: "lastViewed", ascending: false)
         ]
 
         request.fetchLimit = 4
@@ -69,7 +69,7 @@ final class HomeDocumentsStore: NSObject {
     }
     
     private func rebuild() {
-        let docs = fetchResultController.fetchedObjects ?? []
+        let docs = Array((fetchResultController.fetchedObjects ?? []).prefix(4))
         documentEntitiesSubject.send(docs)
 
         let validIDs = Set(docs.compactMap { $0.id })
@@ -78,7 +78,7 @@ final class HomeDocumentsStore: NSObject {
         dict.keys
             .filter { !validIDs.contains($0.docID) }
             .forEach { dict[$0] = nil }
-        
+
         thumbnailsSubject.send(dict)
         thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
     }

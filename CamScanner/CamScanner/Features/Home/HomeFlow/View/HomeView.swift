@@ -15,16 +15,18 @@ struct HomeView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    RecentView(model: vm.recentModel) {
-                        // click plus button
-                    } onDocumentTapped: { item in
-                        if !item.isLocked {
-                            router.push(HomeRoute.openDocument(id: item.id))
+                    if !vm.recentModel.isEmpty {
+                        RecentView(model: vm.recentModel) {
+                            router.present(ScanFlowRoute.scan)
+                        } onDocumentTapped: { item in
+                            if !item.isLocked {
+                                router.push(HomeRoute.openDocument(id: item.id))
+                            }
+                        } onFavoriteTapped: { documentId, isFavorite in
+                            vm.handleDocumentFavourite(documentId: documentId, isFavourite: isFavorite)
                         }
-                    } onFavoriteTapped: { documentId, isFavorite in
-                        vm.handleDocumentFavourite(documentId: documentId, isFavourite: isFavorite)
+                        .padding(.bottom, 26)
                     }
-                    .padding(.bottom, 26)
                     
                     ExploreToolsView(model: vm.exploreToolModel) {
                         // all click
