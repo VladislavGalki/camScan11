@@ -290,35 +290,46 @@ final class ScanCropperViewModel: ObservableObject {
 }
 
 private extension ScanCropperViewModel {
-    func makePageGroups(from items: [CropperPageItem]) -> [PreviewPageGroup] {
+    private func makePageGroups(from items: [CropperPageItem]) -> [PreviewPageGroup] {
         guard !items.isEmpty else { return [] }
 
         var result: [PreviewPageGroup] = []
-        var currentType = items[0].documentType
-        var currentFrames: [CapturedFrame] = [items[0].frame]
+        var index = 0
 
-        for item in items.dropFirst() {
-            if item.documentType == currentType {
-                currentFrames.append(item.frame)
-            } else {
+        while index < items.count {
+            let current = items[index]
+
+            switch current.documentType {
+            case .documents, .passport:
                 result.append(
                     PreviewPageGroup(
-                        documentType: currentType,
-                        frames: currentFrames
+                        documentType: current.documentType,
+                        frames: [current.frame]
                     )
                 )
+                index += 1
 
-                currentType = item.documentType
-                currentFrames = [item.frame]
+            case .idCard, .driverLicense:
+                var frames: [CapturedFrame] = [current.frame]
+
+                if index + 1 < items.count,
+                   items[index + 1].documentType == current.documentType {
+                    frames.append(items[index + 1].frame)
+                    index += 2
+                } else {
+                    index += 1
+                }
+
+                result.append(
+                    PreviewPageGroup(
+                        documentType: current.documentType,
+                        frames: frames
+                    )
+                )
+            case .qrCode:
+                index += 1
             }
         }
-
-        result.append(
-            PreviewPageGroup(
-                documentType: currentType,
-                frames: currentFrames
-            )
-        )
 
         return result
     }

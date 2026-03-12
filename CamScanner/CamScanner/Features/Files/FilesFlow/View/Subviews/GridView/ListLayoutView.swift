@@ -195,7 +195,7 @@ struct ListDocumentBackground: View {
             Rectangle()
                 .foregroundStyle(.bg(.surface))
         } else {
-            switch item.documentType {
+            switch item.previewDocumentType {
             case .documents:
                 Rectangle()
                     .foregroundStyle(
@@ -225,7 +225,7 @@ struct ListDocumentPreview: View {
         if item.isLocked {
             ListDocumentLock()
         } else {
-            switch item.documentType {
+            switch item.previewDocumentType {
             case .documents:
                 if let image = item.thumbnail {
                     Image(uiImage: image)

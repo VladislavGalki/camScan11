@@ -3,14 +3,6 @@ import CoreData
 import Combine
 import UIKit
 
-#if DEBUG
-private func log(_ message: String) {
-    print("📦 FileStore | \(message)")
-}
-#else
-private func log(_ message: String) {}
-#endif
-
 final class FileDocumentStore: NSObject {
     
     // MARK: - Publishers
@@ -238,8 +230,6 @@ final class FileDocumentStore: NSObject {
     // MARK: - Rebuild
     
     private func rebuild(currentFolderID: UUID? = nil) {
-        log("🔁 REBUILD started | sort: \(currentSortType) | search: \(searchQuery)")
-        
         let documents: [DocumentEntity]
         let folders: [FolderEntity]
 
@@ -344,8 +334,6 @@ final class FileDocumentStore: NSObject {
         for item in sorted {
             loadThumbnailsIfNeeded(for: item)
         }
-        
-        log("🔁 REBUILD finished | items: \(sorted.count)")
     }
     
     private func fetchAllDocuments() -> [DocumentEntity] {
@@ -433,12 +421,12 @@ final class FileDocumentStore: NSObject {
     private func mapToDocument(_ doc: DocumentEntity) -> FileDocumentItem {
         let pages = (doc.pages as? Set<PageEntity>)?
             .sorted { $0.index < $1.index } ?? []
-        
+
         let first = pages.first?.imagePath
         let second = pages.count > 1 ? pages[1].imagePath : nil
-        
+
         guard let id = doc.id else { fatalError("Document without id") }
-        
+
         return FileDocumentItem(
             id: id,
             folderID: doc.folder?.id,
@@ -450,6 +438,8 @@ final class FileDocumentStore: NSObject {
             lockViaFaceId: doc.lockViaFaceId,
             isFavourite: doc.isFavourite,
             sizeInBytes: doc.cachedSize,
+            isMerged: isMergedDocument(doc),
+            previewDocumentType: previewDocumentType(for: doc),
             firstPagePath: first,
             secondPagePath: second,
             thumbnail: nil,
@@ -555,5 +545,42 @@ extension FileDocumentStore: NSFetchedResultsControllerDelegate {
             deadline: .now() + 0.05,
             execute: workItem
         )
+    }
+}
+
+// MARK: - Helpers
+
+extension FileDocumentStore {
+    private func isMergedDocument(_ doc: DocumentEntity) -> Bool {
+        let containerType = DocumentContainerType(
+            rawValue: doc.containerTypeRaw
+        ) ?? .regular
+
+        return containerType == .merged
+    }
+    
+    private func previewDocumentType(for doc: DocumentEntity) -> DocumentTypeEnum {
+        let defaultType = DocumentTypeEnum(
+            rawValue: doc.documentTypeRaw ?? ""
+        ) ?? .documents
+
+        let containerType = DocumentContainerType(
+            rawValue: doc.containerTypeRaw
+        ) ?? .regular
+
+        guard containerType == .merged else {
+            return defaultType
+        }
+
+        let pages = (doc.pages as? Set<PageEntity>)?
+            .sorted { $0.index < $1.index } ?? []
+
+        guard let firstPage = pages.first else {
+            return defaultType
+        }
+
+        return DocumentTypeEnum(
+            rawValue: firstPage.sourceDocumentTypeRaw
+        ) ?? defaultType
     }
 }

@@ -138,7 +138,7 @@ struct RecentView: View {
     
     @ViewBuilder
     private func itemImageView(for item: RecentDocumentModel) -> some View {
-        switch item.documentType {
+        switch item.previewDocumentType {
         case .documents:
             if let image = item.thumbnail {
                 Image(uiImage: image)

@@ -195,17 +195,23 @@ extension MoveDocumentsViewModel {
         let first = pages.first?.imagePath
         let second = pages.count > 1 ? pages[1].imagePath : nil
 
+        let documentType = DocumentTypeEnum(
+            rawValue: doc.documentTypeRaw ?? ""
+        ) ?? .documents
+
         return FileDocumentItem(
             id: doc.id ?? UUID(),
             folderID: doc.folder?.id,
             title: doc.title,
-            documentType: DocumentTypeEnum(rawValue: doc.documentTypeRaw ?? "") ?? .documents,
+            documentType: documentType,
             createdAt: doc.createdAt,
             pageCount: Int(doc.pageCount),
             isLocked: doc.isLocked,
             lockViaFaceId: doc.lockViaFaceId,
             isFavourite: doc.isFavourite,
             sizeInBytes: doc.cachedSize,
+            isMerged: isMergedDocument(doc),
+            previewDocumentType: previewDocumentType(for: doc),
             firstPagePath: first,
             secondPagePath: second,
             thumbnail: nil,
@@ -213,5 +219,38 @@ extension MoveDocumentsViewModel {
             passwordHash: doc.passwordHash,
             passwordSalt: doc.passwordSalt
         )
+    }
+    
+    private func previewDocumentType(for doc: DocumentEntity) -> DocumentTypeEnum {
+        let defaultType = DocumentTypeEnum(
+            rawValue: doc.documentTypeRaw ?? ""
+        ) ?? .documents
+
+        let containerType = DocumentContainerType(
+            rawValue: doc.containerTypeRaw
+        ) ?? .regular
+
+        guard containerType == .merged else {
+            return defaultType
+        }
+
+        let pages = (doc.pages as? Set<PageEntity>)?
+            .sorted { $0.index < $1.index } ?? []
+
+        guard let firstPage = pages.first else {
+            return defaultType
+        }
+
+        return DocumentTypeEnum(
+            rawValue: firstPage.sourceDocumentTypeRaw
+        ) ?? defaultType
+    }
+    
+    private func isMergedDocument(_ doc: DocumentEntity) -> Bool {
+        let containerType = DocumentContainerType(
+            rawValue: doc.containerTypeRaw
+        ) ?? .regular
+
+        return containerType == .merged
     }
 }

@@ -648,11 +648,20 @@ extension DocumentRepository {
         }
 
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
-        request.predicate = NSPredicate(format: "id IN %@", ids)
+        request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
 
-        let documents = try context.fetch(request)
+        let fetchedDocuments = try context.fetch(request)
 
-        return try buildShareModel(from: documents)
+        let documentsByID: [UUID: DocumentEntity] = Dictionary(
+            uniqueKeysWithValues: fetchedDocuments.compactMap { document in
+                guard let id = document.id else { return nil }
+                return (id, document)
+            }
+        )
+
+        let orderedDocuments = ids.compactMap { documentsByID[$0] }
+
+        return try buildShareModel(from: orderedDocuments)
     }
     
     private func fetchDocument(id: UUID) throws -> DocumentEntity? {
