@@ -783,6 +783,22 @@ extension DocumentRepository {
 
 // MARK: - Helpers
 extension DocumentRepository {
+    func fetchDocumentTitle(id: UUID) throws -> String {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+
+        guard let document = try context.fetch(request).first else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9001,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        return document.title
+    }
+    
     private func containerType(for document: DocumentEntity) -> DocumentContainerType {
         DocumentContainerType(
             rawValue: document.containerTypeRaw

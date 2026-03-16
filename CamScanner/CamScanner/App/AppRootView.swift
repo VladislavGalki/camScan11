@@ -29,6 +29,10 @@ struct AppRootView: View {
                 return AnyView(
                     FolderView(inputModel: inputModel, onFolderDeleted: onFolderDeleted)
                 )
+            case let .openDocument(inputModel):
+                return AnyView(
+                    OpenDocumentView(inputModel: inputModel)
+                )
             }
             
         // MARK: - Scan
@@ -37,6 +41,20 @@ struct AppRootView: View {
             switch r {
             case .scan:
                 return AnyView(ScanFlowContainerView())
+            }
+            
+        // MARK: - OpenDocument
+            
+        case let r as OpenDocumentRoute:
+            switch r {
+            case let .scanCropper(inputModel, onFinish):
+                return AnyView(
+                    ScanCropperView(input: inputModel, onFinish: onFinish)
+                )
+            case let .share(inputModel):
+                return AnyView(
+                    ShareView(inputModel: inputModel)
+                )
             }
 
         // MARK: - Merge

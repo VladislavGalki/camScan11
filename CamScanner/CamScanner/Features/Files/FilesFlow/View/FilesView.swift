@@ -105,7 +105,7 @@ private extension FilesView {
                         return
                     }
                     
-                    print("DELETED HANDLE NOTIFICATION")
+                    router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: id)))
                 },
                 onFavourite: { id, isFavourite in
                     viewModel.handleDocumentFavourite(
@@ -268,7 +268,9 @@ private extension FilesView {
                         viewModel.openFolderTapped(id: id)
                         viewModel.clearSearch()
                     },
-                    onDocumentClick: { _ in },
+                    onDocumentClick: { id in
+                        router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: id)))
+                    },
                     onFavourite: { id, isFavourite in
                         viewModel.handleDocumentFavourite(
                             documentId: id,
