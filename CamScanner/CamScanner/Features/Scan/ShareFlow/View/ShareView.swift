@@ -105,7 +105,6 @@ struct ShareView: View {
         .background(
             ProgressiveBlurView()
                 .blur(radius: 20)
-                .padding(.horizontal, -32)
                 .background {
                     LinearGradient(
                         colors: [

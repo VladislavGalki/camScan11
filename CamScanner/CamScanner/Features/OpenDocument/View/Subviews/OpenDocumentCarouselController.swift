@@ -54,6 +54,9 @@ final class OpenDocumentCarouselController: UIViewController {
         guard newModels != models else { return }
         models = newModels
         collectionView.reloadData()
+        
+        currentIndex = min(currentIndex, max(models.count - 1, 0))
+        updateIndicator(index: currentIndex)
     }
 
     func handleBottomBarAction(_ action: ScanPreviewBottomBarAction) {
@@ -231,7 +234,8 @@ extension OpenDocumentCarouselController: UICollectionViewDelegateFlowLayout {
 
         let newOffset = clampedIndex * fullWidth - scrollView.contentInset.left
         targetContentOffset.pointee.x = newOffset
-
+        
+        currentIndex = Int(clampedIndex)
         onPageChanged(Int(clampedIndex))
     }
 

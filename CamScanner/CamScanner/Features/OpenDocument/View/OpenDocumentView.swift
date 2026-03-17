@@ -17,17 +17,21 @@ struct OpenDocumentView: View {
     var body: some View {
         VStack(spacing: 0) {
             navigationView
-                .padding(.horizontal, 16)
                 .padding(.bottom, 37)
 
             carouselView
                 .frame(maxHeight: .infinity)
-                .padding(.bottom, 167)
+                .padding(.bottom, 37)
+
+            filtersView
 
             bottomBarView
         }
-        .navigationBarBackButtonHidden()
-        .background(Color.bg(.main))
+        .navigationBarBackButtonHidden(true)
+        .background(
+            Color.bg(.main).ignoresSafeArea()
+        )
+        .ignoresSafeArea(.keyboard, edges: .all)
     }
 }
 
@@ -36,7 +40,7 @@ private extension OpenDocumentView {
         HStack(spacing: 10) {
             AppButton(
                 config: AppButtonConfig(
-                    content: .iconOnly(.back),
+                    content: .iconOnly(.strokeArrowBack),
                     style: .secondary,
                     size: .m
                 ),
@@ -77,6 +81,13 @@ private extension OpenDocumentView {
             )
         }
         .padding(.bottom, 10)
+        .padding(.horizontal, 16)
+        .background(
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+                .appBorderModifier(.border(.primary), width: 1, radius: 0, corners: .allCorners)
+                .ignoresSafeArea(edges: .top)
+        )
     }
     
     var carouselView: some View {
@@ -92,45 +103,149 @@ private extension OpenDocumentView {
         )
     }
     
-    var bottomBarView: some View {
-        HStack {
-            bottomItem(title: "Add Page", icon: .page_plus)
-            bottomItem(title: "Filters", icon: .plus)
-            bottomItem(title: "Crop", icon: .crop)
-                .onTapGesture {
-                    router.push(
-                        OpenDocumentRoute.scanCropper(
-                            viewModel.makeCropperInputModel(),
-                            onFinish: { outputModel in
-                                viewModel.applyCropOutput(outputModel)
-                            }
-                        )
-                    )
+    private var filtersView: some View {
+        VStack(spacing: 16) {
+            FilterCarouselView(
+                model: viewModel.filterPreviewItems,
+                onFilterSelected: { filter in
+                    viewModel.applyFilter(filter)
                 }
-            bottomItem(title: "Rotate", icon: .rotate)
-                .onTapGesture {
-                    bottomBarAction = .rotate
-                }
-            bottomItem(title: "Add text", icon: .plus)
-            bottomItem(title: "Signature", icon: .signature)
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
-        .background(Color.bg(.surface))
-    }
+            )
 
-    func bottomItem(title: String, icon: AppIcon) -> some View {
-        VStack(spacing: 4) {
-            Image(appIcon: icon)
-                .renderingMode(.template)
-                .foregroundStyle(.elements(.secondary))
-
-            Text(title)
-                .appTextStyle(.tabBar)
-                .foregroundStyle(.text(.secondary))
+            AppSlider(value: $viewModel.sliderValue, range: 0...1)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            viewModel.previewSliderValue(viewModel.sliderValue)
+                        }
+                        .onEnded { _ in
+                            viewModel.commitSliderValue(viewModel.sliderValue)
+                        }
+                )
+                .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .frame(height: 132)
+        .background(
+            Color.bg(.surface)
+                .appBorderModifier(.border(.primary), width: 1, radius: 0, corners: .allCorners)
+        )
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: 8) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.back),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action: { viewModel.undoFilter() }
+                )
+                .appButtonEnabled(viewModel.shouldEnableUndoButton)
+
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .iconOnly(.forward),
+                        style: .secondary,
+                        size: .s
+                    ),
+                    action: { viewModel.redoFilter() }
+                )
+                .appButtonEnabled(viewModel.shouldEnableRedoButton)
+            }
+            .padding(.horizontal, 16)
+            .offset(y: -44)
+            .opacity(viewModel.shouldShowFilterStateButton ? 1 : 0)
+        }
+        .overlay(alignment: .topTrailing) {
+            AppButton(
+                config: AppButtonConfig(
+                    content: .title("Apply to all pages"),
+                    style: .secondary,
+                    size: .s
+                ),
+                action: { viewModel.applyFilterToAllPages() }
+            )
+            .padding(.horizontal, 16)
+            .offset(y: -44)
+            .opacity(viewModel.shouldShowFilterStateButton ? 1 : 0)
+        }
+        .disabled(viewModel.filterPreviewItems.contains { !$0.isEnabled })
+    }
+    
+    var bottomBarView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(OpenDocumentBottomBarActionType.allCases) { item in
+                    bottomItem(item)
+                        .onTapGesture {
+                            handleBottomBarTap(item)
+                        }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
+        }
+        .background(
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+    
+    func bottomItem(_ item: OpenDocumentBottomBarActionType) -> some View {
+        VStack(spacing: 4) {
+            Image(appIcon: item.icon)
+                .renderingMode(.template)
+                .foregroundStyle(
+                    item.isDestructive
+                    ? .elements(.destructive)
+                    : .elements(.secondary)
+                )
+
+            Text(item.title)
+                .appTextStyle(.tabBar)
+                .foregroundStyle(
+                    item.isDestructive
+                    ? .text(.destructive)
+                    : .text(.secondary)
+                )
+        }
+        .frame(width: 70, height: 54)
         .contentShape(Rectangle())
+    }
+    
+    private func handleBottomBarTap(_ action: OpenDocumentBottomBarActionType) {
+        switch action {
+        case .crop:
+            router.push(
+                OpenDocumentRoute.scanCropper(
+                    viewModel.makeCropperInputModel(),
+                    onFinish: { outputModel in
+                        viewModel.applyCropOutput(outputModel)
+                    }
+                )
+            )
+        case .rotate:
+            bottomBarAction = .rotate
+        case .addPage:
+            break
+        case .addText:
+            break
+        case .signature:
+            break
+        case .erase:
+            break
+        case .watermark:
+            break
+        case .extract:
+            break
+        case .translate:
+            break
+        case .delete:
+            break
+        }
     }
 }

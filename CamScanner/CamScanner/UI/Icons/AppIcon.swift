@@ -47,6 +47,12 @@ public enum AppIcon: String, CaseIterable {
     case edit = "edit"
     case move = "move"
     case merge = "merge"
+    case filters = "filters"
+    case erase = "erase"
+    case watermark = "watermark"
+    case extract = "extract"
+    case addText = "addText"
+    case translate = "translate"
     
     // MARK: - Fill
     case homeFill = "home_fill"
