@@ -71,6 +71,10 @@ final class OpenDocumentViewModel: ObservableObject {
 // MARK: - Computed
 
 extension OpenDocumentViewModel {
+    var currentFilterType: DocumentFilterType {
+        currentFrame?.currentFilter.type ?? .original
+    }
+    
     var currentFrame: CapturedFrame? {
         guard models.indices.contains(selectedIndex) else { return nil }
         return models[selectedIndex].frames.first

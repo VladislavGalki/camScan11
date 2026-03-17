@@ -5,6 +5,7 @@ import CoreImage.CIFilterBuiltins
 final class FilterRenderer {
     static let shared = FilterRenderer()
     private let context = CIContext(options: nil)
+    private let openCVRenderer = OpenCVFilterRenderer()
 
     private init() {}
 
@@ -14,6 +15,10 @@ final class FilterRenderer {
         image: UIImage,
         state: FilterState
     ) -> UIImage? {
+        if state.type == .blackWhite || state.type == .perfect {
+            return openCVRenderer.render(image: image, state: state)
+        }
+        
         guard var ciImage = normalizedCIImage(from: image) else {
             return image
         }

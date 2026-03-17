@@ -112,7 +112,7 @@ private extension OpenDocumentView {
                 }
             )
 
-            AppSlider(value: $viewModel.sliderValue, range: 0...1)
+            AppSlider(value: $viewModel.sliderValue, range: viewModel.currentFilterType.sliderRange)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in

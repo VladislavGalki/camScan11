@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3043E9102F4509FC00CAB5E9 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 3043E90F2F4509FC00CAB5E9 /* ZIPFoundation */; };
+		3063AA9F2F69C27C003F58E2 /* OpenCV in Frameworks */ = {isa = PBXBuildFile; productRef = 3063AA9E2F69C27C003F58E2 /* OpenCV */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3043E9102F4509FC00CAB5E9 /* ZIPFoundation in Frameworks */,
+				3063AA9F2F69C27C003F58E2 /* OpenCV in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +86,7 @@
 			name = CamScanner;
 			packageProductDependencies = (
 				3043E90F2F4509FC00CAB5E9 /* ZIPFoundation */,
+				3063AA9E2F69C27C003F58E2 /* OpenCV */,
 			);
 			productName = CamScanner;
 			productReference = 30026BC32EF95D0700CD494A /* CamScanner.app */;
@@ -115,6 +118,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3043E90E2F4509FC00CAB5E9 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				3063AA9D2F69C27C003F58E2 /* XCRemoteSwiftPackageReference "opencv-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 30026BC42EF95D0700CD494A /* Products */;
@@ -389,6 +393,14 @@
 				minimumVersion = 0.9.20;
 			};
 		};
+		3063AA9D2F69C27C003F58E2 /* XCRemoteSwiftPackageReference "opencv-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/yeatse/opencv-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.13.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -396,6 +408,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3043E90E2F4509FC00CAB5E9 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		3063AA9E2F69C27C003F58E2 /* OpenCV */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3063AA9D2F69C27C003F58E2 /* XCRemoteSwiftPackageReference "opencv-spm" */;
+			productName = OpenCV;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

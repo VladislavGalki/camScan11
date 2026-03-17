@@ -28,7 +28,7 @@ extension DocumentFilterType {
         case .original: return 0.0
         case .auto: return 0.1
         case .perfect: return 0.4
-        case .blackWhite: return 0.3
+        case .blackWhite: return 0.8
         case .inverted: return 0.2
         }
     }
@@ -45,7 +45,7 @@ extension DocumentFilterType {
             return -0.4...0.6
 
         case .blackWhite:
-            return -0.5...0.5
+            return 0.6...1.4
 
         case .inverted:
             return -0.6...0.6
