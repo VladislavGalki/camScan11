@@ -24,6 +24,8 @@ extension DocumentEntity {
     @NSManaged public var folder: FolderEntity?
     
     @NSManaged public var cachedSize: Int64
+    
+    @NSManaged public var textOverlays: NSSet?
 }
 
 // MARK: Generated accessors for pages
@@ -40,6 +42,18 @@ extension DocumentEntity {
 
     @objc(removePages:)
     @NSManaged public func removeFromPages(_ values: NSSet)
+    
+    @objc(addTextOverlaysObject:)
+    @NSManaged public func addToTextOverlays(_ value: TextOverlayEntity)
+
+    @objc(removeTextOverlaysObject:)
+    @NSManaged public func removeFromTextOverlays(_ value: TextOverlayEntity)
+
+    @objc(addTextOverlays:)
+    @NSManaged public func addToTextOverlays(_ values: NSSet)
+
+    @objc(removeTextOverlays:)
+    @NSManaged public func removeFromTextOverlays(_ values: NSSet)
 }
 
 extension DocumentEntity: Identifiable {}

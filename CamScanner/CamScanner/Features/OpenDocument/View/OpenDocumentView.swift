@@ -233,7 +233,11 @@ private extension OpenDocumentView {
         case .addPage:
             break
         case .addText:
-            break
+            router.push(
+                OpenDocumentRoute.addText(
+                    AddTextInputModel(documentID: viewModel.documentId)
+                )
+            )
         case .signature:
             break
         case .erase:

@@ -6,6 +6,8 @@ enum OpenDocumentRoute: Route {
         onFinish: (ScanPreviewInputModel) -> Void
     )
     
+    case addText(AddTextInputModel)
+    
     case share(ShareInputModel)
 }
 
@@ -13,6 +15,8 @@ extension OpenDocumentRoute: Equatable {
     static func == (lhs: OpenDocumentRoute, rhs: OpenDocumentRoute) -> Bool {
         switch (lhs, rhs) {
         case let (.scanCropper(lModel, _), .scanCropper(rModel, _)):
+            return lModel == rModel
+        case let (.addText(lModel), .addText(rModel)):
             return lModel == rModel
         case let (.share(lModel), .share(rModel)):
             return lModel == rModel
@@ -27,6 +31,9 @@ extension OpenDocumentRoute: Hashable {
         switch self {
         case let .scanCropper(model, _):
             hasher.combine("scanCropper")
+            hasher.combine(model)
+        case let .addText(model):
+            hasher.combine("addText")
             hasher.combine(model)
         case let .share(model):
             hasher.combine("share")

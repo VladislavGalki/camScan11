@@ -45,7 +45,7 @@ extension DocumentFilterType {
             return -0.4...0.6
 
         case .blackWhite:
-            return 0.6...1.4
+            return 0.6...2.8
 
         case .inverted:
             return -0.6...0.6

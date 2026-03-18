@@ -51,6 +51,10 @@ struct AppRootView: View {
                 return AnyView(
                     ScanCropperView(input: inputModel, onFinish: onFinish)
                 )
+            case let .addText(inputModel):
+                return AnyView(
+                    AddTextView(inputModel: inputModel)
+                )
             case let .share(inputModel):
                 return AnyView(
                     ShareView(inputModel: inputModel)

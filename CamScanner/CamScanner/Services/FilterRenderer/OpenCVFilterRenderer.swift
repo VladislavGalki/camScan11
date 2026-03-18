@@ -4,17 +4,18 @@ import opencv2
 
 final class OpenCVFilterRenderer {
     func render(image: UIImage, state: FilterState) -> UIImage? {
-        let rotated = rotatedImageIfNeeded(image, angle: state.rotationAngle)
+        let source = Mat(uiImage: image)
+        let rotated = rotateMatIfNeeded(source, angle: state.rotationAngle)
 
         switch state.type {
         case .blackWhite:
             return renderBlackWhite(
-                image: rotated,
+                source: rotated,
                 adjustment: state.adjustment
             )
 
         case .perfect:
-            return renderPerfect(image: rotated)
+            return renderPerfect(source: rotated)
 
         default:
             return image
@@ -24,11 +25,9 @@ final class OpenCVFilterRenderer {
 
 private extension OpenCVFilterRenderer {
     func renderBlackWhite(
-        image: UIImage,
+        source: Mat,
         adjustment: CGFloat
     ) -> UIImage? {
-        print(adjustment)
-        let source = Mat(uiImage: image)
         let gray = toGray(source)
         let normalized = removeShadows(from: gray, sigmaX: 2.5)
 
@@ -40,8 +39,6 @@ private extension OpenCVFilterRenderer {
         clahe.apply(src: normalized, dst: claheOutput)
 
         let contrasted = Mat()
-
-        // adjustment == 1 -> базовый пресет
         let alpha = max(0.6, Double(adjustment))
         let beta = -2.05
 
@@ -75,8 +72,7 @@ private extension OpenCVFilterRenderer {
         return cleaned.toUIImage()
     }
 
-    func renderPerfect(image: UIImage) -> UIImage? {
-        let source = Mat(uiImage: image)
+    func renderPerfect(source: Mat) -> UIImage? {
         let gray = toGray(source)
         let normalized = removeShadows(from: gray, sigmaX: 31)
 
@@ -216,22 +212,25 @@ private extension OpenCVFilterRenderer {
         return result
     }
 
-    func rotatedImageIfNeeded(_ image: UIImage, angle: CGFloat) -> UIImage {
-        guard angle != 0 else { return image }
+    func rotateMatIfNeeded(_ source: Mat, angle: CGFloat) -> Mat {
+        let degrees = Int((angle * 180 / .pi).rounded())
+        let normalized = ((degrees % 360) + 360) % 360
 
-        let renderer = UIGraphicsImageRenderer(size: image.size)
-        return renderer.image { context in
-            let cg = context.cgContext
-            cg.translateBy(x: image.size.width / 2, y: image.size.height / 2)
-            cg.rotate(by: angle)
-            image.draw(
-                in: CGRect(
-                    x: -image.size.width / 2,
-                    y: -image.size.height / 2,
-                    width: image.size.width,
-                    height: image.size.height
-                )
-            )
+        guard normalized != 0 else { return source }
+
+        let result = Mat()
+
+        switch normalized {
+        case 90:
+            Core.rotate(src: source, dst: result, rotateCode: .ROTATE_90_CLOCKWISE)
+        case 180:
+            Core.rotate(src: source, dst: result, rotateCode: .ROTATE_180)
+        case 270:
+            Core.rotate(src: source, dst: result, rotateCode: .ROTATE_90_COUNTERCLOCKWISE)
+        default:
+            return source
         }
+
+        return result
     }
 }

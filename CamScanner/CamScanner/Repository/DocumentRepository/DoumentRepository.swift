@@ -619,6 +619,81 @@ extension DocumentRepository {
     }
 }
 
+// MARK: - TextOverlays
+extension DocumentRepository {
+    func fetchTextOverlays(documentID: UUID) throws -> [DocumentTextItem] {
+        guard let document = try fetchDocument(id: documentID) else { return [] }
+
+        let overlays = (document.textOverlays as? Set<TextOverlayEntity>) ?? []
+
+        return overlays
+            .sorted {
+                if $0.pageIndex != $1.pageIndex {
+                    return $0.pageIndex < $1.pageIndex
+                }
+                return $0.createdAt < $1.createdAt
+            }
+            .map(DocumentTextItem.init(entity:))
+    }
+    
+    func replaceTextOverlays(
+        documentID: UUID,
+        items: [DocumentTextItem]
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9101,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let existing = (document.textOverlays as? Set<TextOverlayEntity>) ?? []
+        for overlay in existing {
+            context.delete(overlay)
+        }
+
+        let now = Date()
+
+        for item in items {
+            let entity = TextOverlayEntity(context: context)
+            entity.id = item.id
+            entity.pageIndex = Int16(item.pageIndex)
+            entity.text = item.text
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+            entity.fontSize = item.style.fontSize
+            entity.textColorHex = item.style.textColorHex
+            entity.alignmentRaw = item.style.alignment.rawValue
+            entity.createdAt = now
+            entity.updatedAt = now
+            entity.document = document
+        }
+
+        try context.save()
+    }
+    
+    func deleteTextOverlay(
+        documentID: UUID,
+        overlayID: UUID
+    ) throws {
+        let request: NSFetchRequest<TextOverlayEntity> = TextOverlayEntity.fetchRequest()
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "document.id == %@", documentID as CVarArg),
+            NSPredicate(format: "id == %@", overlayID as CVarArg)
+        ])
+        request.fetchLimit = 1
+
+        if let entity = try context.fetch(request).first {
+            context.delete(entity)
+            try context.save()
+        }
+    }
+}
+
 // MARK: - Share
 extension DocumentRepository {
     func loadShareModel(id: UUID) throws -> ShareInputModel {

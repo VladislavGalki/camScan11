@@ -43,6 +43,10 @@ final class ScanPreviewViewModel: ObservableObject {
     var documentType: DocumentTypeEnum {
         inputModel.pageGroups.first?.documentType ?? .documents
     }
+    
+    var currentFilterType: DocumentFilterType {
+        currentFrame?.currentFilter.type ?? .original
+    }
 
     var currentFrame: CapturedFrame? {
         guard selectedPageIndex < scanPreviewModel.count else { return nil }

@@ -71,6 +71,10 @@ final class OpenDocumentViewModel: ObservableObject {
 // MARK: - Computed
 
 extension OpenDocumentViewModel {
+    var documentId: UUID {
+        inputModel.documentID
+    }
+    
     var currentFilterType: DocumentFilterType {
         currentFrame?.currentFilter.type ?? .original
     }
