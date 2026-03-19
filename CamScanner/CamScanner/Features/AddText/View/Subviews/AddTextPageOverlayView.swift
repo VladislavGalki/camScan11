@@ -41,13 +41,18 @@ struct AddTextPageOverlayView: View {
     let pageIndex: Int
     let items: [DocumentTextItem]
     let selectedTextID: UUID?
+    let editingTextID: UUID?
+    let editingTextDraft: String
 
     let onPageTap: (CGPoint, CGSize) -> Void
     let onTextTap: (UUID) -> Void
     let onTextMove: (UUID, CGPoint) -> Void
     let onTextResize: (UUID, CGFloat, CGFloat?) -> Void
     let onResizeStateChanged: (Bool) -> Void
-
+    
+    let onEditingTextChanged: (String, CGSize) -> Void
+    let onEditingSubmit: () -> Void
+    
     // MARK: Body
 
     var body: some View {
@@ -97,31 +102,65 @@ private extension AddTextPageOverlayView {
 // MARK: - Text Block
 
 private extension AddTextPageOverlayView {
-    func draggableTextBlock(_ item: DocumentTextItem, in size: CGSize) -> some View {
+    private func draggableTextBlock(_ item: DocumentTextItem, in size: CGSize) -> some View {
         let width = displayedWidth(for: item) * size.width
         let height = item.height * size.height
         let isSelected = item.id == selectedTextID
+        let isEditing = item.id == editingTextID
 
         return ZStack {
-            selectionBorder(isSelected: isSelected, width: width, height: height)
+            selectionBorder(
+                isSelected: isSelected || isEditing,
+                width: width,
+                height: height
+            )
 
-            textContent(item, width: width, height: height)
-                .frame(width: width, height: height)
-                .contentShape(Rectangle())
-                .gesture(moveGesture(for: item, in: size))
-                .highPriorityGesture(
-                    TapGesture()
-                        .onEnded {
-                            onTextTap(item.id)
-                        }
-                )
+            if isEditing {
+                editingContent(item, width: width, height: height, pageSize: size)
+            } else {
+                textContent(item, width: width, height: height)
+                    .frame(width: width, height: height)
+                    .offset(x: 8)
+                    .contentShape(Rectangle())
+                    .gesture(moveGesture(for: item, in: size))
+                    .highPriorityGesture(
+                        TapGesture()
+                            .onEnded {
+                                onTextTap(item.id)
+                            }
+                    )
+            }
 
-            if isSelected {
+            if isSelected && !isEditing {
                 leftResizeHandle(item, in: size, width: width, height: height)
                 rightResizeHandle(item, in: size, width: width, height: height)
             }
         }
         .frame(width: width, height: height)
+    }
+    
+    private func editingContent(
+        _ item: DocumentTextItem,
+        width: CGFloat,
+        height: CGFloat,
+        pageSize: CGSize
+    ) -> some View {
+        AutoFocusTextView(
+            text: Binding(
+                get: { editingTextDraft },
+                set: { newValue in
+                    onEditingTextChanged(newValue, pageSize)
+                }
+            ),
+            fontSize: item.style.fontSize,
+            textColor: UIColor(Color(hex: item.style.textColorHex) ?? .black),
+            textAlignment: uiTextAlignment(for: item.style.alignment),
+            onSubmit: {
+                onEditingSubmit()
+            }
+        )
+        .frame(width: width, height: height)
+        .clipped()
     }
 
     func selectionBorder(isSelected: Bool, width: CGFloat, height: CGFloat) -> some View {
@@ -140,7 +179,7 @@ private extension AddTextPageOverlayView {
             .lineSpacing(0)
             .foregroundStyle(Color(hex: item.style.textColorHex) ?? .black)
             .multilineTextAlignment(textAlignment(for: item.style.alignment))
-            .frame(width: width, height: height, alignment: .center)
+            .frame(width: width, height: height, alignment: .leading)
     }
 }
 
@@ -342,19 +381,13 @@ private extension AddTextPageOverlayView {
     }
 }
 
-// MARK: - Color
-
-extension Color {
-    init?(hex: String) {
-        let cleaned = hex.replacingOccurrences(of: "#", with: "")
-
-        guard cleaned.count == 6,
-              let value = Int(cleaned, radix: 16) else { return nil }
-
-        let r = Double((value >> 16) & 0xFF) / 255.0
-        let g = Double((value >> 8) & 0xFF) / 255.0
-        let b = Double(value & 0xFF) / 255.0
-
-        self.init(red: r, green: g, blue: b)
+// MARK: - Helper
+extension AddTextPageOverlayView {
+    private func uiTextAlignment(for alignment: DocumentTextAlignment) -> NSTextAlignment {
+        switch alignment {
+        case .left: return .left
+        case .center: return .center
+        case .right: return .right
+        }
     }
 }

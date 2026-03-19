@@ -127,13 +127,17 @@ extension AddTextPageCell {
         pageIndex: Int,
         textItems: [DocumentTextItem],
         selectedTextID: UUID?,
+        editingTextID: UUID?,
+        editingTextDraft: String,
         parent: UIViewController,
         onPageTap: @escaping (CGPoint, CGSize) -> Void,
         onTextTap: @escaping (UUID) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
         onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
         onResizeStateChanged: @escaping (Bool) -> Void,
-        onSelectedTextFrameChanged: ((UUID, CGRect?) -> Void)? = nil
+        onSelectedTextFrameChanged: ((UUID, CGRect?) -> Void)? = nil,
+        onEditingTextChanged: @escaping (String, CGSize) -> Void,
+        onEditingSubmit: @escaping () -> Void
     ) {
         self.onSelectedTextFrameChanged = onSelectedTextFrameChanged
         scrollView.zoomScale = 1
@@ -197,11 +201,15 @@ extension AddTextPageCell {
             pageIndex: pageIndex,
             textItems: textItems,
             selectedTextID: selectedTextID,
+            editingTextID: editingTextID,
+            editingTextDraft: editingTextDraft,
             onPageTap: onPageTap,
             onTextTap: onTextTap,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
-            onResizeStateChanged: onResizeStateChanged
+            onResizeStateChanged: onResizeStateChanged,
+            onEditingTextChanged: onEditingTextChanged,
+            onEditingSubmit: onEditingSubmit
         )
     }
 
@@ -209,11 +217,15 @@ extension AddTextPageCell {
         pageIndex: Int,
         textItems: [DocumentTextItem],
         selectedTextID: UUID?,
+        editingTextID: UUID?,
+        editingTextDraft: String,
         onPageTap: @escaping (CGPoint, CGSize) -> Void,
         onTextTap: @escaping (UUID) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
         onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
-        onResizeStateChanged: @escaping (Bool) -> Void
+        onResizeStateChanged: @escaping (Bool) -> Void,
+        onEditingTextChanged: @escaping (String, CGSize) -> Void,
+        onEditingSubmit: @escaping () -> Void
     ) {
         currentTextItems = textItems
         currentSelectedTextID = selectedTextID
@@ -222,11 +234,15 @@ extension AddTextPageCell {
             pageIndex: pageIndex,
             items: textItems,
             selectedTextID: selectedTextID,
+            editingTextID: editingTextID,
+            editingTextDraft: editingTextDraft,
             onPageTap: onPageTap,
             onTextTap: onTextTap,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
-            onResizeStateChanged: onResizeStateChanged
+            onResizeStateChanged: onResizeStateChanged,
+            onEditingTextChanged: onEditingTextChanged,
+            onEditingSubmit: onEditingSubmit
         )
 
         if let overlayHostingController {

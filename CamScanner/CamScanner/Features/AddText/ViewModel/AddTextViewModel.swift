@@ -21,6 +21,8 @@ final class AddTextViewModel: ObservableObject {
     // MARK: - Private
 
     private let store: AddTextStore
+    
+    private var textEditingSession: TextEditingSession?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
@@ -96,6 +98,109 @@ extension AddTextViewModel {
 
         editingTextID = selectedTextID
         editingTextDraft = item.text
+        bubbleAnchor = nil
+
+        let leftEdgeX = item.centerX - item.width / 2
+        let topEdgeY = item.centerY - item.height / 2
+
+        textEditingSession = TextEditingSession(
+            textID: selectedTextID,
+            initialWidth: item.width,
+            initialHeight: item.height,
+            initialCenterX: item.centerX,
+            initialCenterY: item.centerY,
+            leftEdgeX: leftEdgeX,
+            topEdgeY: topEdgeY
+        )
+    }
+    
+    func updateEditingDraft(_ text: String, pageSize: CGSize) {
+        editingTextDraft = text
+
+        guard let editingTextID,
+              let session = textEditingSession,
+              session.textID == editingTextID,
+              let index = textItems.firstIndex(where: { $0.id == editingTextID }) else { return }
+
+        textItems[index].text = text
+
+        let fontSize = textItems[index].style.fontSize
+
+        let minWidthPoints = session.initialWidth * pageSize.width
+        let minHeightPoints = session.initialHeight * pageSize.height
+
+        let leftEdgePoints = session.leftEdgeX * pageSize.width
+        let availableWidthPoints = max(pageSize.width - leftEdgePoints, minWidthPoints)
+
+        let measuredSize = measuredEditingSize(
+            text: text,
+            fontSize: fontSize,
+            maxWidth: availableWidthPoints
+        )
+
+        let widthPoints = max(minWidthPoints, min(measuredSize.width, availableWidthPoints))
+        let hitMaxWidth = widthPoints >= availableWidthPoints - 0.5
+
+        let heightPoints = hitMaxWidth
+            ? max(minHeightPoints, measuredSize.height)
+            : minHeightPoints
+
+        let widthNormalized = widthPoints / max(pageSize.width, 1)
+        let heightNormalized = heightPoints / max(pageSize.height, 1)
+
+        let newCenterX = session.leftEdgeX + widthNormalized / 2
+        let newCenterY = session.topEdgeY + heightNormalized / 2
+
+        guard textItems[index].width != widthNormalized ||
+              textItems[index].height != heightNormalized ||
+              textItems[index].centerX != newCenterX ||
+              textItems[index].centerY != newCenterY else {
+            return
+        }
+
+        textItems[index].width = widthNormalized
+        textItems[index].height = heightNormalized
+        textItems[index].centerX = newCenterX
+        textItems[index].centerY = newCenterY
+    }
+    
+    func updateEditingTextLayout(
+        measuredSize: CGSize,
+        pageSize: CGSize
+    ) {
+        guard let editingTextID,
+              let session = textEditingSession,
+              session.textID == editingTextID,
+              let index = textItems.firstIndex(where: { $0.id == editingTextID }) else { return }
+
+        let minWidthPoints = session.initialWidth * pageSize.width
+        let minHeightPoints = session.initialHeight * pageSize.height
+
+        let leftEdgePoints = session.leftEdgeX * pageSize.width
+        let availableWidthPoints = max(pageSize.width - leftEdgePoints, minWidthPoints)
+
+        let clampedWidthPoints = min(
+            max(measuredSize.width, minWidthPoints),
+            availableWidthPoints
+        )
+
+        let widthNormalized = clampedWidthPoints / max(pageSize.width, 1)
+
+        let hitMaxWidth = clampedWidthPoints >= availableWidthPoints - 0.5
+        let targetHeightPoints = hitMaxWidth
+            ? max(measuredSize.height, minHeightPoints)
+            : minHeightPoints
+
+        let heightNormalized = targetHeightPoints / max(pageSize.height, 1)
+
+        textItems[index].width = widthNormalized
+        textItems[index].height = heightNormalized
+
+        let newCenterX = session.leftEdgeX + widthNormalized / 2
+        let newCenterY = session.topEdgeY + heightNormalized / 2
+
+        textItems[index].centerX = newCenterX
+        textItems[index].centerY = newCenterY
     }
 
     func applyTextEditing() {
@@ -103,20 +208,23 @@ extension AddTextViewModel {
               let index = textItems.firstIndex(where: { $0.id == editingTextID }) else {
             self.editingTextID = nil
             self.editingTextDraft = ""
+            self.textEditingSession = nil
             return
         }
 
         let trimmed = editingTextDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newText = trimmed.isEmpty ? "Text" : trimmed
+        let finalText = trimmed.isEmpty ? "Text" : trimmed
 
-        textItems[index].text = newText
+        textItems[index].text = finalText
+        editingTextDraft = finalText
         self.editingTextID = nil
-        self.editingTextDraft = ""
+        self.textEditingSession = nil
     }
 
     func cancelTextEditing() {
         editingTextID = nil
         editingTextDraft = ""
+        textEditingSession = nil
     }
 
     func moveText(id: UUID, to center: CGPoint) {
@@ -177,4 +285,63 @@ private extension AddTextViewModel {
             }
             .store(in: &cancellables)
     }
+}
+
+// MARK: - Helpers
+
+private extension AddTextViewModel {
+    func measuredEditingSize(
+        text: String,
+        fontSize: CGFloat,
+        maxWidth: CGFloat
+    ) -> CGSize {
+        let horizontalInset: CGFloat = 8
+        let verticalInset: CGFloat = 8
+        let kern: CGFloat = -0.43
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: .regular),
+            .kern: kern,
+            .paragraphStyle: paragraph
+        ]
+
+        let sourceText = text.isEmpty ? " " : text
+        let attributed = NSAttributedString(string: sourceText, attributes: attributes)
+
+        let singleLineRect = attributed.boundingRect(
+            with: CGSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            ),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+
+        let contentIdealWidth = ceil(singleLineRect.width)
+        let targetContentWidth = min(contentIdealWidth, max(maxWidth - horizontalInset * 2, 1))
+
+        let wrappedRect = attributed.boundingRect(
+            with: CGSize(width: targetContentWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+
+        return CGSize(
+            width: targetContentWidth + horizontalInset * 2,
+            height: ceil(wrappedRect.height) + verticalInset * 2
+        )
+    }
+}
+
+private struct TextEditingSession {
+    let textID: UUID
+    let initialWidth: CGFloat
+    let initialHeight: CGFloat
+    let initialCenterX: CGFloat
+    let initialCenterY: CGFloat
+    let leftEdgeX: CGFloat
+    let topEdgeY: CGFloat
 }

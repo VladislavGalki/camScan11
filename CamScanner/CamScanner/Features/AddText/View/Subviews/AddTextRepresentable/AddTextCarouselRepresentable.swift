@@ -4,6 +4,8 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
     var models: [ScanPreviewModel]
     var textItems: [DocumentTextItem]
     var selectedTextID: UUID?
+    var editingTextID: UUID?
+    var editingTextDraft: String
 
     var onPageChanged: (Int) -> Void
     var onPageTap: (Int, CGPoint, CGSize) -> Void
@@ -12,19 +14,25 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
     var onTextMove: (UUID, CGPoint) -> Void
     var onTextResize: (UUID, CGFloat, CGFloat?) -> Void
     var onResizeStateChanged: (Bool) -> Void
+    var onEditingTextChanged: (String, CGSize) -> Void
+    var onEditingSubmit: () -> Void
 
     func makeUIViewController(context: Context) -> AddTextCarouselController {
         AddTextCarouselController(
             models: models,
             textItems: textItems,
             selectedTextID: selectedTextID,
+            editingTextID: editingTextID,
+            editingTextDraft: editingTextDraft,
             onPageChanged: onPageChanged,
             onPageTap: onPageTap,
             onTextTap: onTextTap,
             onSelectedTextFrameChanged: onSelectedTextFrameChanged,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
-            onResizeStateChanged: onResizeStateChanged
+            onResizeStateChanged: onResizeStateChanged,
+            onEditingTextChanged: onEditingTextChanged,
+            onEditingSubmit: onEditingSubmit
         )
     }
 
@@ -32,7 +40,9 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
         vc.update(
             models: models,
             textItems: textItems,
-            selectedTextID: selectedTextID
+            selectedTextID: selectedTextID,
+            editingTextID: editingTextID,
+            editingTextDraft: editingTextDraft
         )
     }
 }

@@ -23,6 +23,7 @@ struct AddTextView: View {
                 carouselView
                     .frame(maxHeight: .infinity)
                     .padding(.bottom, 187)
+                    .ignoresSafeArea(.keyboard, edges: .all)
             }
 
             bubbleOverlay
@@ -98,6 +99,8 @@ private extension AddTextView {
             models: viewModel.models,
             textItems: viewModel.textItems,
             selectedTextID: viewModel.selectedTextID,
+            editingTextID: viewModel.editingTextID,
+            editingTextDraft: viewModel.editingTextDraft,
             onPageChanged: { index in
                 viewModel.updateSelectedIndex(index)
             },
@@ -132,14 +135,23 @@ private extension AddTextView {
             },
             onResizeStateChanged: { isResizing in
                 viewModel.setBubbleAnchorFrozen(isResizing)
+            },
+            onEditingTextChanged: { text, pageSize in
+                Task { @MainActor in
+                    viewModel.updateEditingDraft(text, pageSize: pageSize)
+                }
+            },
+            onEditingSubmit: {
+                viewModel.applyTextEditing()
             }
         )
     }
 
     @ViewBuilder
-    var bubbleOverlay: some View {
+    private var bubbleOverlay: some View {
         if let anchor = viewModel.bubbleAnchor,
-           viewModel.selectedTextID == anchor.textID {
+           viewModel.selectedTextID == anchor.textID,
+           viewModel.editingTextID == nil {
             GeometryReader { geo in
                 let bubbleSize = CGSize(width: 280, height: 64)
                 let horizontalPadding: CGFloat = 8

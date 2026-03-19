@@ -18,6 +18,9 @@ final class AddTextCarouselController: UIViewController {
     private var textItems: [DocumentTextItem]
     private var selectedTextID: UUID?
     private var currentIndex: Int = 0
+    
+    private var editingTextID: UUID?
+    private var editingTextDraft: String
 
     // MARK: - Callbacks
 
@@ -28,6 +31,8 @@ final class AddTextCarouselController: UIViewController {
     private let onTextMove: (UUID, CGPoint) -> Void
     private let onTextResize: (UUID, CGFloat, CGFloat?) -> Void
     private let onResizeStateChanged: (Bool) -> Void
+    private let onEditingTextChanged: (String, CGSize) -> Void
+    private let onEditingSubmit: () -> Void
 
     // MARK: - Init
 
@@ -35,17 +40,23 @@ final class AddTextCarouselController: UIViewController {
         models: [ScanPreviewModel],
         textItems: [DocumentTextItem],
         selectedTextID: UUID?,
+        editingTextID: UUID?,
+        editingTextDraft: String,
         onPageChanged: @escaping (Int) -> Void,
         onPageTap: @escaping (Int, CGPoint, CGSize) -> Void,
         onTextTap: @escaping (UUID) -> Void,
         onSelectedTextFrameChanged: @escaping (UUID, CGRect?) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
         onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
-        onResizeStateChanged: @escaping (Bool) -> Void
+        onResizeStateChanged: @escaping (Bool) -> Void,
+        onEditingTextChanged: @escaping (String, CGSize) -> Void,
+        onEditingSubmit: @escaping () -> Void
     ) {
         self.models = models
         self.textItems = textItems
         self.selectedTextID = selectedTextID
+        self.editingTextID = editingTextID
+        self.editingTextDraft = editingTextDraft
         self.onPageChanged = onPageChanged
         self.onPageTap = onPageTap
         self.onTextTap = onTextTap
@@ -53,6 +64,8 @@ final class AddTextCarouselController: UIViewController {
         self.onTextMove = onTextMove
         self.onTextResize = onTextResize
         self.onResizeStateChanged = onResizeStateChanged
+        self.onEditingTextChanged = onEditingTextChanged
+        self.onEditingSubmit = onEditingSubmit
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -77,15 +90,21 @@ final class AddTextCarouselController: UIViewController {
     func update(
         models newModels: [ScanPreviewModel],
         textItems newTextItems: [DocumentTextItem],
-        selectedTextID newSelectedTextID: UUID?
+        selectedTextID newSelectedTextID: UUID?,
+        editingTextID newEditingTextID: UUID?,
+        editingTextDraft newEditingTextDraft: String
     ) {
         let didModelsChange = models != newModels
         let didTextItemsChange = textItems != newTextItems
         let didSelectionChange = selectedTextID != newSelectedTextID
+        let didEditingIDChange = editingTextID != newEditingTextID
+        let didEditingDraftChange = editingTextDraft != newEditingTextDraft
 
         models = newModels
         textItems = newTextItems
         selectedTextID = newSelectedTextID
+        editingTextID = newEditingTextID
+        editingTextDraft = newEditingTextDraft
 
         if didModelsChange {
             collectionView.reloadData()
@@ -93,7 +112,10 @@ final class AddTextCarouselController: UIViewController {
             return
         }
 
-        if didTextItemsChange || didSelectionChange {
+        if didTextItemsChange ||
+            didSelectionChange ||
+            didEditingIDChange ||
+            didEditingDraftChange {
             updateVisibleOverlays()
             updateIndicator(index: min(currentIndex, max(newModels.count - 1, 0)))
         }
@@ -181,6 +203,8 @@ private extension AddTextCarouselController {
                 pageIndex: indexPath.item,
                 textItems: textItems.filter { $0.pageIndex == indexPath.item },
                 selectedTextID: selectedTextID,
+                editingTextID: editingTextID,
+                editingTextDraft: editingTextDraft,
                 onPageTap: { [weak self] point, initialSize in
                     self?.onPageTap(indexPath.item, point, initialSize)
                 },
@@ -195,6 +219,12 @@ private extension AddTextCarouselController {
                 },
                 onResizeStateChanged: { [weak self] value in
                     self?.onResizeStateChanged(value)
+                },
+                onEditingTextChanged: { [weak self] text, size in
+                    self?.onEditingTextChanged(text, size)
+                },
+                onEditingSubmit: { [weak self] in
+                    self?.onEditingSubmit()
                 }
             )
         }
@@ -221,6 +251,8 @@ extension AddTextCarouselController: UICollectionViewDataSource {
             pageIndex: indexPath.item,
             textItems: textItems.filter { $0.pageIndex == indexPath.item },
             selectedTextID: selectedTextID,
+            editingTextID: editingTextID,
+            editingTextDraft: editingTextDraft,
             parent: self,
             onPageTap: { [weak self] point, initialSize in
                 self?.onPageTap(indexPath.item, point, initialSize)
@@ -251,6 +283,12 @@ extension AddTextCarouselController: UICollectionViewDataSource {
                 let rectInWindow = self.view.convert(rectInController, to: window)
 
                 self.onSelectedTextFrameChanged(id, rectInWindow)
+            },
+            onEditingTextChanged: { [weak self] text, size in
+                self?.onEditingTextChanged(text, size)
+            },
+            onEditingSubmit: { [weak self] in
+                self?.onEditingSubmit()
             }
         )
 
