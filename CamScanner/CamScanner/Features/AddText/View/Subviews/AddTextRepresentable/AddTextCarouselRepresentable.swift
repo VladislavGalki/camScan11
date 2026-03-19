@@ -17,6 +17,7 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
     var onResizeStateChanged: (Bool) -> Void
     var onEditingTextChanged: (String, CGSize) -> Void
     var onEditingSubmit: () -> Void
+    var onScrollStarted: () -> Void
 
     func makeUIViewController(context: Context) -> AddTextCarouselController {
         AddTextCarouselController(
@@ -34,7 +35,8 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
             onPageSizeChanged: onPageSizeChanged,
             onResizeStateChanged: onResizeStateChanged,
             onEditingTextChanged: onEditingTextChanged,
-            onEditingSubmit: onEditingSubmit
+            onEditingSubmit: onEditingSubmit,
+            onScrollStarted: onScrollStarted
         )
     }
 

@@ -232,7 +232,7 @@ private extension AddTextPageOverlayView {
 // MARK: - Resize
 
 private extension AddTextPageOverlayView {
-    func leftResizeHandle(
+    private func leftResizeHandle(
         _ item: DocumentTextItem,
         in size: CGSize,
         width: CGFloat,
@@ -260,13 +260,15 @@ private extension AddTextPageOverlayView {
                         let deltaXNormalized = deltaXPoints / max(size.width, 1)
 
                         let minWidthNormalized = Constants.initialWidth / max(size.width, 1)
-                        let newWidth = max(session.initialWidth - deltaXNormalized, minWidthNormalized)
 
-                        let actualDeltaWidth = session.initialWidth - newWidth
-                        let newCenterX = session.initialCenterX + actualDeltaWidth / 2
+                        let rightEdge = session.initialCenterX + session.initialWidth / 2
+                        let proposedWidth = session.initialWidth - deltaXNormalized
+                        let clampedWidth = max(minWidthNormalized, min(proposedWidth, rightEdge))
+
+                        let newCenterX = rightEdge - clampedWidth / 2
 
                         activeResizeTextID = item.id
-                        activeResizeWidth = newWidth
+                        activeResizeWidth = clampedWidth
                         activeResizeCenterX = newCenterX
                     }
                     .onEnded { _ in
@@ -276,7 +278,7 @@ private extension AddTextPageOverlayView {
             )
     }
 
-    func rightResizeHandle(
+    private func rightResizeHandle(
         _ item: DocumentTextItem,
         in size: CGSize,
         width: CGFloat,
@@ -304,13 +306,16 @@ private extension AddTextPageOverlayView {
                         let deltaXNormalized = deltaXPoints / max(size.width, 1)
 
                         let minWidthNormalized = Constants.initialWidth / max(size.width, 1)
-                        let newWidth = max(session.initialWidth + deltaXNormalized, minWidthNormalized)
 
-                        let actualDeltaWidth = newWidth - session.initialWidth
-                        let newCenterX = session.initialCenterX + actualDeltaWidth / 2
+                        let leftEdge = session.initialCenterX - session.initialWidth / 2
+                        let proposedWidth = session.initialWidth + deltaXNormalized
+                        let maxWidth = 1 - leftEdge
+                        let clampedWidth = max(minWidthNormalized, min(proposedWidth, maxWidth))
+
+                        let newCenterX = leftEdge + clampedWidth / 2
 
                         activeResizeTextID = item.id
-                        activeResizeWidth = newWidth
+                        activeResizeWidth = clampedWidth
                         activeResizeCenterX = newCenterX
                     }
                     .onEnded { _ in

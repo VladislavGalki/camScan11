@@ -149,6 +149,9 @@ private extension AddTextView {
             },
             onEditingSubmit: {
                 viewModel.applyTextEditing()
+            },
+            onScrollStarted: {
+                viewModel.clearSelection()
             }
         )
     }

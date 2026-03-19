@@ -74,6 +74,11 @@ extension AddTextViewModel {
         selectedIndex: \(selectedIndex)
         """)
     }
+    
+    func clearSelection() {
+        selectedTextID = nil
+        bubbleAnchor = nil
+    }
 
     func handlePageTap(
         pageIndex: Int,
@@ -325,20 +330,16 @@ extension AddTextViewModel {
     func moveText(id: UUID, to center: CGPoint) {
         guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
 
-        let previousCenter = CGPoint(
-            x: textItems[index].centerX,
-            y: textItems[index].centerY
-        )
+        let item = textItems[index]
 
-        textItems[index].centerX = min(max(center.x, 0), 1)
-        textItems[index].centerY = min(max(center.y, 0), 1)
+        let minCenterX = min(item.width / 2, 0.5)
+        let maxCenterX = max(1 - item.width / 2, 0.5)
 
-        print("""
-        ↔️ MOVE TEXT
-        id: \(id)
-        previousCenter: \(previousCenter)
-        newCenter: \(CGPoint(x: textItems[index].centerX, y: textItems[index].centerY))
-        """)
+        let minCenterY = min(item.height / 2, 0.5)
+        let maxCenterY = max(1 - item.height / 2, 0.5)
+
+        textItems[index].centerX = min(max(center.x, minCenterX), maxCenterX)
+        textItems[index].centerY = min(max(center.y, minCenterY), maxCenterY)
     }
 
     func resizeText(

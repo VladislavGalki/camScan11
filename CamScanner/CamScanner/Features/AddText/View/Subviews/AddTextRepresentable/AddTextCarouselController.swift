@@ -34,6 +34,7 @@ final class AddTextCarouselController: UIViewController {
     private let onResizeStateChanged: (Bool) -> Void
     private let onEditingTextChanged: (String, CGSize) -> Void
     private let onEditingSubmit: () -> Void
+    private let onScrollStarted: () -> Void
 
     // MARK: - Init
 
@@ -52,7 +53,8 @@ final class AddTextCarouselController: UIViewController {
         onPageSizeChanged: @escaping (CGSize) -> Void,
         onResizeStateChanged: @escaping (Bool) -> Void,
         onEditingTextChanged: @escaping (String, CGSize) -> Void,
-        onEditingSubmit: @escaping () -> Void
+        onEditingSubmit: @escaping () -> Void,
+        onScrollStarted: @escaping () -> Void
     ) {
         self.models = models
         self.textItems = textItems
@@ -69,6 +71,7 @@ final class AddTextCarouselController: UIViewController {
         self.onResizeStateChanged = onResizeStateChanged
         self.onEditingTextChanged = onEditingTextChanged
         self.onEditingSubmit = onEditingSubmit
+        self.onScrollStarted = onScrollStarted
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -108,6 +111,8 @@ final class AddTextCarouselController: UIViewController {
         selectedTextID = newSelectedTextID
         editingTextID = newEditingTextID
         editingTextDraft = newEditingTextDraft
+        
+        collectionView.isScrollEnabled = (editingTextID == nil)
 
         if didModelsChange {
             collectionView.reloadData()
@@ -349,6 +354,11 @@ extension AddTextCarouselController: UICollectionViewDelegateFlowLayout {
         let newOffset = clampedIndex * fullWidth - scrollView.contentInset.left
         targetContentOffset.pointee.x = newOffset
         onPageChanged(Int(clampedIndex))
+    }
+    
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        guard editingTextID == nil else { return }
+        onScrollStarted()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
