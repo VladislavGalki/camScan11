@@ -125,13 +125,19 @@ private extension AddTextView {
                 )
 
                 guard viewModel.bubbleAnchor != newAnchor else { return }
-                viewModel.updateBubbleAnchor(newAnchor)
+                
+                Task { @MainActor in
+                    viewModel.updateBubbleAnchor(newAnchor)
+                }
             },
             onTextMove: { id, center in
                 viewModel.moveText(id: id, to: center)
             },
-            onTextResize: { id, width, centerX in
-                viewModel.resizeText(id: id, width: width, centerX: centerX)
+            onTextResize: { id, width, centerX, size in
+                viewModel.resizeText(id: id, width: width, centerX: centerX, pageSize: size)
+            },
+            onPageSizeChanged: { size in
+                viewModel.updateCurrentPageSize(size)
             },
             onResizeStateChanged: { isResizing in
                 viewModel.setBubbleAnchorFrozen(isResizing)

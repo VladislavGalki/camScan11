@@ -47,7 +47,8 @@ struct AddTextPageOverlayView: View {
     let onPageTap: (CGPoint, CGSize) -> Void
     let onTextTap: (UUID) -> Void
     let onTextMove: (UUID, CGPoint) -> Void
-    let onTextResize: (UUID, CGFloat, CGFloat?) -> Void
+    let onTextResize: (UUID, CGFloat, CGFloat?, CGSize) -> Void
+    let onPageSizeChanged: (CGSize) -> Void
     let onResizeStateChanged: (Bool) -> Void
     
     let onEditingTextChanged: (String, CGSize) -> Void
@@ -67,6 +68,12 @@ struct AddTextPageOverlayView: View {
                             y: item.centerY * geo.size.height
                         )
                 }
+            }
+            .onAppear {
+                onPageSizeChanged(geo.size)
+            }
+            .onChange(of: geo.size) { _, newSize in
+                onPageSizeChanged(newSize)
             }
         }
     }
@@ -120,7 +127,6 @@ private extension AddTextPageOverlayView {
             } else {
                 textContent(item, width: width, height: height)
                     .frame(width: width, height: height)
-                    .offset(x: 8)
                     .contentShape(Rectangle())
                     .gesture(moveGesture(for: item, in: size))
                     .highPriorityGesture(
@@ -145,7 +151,18 @@ private extension AddTextPageOverlayView {
         height: CGFloat,
         pageSize: CGSize
     ) -> some View {
-        AutoFocusTextView(
+        print("""
+        🟨 EDIT CONTENT
+        item.id: \(item.id)
+        item.text: \(item.text)
+        editingTextDraft: \(editingTextDraft)
+        width: \(width)
+        height: \(height)
+        pageSize: \(pageSize)
+        isEditing: \(editingTextID == item.id)
+        """)
+        
+        return AutoFocusTextView(
             text: Binding(
                 get: { editingTextDraft },
                 set: { newValue in
@@ -155,6 +172,9 @@ private extension AddTextPageOverlayView {
             fontSize: item.style.fontSize,
             textColor: UIColor(Color(hex: item.style.textColorHex) ?? .black),
             textAlignment: uiTextAlignment(for: item.style.alignment),
+            onPredictedTextChange: { predictedText in
+                onEditingTextChanged(predictedText, pageSize)
+            },
             onSubmit: {
                 onEditingSubmit()
             }
@@ -172,14 +192,24 @@ private extension AddTextPageOverlayView {
             .frame(width: width, height: height)
     }
 
-    func textContent(_ item: DocumentTextItem, width: CGFloat, height: CGFloat) -> some View {
+    private func textContent(_ item: DocumentTextItem, width: CGFloat, height: CGFloat) -> some View {
         Text(item.text)
             .font(.system(size: item.style.fontSize, weight: .regular))
             .kerning(item.style.letterSpacing)
             .lineSpacing(0)
             .foregroundStyle(Color(hex: item.style.textColorHex) ?? .black)
             .multilineTextAlignment(textAlignment(for: item.style.alignment))
-            .frame(width: width, height: height, alignment: .leading)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(
+                width: max(width - 16, 0),
+                height: max(height - 16, 0),
+                alignment: .topLeading
+            )
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+            .frame(width: width, height: height, alignment: .topLeading)
+            .clipped()
     }
 }
 
@@ -241,7 +271,7 @@ private extension AddTextPageOverlayView {
                     }
                     .onEnded { _ in
                         onResizeStateChanged(false)
-                        finishResize(for: item)
+                        finishResize(for: item, pageSize: size)
                     }
             )
     }
@@ -285,18 +315,18 @@ private extension AddTextPageOverlayView {
                     }
                     .onEnded { _ in
                         onResizeStateChanged(false)
-                        finishResize(for: item)
+                        finishResize(for: item, pageSize: size)
                     }
             )
     }
 
-    func finishResize(for item: DocumentTextItem) {
+    func finishResize(for item: DocumentTextItem, pageSize: CGSize) {
         guard let session = resizeSession else { return }
 
         let finalWidth = activeResizeWidth ?? session.initialWidth
         let finalCenterX = activeResizeCenterX ?? session.initialCenterX
 
-        onTextResize(item.id, finalWidth, finalCenterX)
+        onTextResize(item.id, finalWidth, finalCenterX, pageSize)
 
         resizeSession = nil
         activeResizeTextID = nil

@@ -12,7 +12,8 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
     var onTextTap: (UUID) -> Void
     var onSelectedTextFrameChanged: (UUID, CGRect?) -> Void
     var onTextMove: (UUID, CGPoint) -> Void
-    var onTextResize: (UUID, CGFloat, CGFloat?) -> Void
+    var onTextResize: (UUID, CGFloat, CGFloat?, CGSize) -> Void
+    var onPageSizeChanged: (CGSize) -> Void
     var onResizeStateChanged: (Bool) -> Void
     var onEditingTextChanged: (String, CGSize) -> Void
     var onEditingSubmit: () -> Void
@@ -30,6 +31,7 @@ struct AddTextCarouselRepresentable: UIViewControllerRepresentable {
             onSelectedTextFrameChanged: onSelectedTextFrameChanged,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
+            onPageSizeChanged: onPageSizeChanged,
             onResizeStateChanged: onResizeStateChanged,
             onEditingTextChanged: onEditingTextChanged,
             onEditingSubmit: onEditingSubmit

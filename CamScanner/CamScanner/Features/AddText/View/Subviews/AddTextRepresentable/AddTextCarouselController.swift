@@ -29,7 +29,8 @@ final class AddTextCarouselController: UIViewController {
     private let onTextTap: (UUID) -> Void
     private let onSelectedTextFrameChanged: (UUID, CGRect?) -> Void
     private let onTextMove: (UUID, CGPoint) -> Void
-    private let onTextResize: (UUID, CGFloat, CGFloat?) -> Void
+    private let onTextResize: (UUID, CGFloat, CGFloat?, CGSize) -> Void
+    private let onPageSizeChanged: (CGSize) -> Void
     private let onResizeStateChanged: (Bool) -> Void
     private let onEditingTextChanged: (String, CGSize) -> Void
     private let onEditingSubmit: () -> Void
@@ -47,7 +48,8 @@ final class AddTextCarouselController: UIViewController {
         onTextTap: @escaping (UUID) -> Void,
         onSelectedTextFrameChanged: @escaping (UUID, CGRect?) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
+        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
+        onPageSizeChanged: @escaping (CGSize) -> Void,
         onResizeStateChanged: @escaping (Bool) -> Void,
         onEditingTextChanged: @escaping (String, CGSize) -> Void,
         onEditingSubmit: @escaping () -> Void
@@ -63,6 +65,7 @@ final class AddTextCarouselController: UIViewController {
         self.onSelectedTextFrameChanged = onSelectedTextFrameChanged
         self.onTextMove = onTextMove
         self.onTextResize = onTextResize
+        self.onPageSizeChanged = onPageSizeChanged
         self.onResizeStateChanged = onResizeStateChanged
         self.onEditingTextChanged = onEditingTextChanged
         self.onEditingSubmit = onEditingSubmit
@@ -214,8 +217,11 @@ private extension AddTextCarouselController {
                 onTextMove: { [weak self] id, center in
                     self?.onTextMove(id, center)
                 },
-                onTextResize: { [weak self] id, width, centerX in
-                    self?.onTextResize(id, width, centerX)
+                onTextResize: { [weak self] id, width, centerX, size in
+                    self?.onTextResize(id, width, centerX, size)
+                },
+                onPageSizeChanged: { [weak self] size in
+                    self?.onPageSizeChanged(size)
                 },
                 onResizeStateChanged: { [weak self] value in
                     self?.onResizeStateChanged(value)
@@ -263,11 +269,14 @@ extension AddTextCarouselController: UICollectionViewDataSource {
             onTextMove: { [weak self] id, center in
                 self?.onTextMove(id, center)
             },
-            onTextResize: { [weak self] id, width, centerX in
-                self?.onTextResize(id, width, centerX)
+            onTextResize: { [weak self] id, width, centerX, size in
+                self?.onTextResize(id, width, centerX, size)
             },
             onResizeStateChanged: { [weak self] value in
                 self?.onResizeStateChanged(value)
+            },
+            onPageSizeChanged: { [weak self] size in
+                self?.onPageSizeChanged(size)
             },
             onSelectedTextFrameChanged: { [weak self] id, rect in
                 guard let self else { return }

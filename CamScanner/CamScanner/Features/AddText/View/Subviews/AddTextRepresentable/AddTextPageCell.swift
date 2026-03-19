@@ -133,8 +133,9 @@ extension AddTextPageCell {
         onPageTap: @escaping (CGPoint, CGSize) -> Void,
         onTextTap: @escaping (UUID) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
+        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
         onResizeStateChanged: @escaping (Bool) -> Void,
+        onPageSizeChanged: @escaping (CGSize) -> Void,
         onSelectedTextFrameChanged: ((UUID, CGRect?) -> Void)? = nil,
         onEditingTextChanged: @escaping (String, CGSize) -> Void,
         onEditingSubmit: @escaping () -> Void
@@ -207,6 +208,7 @@ extension AddTextPageCell {
             onTextTap: onTextTap,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
+            onPageSizeChanged: onPageSizeChanged,
             onResizeStateChanged: onResizeStateChanged,
             onEditingTextChanged: onEditingTextChanged,
             onEditingSubmit: onEditingSubmit
@@ -222,7 +224,8 @@ extension AddTextPageCell {
         onPageTap: @escaping (CGPoint, CGSize) -> Void,
         onTextTap: @escaping (UUID) -> Void,
         onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?) -> Void,
+        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
+        onPageSizeChanged: @escaping (CGSize) -> Void,
         onResizeStateChanged: @escaping (Bool) -> Void,
         onEditingTextChanged: @escaping (String, CGSize) -> Void,
         onEditingSubmit: @escaping () -> Void
@@ -240,6 +243,7 @@ extension AddTextPageCell {
             onTextTap: onTextTap,
             onTextMove: onTextMove,
             onTextResize: onTextResize,
+            onPageSizeChanged: onPageSizeChanged,
             onResizeStateChanged: onResizeStateChanged,
             onEditingTextChanged: onEditingTextChanged,
             onEditingSubmit: onEditingSubmit
