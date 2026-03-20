@@ -41,11 +41,6 @@ extension AddTextViewModel {
     func updateCurrentPageSize(_ pageSize: CGSize) {
         guard pageSize != .zero else { return }
         currentPageSize = pageSize
-
-        print("""
-        📐 UPDATE CURRENT PAGE SIZE
-        pageSize: \(pageSize)
-        """)
     }
 
     func setBubbleAnchorFrozen(_ isFrozen: Bool) {
@@ -70,11 +65,6 @@ extension AddTextViewModel {
         selectedIndex = index
         selectedTextID = nil
         bubbleAnchor = nil
-
-        print("""
-        📄 UPDATE SELECTED INDEX
-        selectedIndex: \(selectedIndex)
-        """)
     }
     
     func clearSelection() {
@@ -104,26 +94,11 @@ extension AddTextViewModel {
 
         textItems.append(item)
         selectedTextID = item.id
-
-        print("""
-        ➕ HANDLE PAGE TAP
-        pageIndex: \(pageIndex)
-        location: \(location)
-        initialSize: \(initialSize)
-        createdItemID: \(item.id)
-        createdWidth: \(item.width)
-        createdHeight: \(item.height)
-        """)
     }
 
     func selectText(_ id: UUID?) {
         selectedTextID = id
         bubbleAnchor = nil
-
-        print("""
-        🎯 SELECT TEXT
-        selectedTextID: \(String(describing: selectedTextID))
-        """)
     }
 
     func startEditingSelectedText() {
@@ -151,21 +126,6 @@ extension AddTextViewModel {
             topEdgeY: topEdgeY,
             shouldLockWidth: shouldLockWidth
         )
-
-        print("""
-        🟩 START EDIT
-        selectedTextID: \(selectedTextID)
-        item.text: \(item.text)
-        item.width: \(item.width)
-        item.height: \(item.height)
-        item.centerX: \(item.centerX)
-        item.centerY: \(item.centerY)
-        currentPageSize: \(currentPageSize)
-        leftEdgeX: \(leftEdgeX)
-        topEdgeY: \(topEdgeY)
-        shouldLockWidth: \(shouldLockWidth)
-        editingTextDraft: \(editingTextDraft)
-        """)
     }
 
     func updateEditingDraft(_ text: String, pageSize: CGSize) {
@@ -173,26 +133,10 @@ extension AddTextViewModel {
         currentPageSize = pageSize
         editingTextDraft = text
 
-        print("""
-        🟦 VM UPDATE EDIT DRAFT
-        incomingText: \(text)
-        incomingCount: \(text.count)
-        editingTextID: \(String(describing: editingTextID))
-        currentDraft(before): \(previousDraft)
-        currentDraft(after): \(editingTextDraft)
-        pageSize: \(pageSize)
-        """)
-
         guard let editingTextID,
               let session = textEditingSession,
               session.textID == editingTextID,
               let index = textItems.firstIndex(where: { $0.id == editingTextID }) else {
-            print("""
-            🟥 VM UPDATE EDIT DRAFT ABORT
-            reason: missing editing session or item
-            editingTextID: \(String(describing: editingTextID))
-            hasSession: \(textEditingSession != nil)
-            """)
             return
         }
 
@@ -200,35 +144,55 @@ extension AddTextViewModel {
 
         let fontSize = textItems[index].style.fontSize
 
-        let minWidthPoints = session.initialWidth * pageSize.width
-        let minHeightPoints = session.initialHeight * pageSize.height
+        let minWidthPoints: CGFloat = 56
+        let minHeightPoints: CGFloat = 44
 
         let leftEdgePoints = session.leftEdgeX * pageSize.width
         let availableWidthPoints = max(pageSize.width - leftEdgePoints, minWidthPoints)
-
         let lockedWidthPoints = session.initialWidth * pageSize.width
 
-        let measurementWidth: CGFloat = session.shouldLockWidth
-            ? lockedWidthPoints
-            : availableWidthPoints
-
-        let measuredSize = measuredEditingSize(
+        let measuredAtAvailableWidth = measuredEditingSize(
             text: text,
             fontSize: fontSize,
-            maxWidth: measurementWidth
+            maxWidth: availableWidthPoints
         )
 
+        let measuredAtLockedWidth = measuredEditingSize(
+            text: text,
+            fontSize: fontSize,
+            maxWidth: lockedWidthPoints
+        )
+
+        let shouldKeepWidthLocked =
+            session.shouldLockWidth &&
+            measuredAtLockedWidth.height > minHeightPoints + 1
+
         let widthPoints: CGFloat
-        if session.shouldLockWidth {
+        if shouldKeepWidthLocked {
             widthPoints = lockedWidthPoints
         } else {
-            widthPoints = max(lockedWidthPoints, min(measuredSize.width, availableWidthPoints))
+            widthPoints = max(
+                minWidthPoints,
+                min(measuredAtAvailableWidth.width, availableWidthPoints)
+            )
         }
 
-        let hitMaxWidth = session.shouldLockWidth || widthPoints >= availableWidthPoints - 0.5
+        let isMultilineAtCurrentWidth: Bool
+        if shouldKeepWidthLocked {
+            isMultilineAtCurrentWidth = measuredAtLockedWidth.height > minHeightPoints + 1
+        } else {
+            isMultilineAtCurrentWidth = measuredAtAvailableWidth.height > minHeightPoints + 1
+        }
 
-        let heightPoints = hitMaxWidth
-            ? max(minHeightPoints, measuredSize.height)
+        let measuredHeight: CGFloat
+        if shouldKeepWidthLocked {
+            measuredHeight = measuredAtLockedWidth.height
+        } else {
+            measuredHeight = measuredAtAvailableWidth.height
+        }
+
+        let heightPoints = isMultilineAtCurrentWidth
+            ? max(minHeightPoints, measuredHeight)
             : minHeightPoints
 
         let widthNormalized = widthPoints / max(pageSize.width, 1)
@@ -237,38 +201,10 @@ extension AddTextViewModel {
         let newCenterX = session.leftEdgeX + widthNormalized / 2
         let newCenterY = session.topEdgeY + heightNormalized / 2
 
-        print("""
-        🟦 VM EDIT GEOMETRY CALC
-        session.initialWidth: \(session.initialWidth)
-        session.initialHeight: \(session.initialHeight)
-        session.leftEdgeX: \(session.leftEdgeX)
-        session.topEdgeY: \(session.topEdgeY)
-        session.shouldLockWidth: \(session.shouldLockWidth)
-
-        minWidthPoints: \(minWidthPoints)
-        minHeightPoints: \(minHeightPoints)
-        leftEdgePoints: \(leftEdgePoints)
-        availableWidthPoints: \(availableWidthPoints)
-        lockedWidthPoints: \(lockedWidthPoints)
-        measurementWidth: \(measurementWidth)
-        measuredSize: \(measuredSize)
-
-        widthPoints: \(widthPoints)
-        heightPoints: \(heightPoints)
-        widthNormalized: \(widthNormalized)
-        heightNormalized: \(heightNormalized)
-        newCenterX: \(newCenterX)
-        newCenterY: \(newCenterY)
-        """)
-
         guard textItems[index].width != widthNormalized ||
               textItems[index].height != heightNormalized ||
               textItems[index].centerX != newCenterX ||
               textItems[index].centerY != newCenterY else {
-            print("""
-            🟨 VM UPDATE EDIT DRAFT SKIP APPLY
-            reason: geometry unchanged
-            """)
             return
         }
 
@@ -276,15 +212,6 @@ extension AddTextViewModel {
         textItems[index].height = heightNormalized
         textItems[index].centerX = newCenterX
         textItems[index].centerY = newCenterY
-
-        print("""
-        🟦 VM UPDATE EDIT LAYOUT RESULT
-        storedText: \(textItems[index].text)
-        width: \(textItems[index].width)
-        height: \(textItems[index].height)
-        centerX: \(textItems[index].centerX)
-        centerY: \(textItems[index].centerY)
-        """)
     }
 
     func applyTextEditing() {
@@ -293,11 +220,6 @@ extension AddTextViewModel {
             self.editingTextID = nil
             self.editingTextDraft = ""
             self.textEditingSession = nil
-
-            print("""
-            ✅ APPLY TEXT EDITING ABORT
-            reason: missing editing item
-            """)
             return
         }
 
@@ -308,25 +230,12 @@ extension AddTextViewModel {
         editingTextDraft = finalText
         self.editingTextID = nil
         self.textEditingSession = nil
-
-        print("""
-        ✅ APPLY TEXT EDITING
-        finalText: \(finalText)
-        finalWidth: \(textItems[index].width)
-        finalHeight: \(textItems[index].height)
-        finalCenterX: \(textItems[index].centerX)
-        finalCenterY: \(textItems[index].centerY)
-        """)
     }
 
     func cancelTextEditing() {
         editingTextID = nil
         editingTextDraft = ""
         textEditingSession = nil
-
-        print("""
-        ❌ CANCEL TEXT EDITING
-        """)
     }
 
     func moveText(id: UUID, to center: CGPoint) {
@@ -366,32 +275,8 @@ extension AddTextViewModel {
         if let centerX {
             textItems[index].centerX = centerX
         }
-
-        print("""
-        📏 RESIZE TEXT BEFORE REFLOW
-        id: \(id)
-        pageSize: \(pageSize)
-        incomingWidth: \(width)
-        clampedWidth: \(clampedWidth)
-        previousWidth: \(previousWidth)
-        previousHeight: \(previousHeight)
-        previousCenterX: \(previousCenterX)
-        previousCenterY: \(previousCenterY)
-        updatedCenterX: \(textItems[index].centerX)
-        """)
         
         reflowTextItemIfNeeded(id: id, pageSize: pageSize)
-
-        if let updatedIndex = textItems.firstIndex(where: { $0.id == id }) {
-            print("""
-            📏 RESIZE TEXT AFTER REFLOW
-            id: \(id)
-            newWidth: \(textItems[updatedIndex].width)
-            newHeight: \(textItems[updatedIndex].height)
-            newCenterX: \(textItems[updatedIndex].centerX)
-            newCenterY: \(textItems[updatedIndex].centerY)
-            """)
-        }
     }
     
     func updateSelectedTextStyle(
@@ -425,11 +310,6 @@ extension AddTextViewModel {
         bubbleAnchor = nil
         textItems.removeAll { $0.id == selectedTextID }
         self.selectedTextID = nil
-
-        print("""
-        🗑 DELETE TEXT
-        deletedID: \(selectedTextID)
-        """)
     }
 
     func openStyleEditor() {

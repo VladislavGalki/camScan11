@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddTextView: View {
     @StateObject private var viewModel: AddTextViewModel
+    
+    @State private var shouldShowDeleteOverlay: Bool = false
 
     @EnvironmentObject private var router: Router
 
@@ -23,6 +25,7 @@ struct AddTextView: View {
                 carouselView
                     .frame(maxHeight: .infinity)
                     .padding(.bottom, 187)
+                    .allowsHitTesting(!viewModel.shouldShowStyleSheet)
                     .ignoresSafeArea(.keyboard, edges: .all)
             }
 
@@ -59,6 +62,11 @@ struct AddTextView: View {
                 .presentationContentInteraction(.scrolls)
             }
         )
+        .overlay {
+            if shouldShowDeleteOverlay {
+                deleteOverlay
+            }
+        }
     }
 }
 
@@ -220,6 +228,54 @@ private extension AddTextView {
             }
         }
     }
+    
+    private var deleteOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.24)
+                .ignoresSafeArea()
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
+            
+            VStack(spacing: 24) {
+                Text("Delete the text?")
+                
+                VStack(spacing: 10) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Delete"),
+                            style: .secondary,
+                            size: .l,
+                            extraTitleColor: .text(.destructive),
+                            isFullWidth: true
+                        ),
+                        action: {
+                            viewModel.deleteSelectedText()
+                            shouldShowDeleteOverlay = false
+                        }
+                    )
+                    
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .title("Cancel"),
+                            style: .secondary,
+                            size: .l,
+                            isFullWidth: true
+                        ),
+                        action: {
+                            shouldShowDeleteOverlay = false
+                        }
+                    )
+                }
+            }
+            .padding(16)
+            .frame(width: 300)
+            .background(
+                Color.bg(.surface)
+                    .cornerRadius(24, corners: .allCorners)
+            )
+        }
+    }
 }
 
 // MARK: - Actions
@@ -232,7 +288,7 @@ private extension AddTextView {
         case .style:
             viewModel.openStyleEditor()
         case .delete:
-            viewModel.deleteSelectedText()
+            shouldShowDeleteOverlay = true
         }
     }
 }
