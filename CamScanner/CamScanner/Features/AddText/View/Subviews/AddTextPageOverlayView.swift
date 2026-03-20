@@ -2,6 +2,12 @@ import SwiftUI
 
 // MARK: - Resize Models
 
+private struct MoveSession: Equatable {
+    let textID: UUID
+    let initialCenterX: CGFloat
+    let initialCenterY: CGFloat
+}
+
 private struct ResizeSession: Equatable {
     let textID: UUID
     let side: ResizeSide
@@ -31,9 +37,12 @@ struct AddTextPageOverlayView: View {
 
     // MARK: State
 
+    @State private var moveSession: MoveSession?
     @State private var activeResizeTextID: UUID?
     @State private var activeResizeWidth: CGFloat?
+    @State private var activeResizeHeight: CGFloat?
     @State private var activeResizeCenterX: CGFloat?
+    @State private var activeResizeCenterY: CGFloat?
     @State private var resizeSession: ResizeSession?
 
     // MARK: Input
@@ -65,7 +74,7 @@ struct AddTextPageOverlayView: View {
                     draggableTextBlock(item, in: geo.size)
                         .position(
                             x: displayedCenterX(for: item) * geo.size.width,
-                            y: item.centerY * geo.size.height
+                            y: displayedCenterY(for: item) * geo.size.height
                         )
                 }
             }
@@ -111,36 +120,39 @@ private extension AddTextPageOverlayView {
 private extension AddTextPageOverlayView {
     private func draggableTextBlock(_ item: DocumentTextItem, in size: CGSize) -> some View {
         let width = displayedWidth(for: item) * size.width
-        let height = item.height * size.height
+        let height = displayedHeight(for: item) * size.height
         let isSelected = item.id == selectedTextID
         let isEditing = item.id == editingTextID
 
         return ZStack {
-            selectionBorder(
-                isSelected: isSelected || isEditing,
-                width: width,
-                height: height
-            )
+            ZStack {
+                selectionBorder(
+                    isSelected: isSelected || isEditing,
+                    width: width,
+                    height: height
+                )
 
-            if isEditing {
-                editingContent(item, width: width, height: height, pageSize: size)
-            } else {
-                textContent(item, width: width, height: height)
-                    .frame(width: width, height: height)
-                    .contentShape(Rectangle())
-                    .gesture(moveGesture(for: item, in: size))
-                    .highPriorityGesture(
-                        TapGesture()
-                            .onEnded {
-                                onTextTap(item.id)
-                            }
-                    )
-            }
+                if isEditing {
+                    editingContent(item, width: width, height: height, pageSize: size)
+                } else {
+                    textContent(item, width: width, height: height)
+                        .frame(width: width, height: height, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .gesture(moveGesture(for: item, in: size))
+                        .highPriorityGesture(
+                            TapGesture()
+                                .onEnded {
+                                    onTextTap(item.id)
+                                }
+                        )
+                }
 
-            if isSelected && !isEditing {
-                leftResizeHandle(item, in: size, width: width, height: height)
-                rightResizeHandle(item, in: size, width: width, height: height)
+                if isSelected && !isEditing {
+                    leftResizeHandle(item, in: size, width: width, height: height)
+                    rightResizeHandle(item, in: size, width: width, height: height)
+                }
             }
+            .rotationEffect(.degrees(item.rotation))
         }
         .frame(width: width, height: height)
     }
@@ -170,7 +182,7 @@ private extension AddTextPageOverlayView {
                 }
             ),
             fontSize: item.style.fontSize,
-            textColor: UIColor(Color(hex: item.style.textColorHex) ?? .black),
+            textColor: UIColor(rgbaHex: item.style.textColorHex) ?? .black,
             textAlignment: uiTextAlignment(for: item.style.alignment),
             onPredictedTextChange: { predictedText in
                 onEditingTextChanged(predictedText, pageSize)
@@ -197,18 +209,18 @@ private extension AddTextPageOverlayView {
             .font(.system(size: item.style.fontSize, weight: .regular))
             .kerning(item.style.letterSpacing)
             .lineSpacing(0)
-            .foregroundStyle(Color(hex: item.style.textColorHex) ?? .black)
+            .foregroundStyle(Color(rgbaHex: item.style.textColorHex) ?? .black)
             .multilineTextAlignment(textAlignment(for: item.style.alignment))
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
             .frame(
                 width: max(width - 16, 0),
                 height: max(height - 16, 0),
-                alignment: .topLeading
+                alignment: .leading
             )
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .frame(width: width, height: height, alignment: .topLeading)
+            .frame(width: width, height: height, alignment: .leading)
             .clipped()
     }
 }
@@ -217,14 +229,30 @@ private extension AddTextPageOverlayView {
 
 private extension AddTextPageOverlayView {
     func moveGesture(for item: DocumentTextItem, in size: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 0)
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
+                if moveSession?.textID != item.id {
+                    moveSession = MoveSession(
+                        textID: item.id,
+                        initialCenterX: item.centerX,
+                        initialCenterY: item.centerY
+                    )
+                }
+
+                guard let session = moveSession else { return }
+
+                let deltaX = value.translation.width / max(size.width, 1)
+                let deltaY = value.translation.height / max(size.height, 1)
+
                 let newCenter = CGPoint(
-                    x: (item.centerX * size.width + value.translation.width) / size.width,
-                    y: (item.centerY * size.height + value.translation.height) / size.height
+                    x: session.initialCenterX + deltaX,
+                    y: session.initialCenterY + deltaY
                 )
 
                 onTextMove(item.id, newCenter)
+            }
+            .onEnded { _ in
+                moveSession = nil
             }
     }
 }
@@ -266,10 +294,23 @@ private extension AddTextPageOverlayView {
                         let clampedWidth = max(minWidthNormalized, min(proposedWidth, rightEdge))
 
                         let newCenterX = rightEdge - clampedWidth / 2
+                        
+                        let previewHeight = measuredPreviewHeight(
+                            for: item,
+                            widthNormalized: clampedWidth,
+                            pageSize: size
+                        )
+                        
+                        let previewCenterY = previewResizedCenterY(
+                            for: item,
+                            heightNormalized: previewHeight
+                        )
 
                         activeResizeTextID = item.id
                         activeResizeWidth = clampedWidth
+                        activeResizeHeight = previewHeight
                         activeResizeCenterX = newCenterX
+                        activeResizeCenterY = previewCenterY
                     }
                     .onEnded { _ in
                         onResizeStateChanged(false)
@@ -313,10 +354,23 @@ private extension AddTextPageOverlayView {
                         let clampedWidth = max(minWidthNormalized, min(proposedWidth, maxWidth))
 
                         let newCenterX = leftEdge + clampedWidth / 2
+                        
+                        let previewHeight = measuredPreviewHeight(
+                            for: item,
+                            widthNormalized: clampedWidth,
+                            pageSize: size
+                        )
+                        
+                        let previewCenterY = previewResizedCenterY(
+                            for: item,
+                            heightNormalized: previewHeight
+                        )
 
                         activeResizeTextID = item.id
                         activeResizeWidth = clampedWidth
+                        activeResizeHeight = previewHeight
                         activeResizeCenterX = newCenterX
+                        activeResizeCenterY = previewCenterY
                     }
                     .onEnded { _ in
                         onResizeStateChanged(false)
@@ -336,7 +390,9 @@ private extension AddTextPageOverlayView {
         resizeSession = nil
         activeResizeTextID = nil
         activeResizeWidth = nil
+        activeResizeHeight = nil
         activeResizeCenterX = nil
+        activeResizeCenterY = nil
     }
 
     private var resizeHandle: some View {
@@ -370,10 +426,65 @@ private extension AddTextPageOverlayView {
         guard activeResizeTextID == item.id else { return item.width }
         return activeResizeWidth ?? item.width
     }
+    
+    func displayedHeight(for item: DocumentTextItem) -> CGFloat {
+        guard activeResizeTextID == item.id else { return item.height }
+        return activeResizeHeight ?? item.height
+    }
 
     func displayedCenterX(for item: DocumentTextItem) -> CGFloat {
         guard activeResizeTextID == item.id else { return item.centerX }
         return activeResizeCenterX ?? item.centerX
+    }
+    
+    func displayedCenterY(for item: DocumentTextItem) -> CGFloat {
+        guard activeResizeTextID == item.id else { return item.centerY }
+        return activeResizeCenterY ?? item.centerY
+    }
+    
+    func measuredPreviewHeight(
+        for item: DocumentTextItem,
+        widthNormalized: CGFloat,
+        pageSize: CGSize
+    ) -> CGFloat {
+        let minHeightPoints: CGFloat = 44
+        let horizontalInset: CGFloat = 8
+        let verticalInset: CGFloat = 8
+
+        let widthPoints = widthNormalized * max(pageSize.width, 1)
+        let availableTextWidth = max(widthPoints - horizontalInset * 2, 1)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular),
+            .kern: item.style.letterSpacing,
+            .paragraphStyle: paragraph
+        ]
+
+        let sourceText = item.text.isEmpty ? " " : item.text
+        let attributed = NSAttributedString(string: sourceText, attributes: attributes)
+
+        let wrappedRect = attributed.boundingRect(
+            with: CGSize(
+                width: availableTextWidth,
+                height: CGFloat.greatestFiniteMagnitude
+            ),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+
+        let heightPoints = max(ceil(wrappedRect.height) + verticalInset * 2, minHeightPoints)
+        return heightPoints / max(pageSize.height, 1)
+    }
+    
+    func previewResizedCenterY(
+        for item: DocumentTextItem,
+        heightNormalized: CGFloat
+    ) -> CGFloat {
+        let topEdgeY = item.centerY - item.height / 2
+        return topEdgeY + heightNormalized / 2
     }
 }
 

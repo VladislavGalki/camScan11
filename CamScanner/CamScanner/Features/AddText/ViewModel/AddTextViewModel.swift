@@ -16,7 +16,9 @@ final class AddTextViewModel: ObservableObject {
 
     @Published var editingTextID: UUID?
     @Published var editingTextDraft: String = ""
-    @Published var shouldShowStyleStub = false
+    
+    @Published var shouldShowStyleSheet = false
+    @Published var styleDraft: AddTextStyleDraft = .default
 
     // MARK: - Private
 
@@ -391,6 +393,31 @@ extension AddTextViewModel {
             """)
         }
     }
+    
+    func updateSelectedTextStyle(
+        colorHex: String? = nil,
+        fontSize: CGFloat? = nil,
+        rotation: CGFloat? = nil
+    ) {
+        guard let selectedTextID,
+              let index = textItems.firstIndex(where: { $0.id == selectedTextID }) else { return }
+
+        if let colorHex {
+            textItems[index].style.textColorHex = colorHex
+        }
+
+        if let fontSize {
+            textItems[index].style.fontSize = fontSize
+
+            if currentPageSize != .zero {
+                reflowTextItemIfNeeded(id: selectedTextID, pageSize: currentPageSize)
+            }
+        }
+
+        if let rotation {
+            textItems[index].rotation = rotation
+        }
+    }
 
     func deleteSelectedText() {
         guard let selectedTextID else { return }
@@ -405,21 +432,21 @@ extension AddTextViewModel {
         """)
     }
 
-    func openStyleStub() {
-        shouldShowStyleStub = true
+    func openStyleEditor() {
+        guard let selectedTextID,
+              let item = textItems.first(where: { $0.id == selectedTextID }) else { return }
 
-        print("""
-        🎨 OPEN STYLE STUB
-        """)
+        styleDraft = AddTextStyleDraft(
+            colorHex: normalizedHex(item.style.textColorHex),
+            fontSize: item.style.fontSize,
+            rotation: item.rotation
+        )
+
+        shouldShowStyleSheet = true
     }
 
     func saveTextItems() {
         try? store.saveTextItems(textItems)
-
-        print("""
-        💾 SAVE TEXT ITEMS
-        count: \(textItems.count)
-        """)
     }
 }
 
@@ -493,16 +520,6 @@ private extension AddTextViewModel {
             height: ceil(wrappedRect.height) + verticalInset * 2
         )
 
-        print("""
-        📐 MEASURED EDITING SIZE
-        text: \(text)
-        fontSize: \(fontSize)
-        maxWidth: \(maxWidth)
-        singleLineRect: \(singleLineRect)
-        wrappedRect: \(wrappedRect)
-        result: \(result)
-        """)
-
         return result
     }
 
@@ -510,9 +527,9 @@ private extension AddTextViewModel {
         guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
 
         let item = textItems[index]
-        let previousHeight = item.height
-        let previousCenterY = item.centerY
-        let widthPoints = item.width * pageSize.width
+
+        let minHeightPoints: CGFloat = 44
+        let widthPoints = item.width * max(pageSize.width, 1)
 
         let measured = measuredEditingSize(
             text: item.text,
@@ -520,7 +537,7 @@ private extension AddTextViewModel {
             maxWidth: widthPoints
         )
 
-        let newHeightPoints = max(measured.height, 44)
+        let newHeightPoints = max(measured.height, minHeightPoints)
         let newHeightNormalized = newHeightPoints / max(pageSize.height, 1)
 
         let topEdgeY = item.centerY - item.height / 2
@@ -528,19 +545,13 @@ private extension AddTextViewModel {
 
         textItems[index].height = newHeightNormalized
         textItems[index].centerY = newCenterY
-
-        print("""
-        🔁 REFLOW TEXT ITEM
-        id: \(id)
-        text: \(item.text)
-        pageSize: \(pageSize)
-        widthPoints: \(widthPoints)
-        measured: \(measured)
-        previousHeight: \(previousHeight)
-        previousCenterY: \(previousCenterY)
-        newHeightNormalized: \(newHeightNormalized)
-        newCenterY: \(newCenterY)
-        """)
+    }
+    
+    func normalizedHex(_ hex: String) -> String {
+        hex
+            .replacingOccurrences(of: "#", with: "")
+            .uppercased()
+            .withHashPrefixRGBA
     }
 }
 

@@ -27,10 +27,37 @@ struct AddTextView: View {
             }
 
             bubbleOverlay
+                .opacity(!viewModel.shouldShowStyleSheet ? 1 : 0)
         }
         .navigationBarBackButtonHidden(true)
         .background(
             Color.bg(.main).ignoresSafeArea()
+        )
+        .sheet(
+            isPresented: $viewModel.shouldShowStyleSheet,
+            onDismiss: {
+                viewModel.shouldShowStyleSheet = false
+            },
+            content: {
+                AddTextStyleSheetView(
+                    draft: $viewModel.styleDraft,
+                    onColorChanged: { hex in
+                        viewModel.updateSelectedTextStyle(colorHex: hex)
+                    },
+                    onFontSizeChanged: { value in
+                        viewModel.updateSelectedTextStyle(fontSize: value)
+                    },
+                    onRotationChanged: { value in
+                        viewModel.updateSelectedTextStyle(rotation: value)
+                    },
+                    onClose: {}
+                )
+                .presentationDetents([.height(163)])
+                .presentationBackgroundInteraction(.enabled)
+                .presentationCornerRadius(0)
+                .presentationDragIndicator(.hidden)
+                .presentationContentInteraction(.scrolls)
+            }
         )
     }
 }
@@ -160,7 +187,8 @@ private extension AddTextView {
     private var bubbleOverlay: some View {
         if let anchor = viewModel.bubbleAnchor,
            viewModel.selectedTextID == anchor.textID,
-           viewModel.editingTextID == nil {
+           viewModel.editingTextID == nil,
+           !viewModel.shouldShowStyleSheet {
             GeometryReader { geo in
                 let bubbleSize = CGSize(width: 280, height: 64)
                 let horizontalPadding: CGFloat = 8
@@ -202,7 +230,7 @@ private extension AddTextView {
         case .edit:
             viewModel.startEditingSelectedText()
         case .style:
-            viewModel.openStyleStub()
+            viewModel.openStyleEditor()
         case .delete:
             viewModel.deleteSelectedText()
         }

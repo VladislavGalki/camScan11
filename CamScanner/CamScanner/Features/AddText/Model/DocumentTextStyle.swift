@@ -12,7 +12,7 @@ struct DocumentTextStyle: Equatable, Hashable, Codable {
         fontSize: 22,
         lineHeight: 28,
         letterSpacing: -0.43,
-        textColorHex: "#000000",
+        textColorHex: "#020202FF",
         alignment: .left
     )
 }
