@@ -296,7 +296,8 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty else { return }
 
-            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
+            let derivedHeight = deriveCellHeight(from: items)
+            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
             let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
 
             let screenContent = CGRect(
@@ -322,7 +323,8 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty, !imageRects.isEmpty else { return }
 
-            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
+            let derivedHeight = deriveCellHeight(from: items)
+            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
             let imgSize = idCardImageViewSize
             let imageCount = imageRects.count
 
@@ -354,7 +356,8 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty else { return }
 
-            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
+            let derivedHeight = deriveCellHeight(from: items)
+            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
 
             // Compute visible image rect on screen (aspect fit inside 360×250 imageView)
             let ivSize = passportImageViewSize
@@ -537,8 +540,8 @@ extension PDFRendererService {
 
         private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
             guard let item = items.first, item.height > 0.001 else {
-                print("🖨️ Renderer | deriveCellHeight: no valid items, fallback=456")
-                return 456
+                print("🖨️ Renderer | deriveCellHeight: no valid items, returning 0 (will use fallback)")
+                return 0
             }
 
             let widthPoints = item.width * cellWidth
@@ -547,8 +550,8 @@ extension PDFRendererService {
             let derived = heightPoints / item.height
             print("🖨️ Renderer | deriveCellHeight: text=\"\(item.text)\" widthPts=\(widthPoints) heightPts=\(heightPoints) item.height=\(item.height) → derived=\(derived)")
             guard derived > 100, derived < 2000 else {
-                print("🖨️ Renderer | deriveCellHeight: out of range, fallback=456")
-                return 456
+                print("🖨️ Renderer | deriveCellHeight: out of range, returning 0 (will use fallback)")
+                return 0
             }
             return derived
         }
