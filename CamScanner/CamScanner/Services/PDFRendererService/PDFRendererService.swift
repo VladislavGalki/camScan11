@@ -93,10 +93,10 @@ final class PDFRendererService {
             ctx: ctx
         )
 
-        TextItemRenderer.draw(
+        TextItemRenderer.drawForDocuments(
             items: document.textItems,
             in: ctx,
-            imageRect: fittedRect
+            fittedRect: fittedRect
         )
 
         if watermark {
@@ -106,7 +106,7 @@ final class PDFRendererService {
             )
         }
     }
-    
+
     private func drawID(_ document: SharePreviewModel, _ ctx: CGContext, _ watermark: Bool) {
         let originals = document.frames.compactMap(\.preview)
         guard !originals.isEmpty else { return }
@@ -154,10 +154,10 @@ final class PDFRendererService {
             height: totalHeight
         )
 
-        TextItemRenderer.draw(
+        TextItemRenderer.drawForIDCard(
             items: document.textItems,
             in: ctx,
-            imageRect: boundingRect
+            contentRect: boundingRect
         )
 
         if watermark {
@@ -167,7 +167,7 @@ final class PDFRendererService {
             )
         }
     }
-    
+
     private func drawPassport(_ document: SharePreviewModel, _ ctx: CGContext, _ watermark: Bool) {
         guard let original = document.frames.first?.preview else {
             return
@@ -196,7 +196,7 @@ final class PDFRendererService {
 
         drawImage(image, in: rect, ctx: ctx)
 
-        TextItemRenderer.draw(
+        TextItemRenderer.drawForPassport(
             items: document.textItems,
             in: ctx,
             imageRect: rect
@@ -209,7 +209,7 @@ final class PDFRendererService {
             )
         }
     }
-    
+
     private func drawImage(_ image: UIImage, in rect: CGRect, ctx: CGContext) {
         guard let cgImage = image.cgImage else {
             return
@@ -280,21 +280,99 @@ final class PDFRendererService {
 
 extension PDFRendererService {
     enum TextItemRenderer {
-        private static let referenceWidth: CGFloat = 375
+        /// Fixed cell width from AddTextCarouselController
+        private static let cellWidth: CGFloat = 322
 
-        static func draw(
+        /// Screen content sizes from AddTextPageCell.configure
+        private static let idCardContentSize = CGSize(width: 171, height: 108 * 2 + 8)
+        private static let passportContentSize = CGSize(width: 360, height: 250)
+
+        // MARK: - Public
+
+        static func drawForDocuments(
+            items: [DocumentTextItem],
+            in ctx: CGContext,
+            fittedRect: CGRect
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = deriveCellHeight(from: items)
+            let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
+
+            let screenContent = CGRect(
+                x: 0,
+                y: (cellHeight - imageHeightInCell) / 2,
+                width: cellWidth,
+                height: imageHeightInCell
+            )
+
+            drawItems(items, in: ctx, cellHeight: cellHeight,
+                      screenContent: screenContent, renderRect: fittedRect)
+        }
+
+        static func drawForIDCard(
+            items: [DocumentTextItem],
+            in ctx: CGContext,
+            contentRect: CGRect
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = deriveCellHeight(from: items)
+
+            let screenContent = CGRect(
+                x: (cellWidth - idCardContentSize.width) / 2,
+                y: (cellHeight - idCardContentSize.height) / 2,
+                width: idCardContentSize.width,
+                height: idCardContentSize.height
+            )
+
+            drawItems(items, in: ctx, cellHeight: cellHeight,
+                      screenContent: screenContent, renderRect: contentRect)
+        }
+
+        static func drawForPassport(
             items: [DocumentTextItem],
             in ctx: CGContext,
             imageRect: CGRect
         ) {
             guard !items.isEmpty else { return }
 
+            let cellHeight = deriveCellHeight(from: items)
+
+            let screenContent = CGRect(
+                x: (cellWidth - passportContentSize.width) / 2,
+                y: (cellHeight - passportContentSize.height) / 2,
+                width: passportContentSize.width,
+                height: passportContentSize.height
+            )
+
+            drawItems(items, in: ctx, cellHeight: cellHeight,
+                      screenContent: screenContent, renderRect: imageRect)
+        }
+
+        // MARK: - Core drawing
+
+        private static func drawItems(
+            _ items: [DocumentTextItem],
+            in ctx: CGContext,
+            cellHeight: CGFloat,
+            screenContent: CGRect,
+            renderRect: CGRect
+        ) {
             UIGraphicsPushContext(ctx)
 
-            let scale = imageRect.width / referenceWidth
+            let scaleX = renderRect.width / screenContent.width
+            let scaleY = renderRect.height / screenContent.height
 
             for item in items {
-                drawItem(item, imageRect: imageRect, scale: scale)
+                drawItem(
+                    item,
+                    cellHeight: cellHeight,
+                    screenContent: screenContent,
+                    renderRect: renderRect,
+                    scaleX: scaleX,
+                    scaleY: scaleY
+                )
             }
 
             UIGraphicsPopContext()
@@ -302,20 +380,34 @@ extension PDFRendererService {
 
         private static func drawItem(
             _ item: DocumentTextItem,
-            imageRect: CGRect,
-            scale: CGFloat
+            cellHeight: CGFloat,
+            screenContent: CGRect,
+            renderRect: CGRect,
+            scaleX: CGFloat,
+            scaleY: CGFloat
         ) {
-            let blockWidth = item.width * imageRect.width
-            let blockHeight = item.height * imageRect.height
-            let centerX = item.centerX * imageRect.width + imageRect.origin.x
-            let centerY = item.centerY * imageRect.height + imageRect.origin.y
+            // Text position in cell coordinates (pts)
+            let cellX = item.centerX * cellWidth
+            let cellY = item.centerY * cellHeight
 
-            let padding: CGFloat = 8 * scale
+            // Map from cell coords → render coords through content alignment
+            let centerX = renderRect.origin.x
+                + (cellX - screenContent.origin.x) * scaleX
+            let centerY = renderRect.origin.y
+                + (cellY - screenContent.origin.y) * scaleY
+
+            // Text block size scaled to render space
+            let blockWidth = item.width * cellWidth * scaleX
+            let blockHeight = item.height * cellHeight * scaleY
+
+            // Use width-based scale for font (preserves line-break behavior)
+            let fontScale = scaleX
+            let padding: CGFloat = 8 * fontScale
             let contentWidth = max(blockWidth - padding * 2, 0)
             let contentHeight = max(blockHeight - padding * 2, 0)
 
-            let fontSize = item.style.fontSize * scale
-            let letterSpacing = item.style.letterSpacing * scale
+            let fontSize = item.style.fontSize * fontScale
+            let letterSpacing = item.style.letterSpacing * fontScale
 
             let font = UIFont.systemFont(ofSize: fontSize, weight: .regular)
             let color = UIColor(rgbaHex: item.style.textColorHex) ?? .black
@@ -370,6 +462,60 @@ extension PDFRendererService {
             )
 
             context.restoreGState()
+        }
+
+        // MARK: - Cell height derivation
+
+        /// Derives the original cell height by reverse-engineering from a stored text item.
+        /// item.height = measuredHeightPts / cellHeight  →  cellHeight = measuredHeightPts / item.height
+        private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
+            guard let item = items.first, item.height > 0.001 else {
+                return 456 // fallback: maxCardHeight from AddTextCarouselController
+            }
+
+            let widthPoints = item.width * cellWidth
+            let heightPoints = measureTextBlockHeight(item: item, widthPoints: widthPoints)
+
+            let derived = heightPoints / item.height
+            guard derived > 100, derived < 2000 else { return 456 }
+            return derived
+        }
+
+        /// Replicates AddTextViewModel.measuredEditingSize height computation
+        private static func measureTextBlockHeight(item: DocumentTextItem, widthPoints: CGFloat) -> CGFloat {
+            let horizontalInset: CGFloat = 8
+            let verticalInset: CGFloat = 8
+            let minHeight: CGFloat = 44
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byWordWrapping
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular),
+                .kern: item.style.letterSpacing,
+                .paragraphStyle: paragraph
+            ]
+
+            let sourceText = item.text.isEmpty ? " " : item.text
+            let attributed = NSAttributedString(string: sourceText, attributes: attributes)
+
+            let singleLineRect = attributed.boundingRect(
+                with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+
+            let idealWidth = ceil(singleLineRect.width)
+            let availableWidth = max(widthPoints - horizontalInset * 2, 1)
+            let targetWidth = min(idealWidth, availableWidth)
+
+            let wrappedRect = attributed.boundingRect(
+                with: CGSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+
+            return max(ceil(wrappedRect.height) + verticalInset * 2, minHeight)
         }
     }
 }
