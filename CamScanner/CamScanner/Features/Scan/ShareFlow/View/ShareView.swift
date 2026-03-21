@@ -185,6 +185,9 @@ struct ShareView: View {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()
+                                    .overlay {
+                                        OpenDocumentTextOverlayView(items: document.textItems)
+                                    }
                             }
                         case .idCard, .driverLicense:
                             VStack(spacing: 8) {
@@ -193,13 +196,23 @@ struct ShareView: View {
                                         .resizable()
                                         .frame(width: 85.5, height: 55)
                                         .scaledToFit()
+                                        .overlay {
+                                            OpenDocumentTextOverlayView(
+                                                items: document.textItems.filter { $0.pageIndex == 0 }
+                                            )
+                                        }
                                 }
-                                
+
                                 if let secondImage = document.frames.last?.preview {
                                     Image(uiImage: secondImage)
                                         .resizable()
                                         .frame(width: 85.5, height: 55)
                                         .scaledToFit()
+                                        .overlay {
+                                            OpenDocumentTextOverlayView(
+                                                items: document.textItems.filter { $0.pageIndex == 1 }
+                                            )
+                                        }
                                 }
                             }
                         case .passport:
@@ -208,6 +221,9 @@ struct ShareView: View {
                                     .resizable()
                                     .frame(width: 88, height: 125)
                                     .scaledToFit()
+                                    .overlay {
+                                        OpenDocumentTextOverlayView(items: document.textItems)
+                                    }
                             }
                         default:
                             EmptyView()
