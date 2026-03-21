@@ -93,6 +93,12 @@ final class PDFRendererService {
             ctx: ctx
         )
 
+        TextItemRenderer.draw(
+            items: document.textItems,
+            in: ctx,
+            imageRect: fittedRect
+        )
+
         if watermark {
             WatermarkRenderer.draw(
                 in: ctx,
@@ -122,8 +128,10 @@ final class PDFRendererService {
             CGFloat(images.count) * imageHeight +
             CGFloat(images.count - 1) * spacing
 
-        var y =
+        let startY =
             (pageSize.height - totalHeight) / 2
+
+        var y = startY
 
         for image in images {
 
@@ -138,6 +146,19 @@ final class PDFRendererService {
 
             y += imageHeight + spacing
         }
+
+        let boundingRect = CGRect(
+            x: (pageSize.width - imageWidth) / 2,
+            y: startY,
+            width: imageWidth,
+            height: totalHeight
+        )
+
+        TextItemRenderer.draw(
+            items: document.textItems,
+            in: ctx,
+            imageRect: boundingRect
+        )
 
         if watermark {
             WatermarkRenderer.draw(
@@ -174,6 +195,12 @@ final class PDFRendererService {
         )
 
         drawImage(image, in: rect, ctx: ctx)
+
+        TextItemRenderer.draw(
+            items: document.textItems,
+            in: ctx,
+            imageRect: rect
+        )
 
         if watermark {
             WatermarkRenderer.draw(
@@ -246,6 +273,104 @@ final class PDFRendererService {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(fileName)
             .appendingPathExtension("pdf")
+    }
+}
+
+// MARK: - TextItemRenderer
+
+extension PDFRendererService {
+    enum TextItemRenderer {
+        private static let referenceWidth: CGFloat = 375
+
+        static func draw(
+            items: [DocumentTextItem],
+            in ctx: CGContext,
+            imageRect: CGRect
+        ) {
+            guard !items.isEmpty else { return }
+
+            UIGraphicsPushContext(ctx)
+
+            let scale = imageRect.width / referenceWidth
+
+            for item in items {
+                drawItem(item, imageRect: imageRect, scale: scale)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        private static func drawItem(
+            _ item: DocumentTextItem,
+            imageRect: CGRect,
+            scale: CGFloat
+        ) {
+            let blockWidth = item.width * imageRect.width
+            let blockHeight = item.height * imageRect.height
+            let centerX = item.centerX * imageRect.width + imageRect.origin.x
+            let centerY = item.centerY * imageRect.height + imageRect.origin.y
+
+            let padding: CGFloat = 8 * scale
+            let contentWidth = max(blockWidth - padding * 2, 0)
+            let contentHeight = max(blockHeight - padding * 2, 0)
+
+            let fontSize = item.style.fontSize * scale
+            let letterSpacing = item.style.letterSpacing * scale
+
+            let font = UIFont.systemFont(ofSize: fontSize, weight: .regular)
+            let color = UIColor(rgbaHex: item.style.textColorHex) ?? .black
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineBreakMode = .byWordWrapping
+            paragraphStyle.lineSpacing = 0
+
+            switch item.style.alignment {
+            case .left:   paragraphStyle.alignment = .left
+            case .center: paragraphStyle.alignment = .center
+            case .right:  paragraphStyle.alignment = .right
+            }
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: color,
+                .kern: letterSpacing,
+                .paragraphStyle: paragraphStyle
+            ]
+
+            let contentRect = CGRect(
+                x: centerX - blockWidth / 2 + padding,
+                y: centerY - blockHeight / 2 + padding,
+                width: contentWidth,
+                height: contentHeight
+            )
+
+            let clipRect = CGRect(
+                x: centerX - blockWidth / 2,
+                y: centerY - blockHeight / 2,
+                width: blockWidth,
+                height: blockHeight
+            )
+
+            guard let context = UIGraphicsGetCurrentContext() else { return }
+            context.saveGState()
+
+            if item.rotation != 0 {
+                context.translateBy(x: centerX, y: centerY)
+                context.rotate(by: item.rotation * .pi / 180)
+                context.translateBy(x: -centerX, y: -centerY)
+            }
+
+            context.clip(to: clipRect)
+
+            (item.text as NSString).draw(
+                with: contentRect,
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+
+            context.restoreGState()
+        }
     }
 }
 

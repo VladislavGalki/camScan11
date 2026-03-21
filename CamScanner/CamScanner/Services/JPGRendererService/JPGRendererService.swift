@@ -90,6 +90,12 @@ final class JPGRendererService {
 
             compressed.draw(in: rect)
 
+            PDFRendererService.TextItemRenderer.draw(
+                items: document.textItems,
+                in: ctx.cgContext,
+                imageRect: rect
+            )
+
             PDFRendererService.WatermarkRenderer
                 .drawUIKit(
                     in: ctx.cgContext,
@@ -148,6 +154,8 @@ final class JPGRendererService {
                 (pageSize.height - totalHeight)
                 / 2
 
+            let startY = y
+
             for image in images {
 
                 let rect = CGRect(
@@ -163,6 +171,19 @@ final class JPGRendererService {
 
                 y += imageHeight + spacing
             }
+
+            let boundingRect = CGRect(
+                x: (pageSize.width - imageWidth) / 2,
+                y: startY,
+                width: imageWidth,
+                height: CGFloat(images.count) * imageHeight + CGFloat(images.count - 1) * spacing
+            )
+
+            PDFRendererService.TextItemRenderer.draw(
+                items: document.textItems,
+                in: ctx.cgContext,
+                imageRect: boundingRect
+            )
 
             PDFRendererService.WatermarkRenderer
                 .drawUIKit(
@@ -220,6 +241,12 @@ final class JPGRendererService {
             )
 
             image.draw(in: rect)
+
+            PDFRendererService.TextItemRenderer.draw(
+                items: document.textItems,
+                in: ctx.cgContext,
+                imageRect: rect
+            )
 
             PDFRendererService.WatermarkRenderer
                 .drawUIKit(
