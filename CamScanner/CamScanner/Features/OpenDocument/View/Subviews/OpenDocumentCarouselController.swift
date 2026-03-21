@@ -12,6 +12,7 @@ final class OpenDocumentCarouselController: UIViewController {
 
     private let pageIndicator = PaddedLabel()
     private var models: [ScanPreviewModel]
+    private var textItems: [DocumentTextItem]
     private var collectionView: UICollectionView!
 
     private var currentIndex: Int = 0
@@ -23,10 +24,12 @@ final class OpenDocumentCarouselController: UIViewController {
 
     init(
         models: [ScanPreviewModel],
+        textItems: [DocumentTextItem],
         onPageChanged: @escaping (Int) -> Void,
         onRotatePage: @escaping (Int) -> Void
     ) {
         self.models = models
+        self.textItems = textItems
         self.onPageChanged = onPageChanged
         self.onRotatePage = onRotatePage
         super.init(nibName: nil, bundle: nil)
@@ -50,13 +53,20 @@ final class OpenDocumentCarouselController: UIViewController {
 
     // MARK: Public
 
-    func update(_ newModels: [ScanPreviewModel]) {
-        guard newModels != models else { return }
+    func update(_ newModels: [ScanPreviewModel], textItems newTextItems: [DocumentTextItem]) {
+        let didModelsChange = models != newModels
+        let didTextItemsChange = textItems != newTextItems
+
         models = newModels
-        collectionView.reloadData()
-        
-        currentIndex = min(currentIndex, max(models.count - 1, 0))
-        updateIndicator(index: currentIndex)
+        textItems = newTextItems
+
+        if didModelsChange {
+            collectionView.reloadData()
+            currentIndex = min(currentIndex, max(models.count - 1, 0))
+            updateIndicator(index: currentIndex)
+        } else if didTextItemsChange {
+            updateVisibleTextOverlays()
+        }
     }
 
     func handleBottomBarAction(_ action: ScanPreviewBottomBarAction) {
@@ -123,6 +133,16 @@ private extension OpenDocumentCarouselController {
         guard !models.isEmpty else { return }
         pageIndicator.text = "\(index + 1)/\(models.count)"
     }
+
+    func updateVisibleTextOverlays() {
+        for cell in collectionView.visibleCells {
+            guard let pageCell = cell as? OpenDocumentPageCell,
+                  let indexPath = collectionView.indexPath(for: pageCell) else { continue }
+
+            let pageTextItems = textItems.filter { $0.pageIndex == indexPath.item }
+            pageCell.updateTextOverlay(textItems: pageTextItems)
+        }
+    }
 }
 
 private extension OpenDocumentCarouselController {
@@ -186,7 +206,9 @@ extension OpenDocumentCarouselController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
 
-        cell.configure(model: models[indexPath.item])
+        let pageIndex = indexPath.item
+        let pageTextItems = textItems.filter { $0.pageIndex == pageIndex }
+        cell.configure(model: models[pageIndex], textItems: pageTextItems)
 
         cell.onZoomChanged = { [weak self] zoomed in
             self?.collectionView.isScrollEnabled = !zoomed

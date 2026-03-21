@@ -7,6 +7,7 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var models: [ScanPreviewModel] = []
     @Published var selectedIndex: Int = 0
     @Published var title: String = ""
+    @Published var textItems: [DocumentTextItem] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
     @Published var sliderValue: Double = 0.5
 
@@ -63,6 +64,12 @@ final class OpenDocumentViewModel: ObservableObject {
                         self.rebuildFilterPreviewItems()
                     }
                 }
+            }
+            .store(in: &cancellables)
+
+        store.textItemsPublisher
+            .sink { [weak self] items in
+                self?.textItems = items
             }
             .store(in: &cancellables)
     }
@@ -131,6 +138,10 @@ extension OpenDocumentViewModel {
         selectedIndex = min(selectedIndex, max(models.count - 1, 0))
         updateSliderFromCurrentFrame()
         rebuildFilterPreviewItems()
+    }
+
+    func reloadTextItems() {
+        store.reloadTextItems()
     }
 
     func rotatePage(at index: Int) {
