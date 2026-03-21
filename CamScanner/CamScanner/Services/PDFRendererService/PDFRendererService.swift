@@ -286,12 +286,6 @@ extension PDFRendererService {
         private static let idCardSpacing: CGFloat = 8
         private static let passportImageViewSize = CGSize(width: 360, height: 250)
 
-        /// Round to screen pixel grid (Auto Layout rounds layout coordinates)
-        private static func px(_ v: CGFloat) -> CGFloat {
-            let scale = UIScreen.main.scale   // 3 on @3x devices
-            return round(v * scale) / scale
-        }
-
         // MARK: - Public
 
         static func drawForDocuments(
@@ -302,13 +296,12 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty else { return }
 
-            let derivedHeight = deriveCellHeight(from: items)
-            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
             let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
 
             let screenContent = CGRect(
                 x: 0,
-                y: px((cellHeight - imageHeightInCell) / 2),
+                y: (cellHeight - imageHeightInCell) / 2,
                 width: cellWidth,
                 height: imageHeightInCell
             )
@@ -329,17 +322,15 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty, !imageRects.isEmpty else { return }
 
-            let derivedHeight = deriveCellHeight(from: items)
-            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
             let imgSize = idCardImageViewSize
             let imageCount = imageRects.count
 
             // Build screen image rects (same layout as AddTextPageCell)
-            // Auto Layout rounds centerX/centerY → origins snap to pixel grid
             let totalH = CGFloat(imageCount) * imgSize.height
                 + CGFloat(imageCount - 1) * idCardSpacing
-            let originX = px((cellWidth - imgSize.width) / 2)
-            var y = px((cellHeight - totalH) / 2)
+            let originX = (cellWidth - imgSize.width) / 2
+            var y = (cellHeight - totalH) / 2
             var screenRects: [CGRect] = []
             for _ in 0..<imageCount {
                 screenRects.append(CGRect(x: originX, y: y,
@@ -363,8 +354,7 @@ extension PDFRendererService {
         ) {
             guard !items.isEmpty else { return }
 
-            let derivedHeight = deriveCellHeight(from: items)
-            let cellHeight = derivedHeight > 0 ? derivedHeight : (providedCellHeight > 0 ? providedCellHeight : 456)
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
 
             // Compute visible image rect on screen (aspect fit inside 360×250 imageView)
             let ivSize = passportImageViewSize
@@ -380,9 +370,8 @@ extension PDFRendererService {
             }
 
             // ImageView centered in cell → visible image centered in imageView
-            // Auto Layout rounds center constraints → origins snap to pixel grid
-            let ivOriginX = px((cellWidth - ivSize.width) / 2)
-            let ivOriginY = px((cellHeight - ivSize.height) / 2)
+            let ivOriginX = (cellWidth - ivSize.width) / 2
+            let ivOriginY = (cellHeight - ivSize.height) / 2
             let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
             let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
 
@@ -509,9 +498,19 @@ extension PDFRendererService {
                 .paragraphStyle: paragraphStyle
             ]
 
+            // Measure actual text height to vertically center within content area
+            // (SwiftUI .frame(alignment: .leading) = left + vertically centered)
+            let textBounds = (item.text as NSString).boundingRect(
+                with: CGSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let vCenterOffset = max((contentHeight - ceil(textBounds.height)) / 2, 0)
+
             let contentRect = CGRect(
                 x: centerX - blockWidth / 2 + padding,
-                y: centerY - blockHeight / 2 + padding,
+                y: centerY - blockHeight / 2 + padding + vCenterOffset,
                 width: contentWidth,
                 height: contentHeight
             )
@@ -544,7 +543,16 @@ extension PDFRendererService {
             context.restoreGState()
         }
 
-        // MARK: - Cell height derivation
+        // MARK: - Cell height resolution
+
+        /// Prefer provided cellHeight (matches display overlay) over derived.
+        /// Derived is a fallback when provided is unavailable.
+        private static func resolveCellHeight(from items: [DocumentTextItem], provided: CGFloat) -> CGFloat {
+            if provided > 0 { return provided }
+            let derived = deriveCellHeight(from: items)
+            if derived > 0 { return derived }
+            return 456
+        }
 
         private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
             guard let item = items.first, item.height > 0.001 else {
