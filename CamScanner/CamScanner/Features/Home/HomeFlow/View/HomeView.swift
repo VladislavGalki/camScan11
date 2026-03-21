@@ -9,6 +9,8 @@ struct HomeView: View {
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
     
+    @State var showAddCandidate: Bool = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             navigationBarView
@@ -31,7 +33,7 @@ struct HomeView: View {
                     ExploreToolsView(model: vm.exploreToolModel) {
                         // all click
                     } onToolTapped: { toolType in
-                        // click on type
+                        showAddCandidate = true
                     }
                     .padding(.horizontal, 16)
                 }
@@ -44,6 +46,9 @@ struct HomeView: View {
             Color.bg(.main)
         )
         .ignoresSafeArea(edges: .top)
+        .fullScreenCover(isPresented: $showAddCandidate) {
+            OpenCVFilterDebugView()
+        }
 
 //        ScrollView {
 //            LazyVStack(spacing: 12) {
@@ -249,3 +254,7 @@ struct HomeView: View {
 //        return df.string(from: item.createdAt)
 //    }
 //}
+
+
+
+

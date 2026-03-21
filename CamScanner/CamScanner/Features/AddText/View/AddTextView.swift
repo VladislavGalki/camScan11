@@ -95,10 +95,24 @@ private extension AddTextView {
                     size: .m
                 ),
                 action: {
+                    if viewModel.shouldShowStyleSheet {
+                        viewModel.shouldShowStyleSheet = false
+                        
+                        Task {
+                           try? await Task.sleep(for: .seconds(0.10))
+                            
+                            viewModel.saveTextItems()
+                            router.pop()
+                        }
+                        
+                        return
+                    }
+
                     viewModel.saveTextItems()
                     router.pop()
                 }
             )
+            .appButtonEnabled((viewModel.isSaveEnabled && !viewModel.isEditingText))
         }
         .overlay {
             Text("Add text")
@@ -117,16 +131,32 @@ private extension AddTextView {
     }
 
     var placeholderView: some View {
-        Text("Tap the screen to place the text")
-            .appTextStyle(.bodySecondary)
-            .foregroundStyle(.text(.onHint))
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
-            .background(
-                Color.bg(.hintBlue)
-                    .appBorderModifier(.border(.hintBlue), radius: 8)
-                    .cornerRadius(8, corners: .allCorners)
-            )
+        HStack(spacing: 0) {
+            Text("\(viewModel.selectedIndex + 1)/\(viewModel.models.count)")
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.onOverlay))
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 100, style: .continuous)
+                        .foregroundStyle(.bg(.overlay))
+                )
+                .padding(.leading, 16)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Text("Tap the screen to place the text")
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.onHint))
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(
+                    Color.bg(.hintBlue)
+                        .appBorderModifier(.border(.hintBlue), radius: 8)
+                        .cornerRadius(8, corners: .allCorners)
+                )
+                .opacity(viewModel.textItems.isEmpty ? 1 : 0)
+        }
     }
 
     var carouselView: some View {

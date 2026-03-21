@@ -1,6 +1,8 @@
+import UIKit
 import SwiftUI
 
 struct AddTextStyleSheetView: View {
+    @State private var didSnapToZero = false
     @Binding var draft: AddTextStyleDraft
 
     let onColorChanged: (String) -> Void
@@ -150,7 +152,18 @@ private extension AddTextStyleSheetView {
                         get: { draft.rotation },
                         set: { newValue in
                             let rounded = round(newValue)
-                            let snapped = abs(rounded) <= 5 ? 0 : rounded
+                            let isInSnapZone = abs(rounded) <= 5
+                            let snapped = isInSnapZone ? 0 : rounded
+
+                            if isInSnapZone && !didSnapToZero {
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.prepare()
+                                generator.impactOccurred()
+                                
+                                didSnapToZero = true
+                            } else if !isInSnapZone {
+                                didSnapToZero = false
+                            }
 
                             draft.rotation = snapped
                             onRotationChanged(snapped)

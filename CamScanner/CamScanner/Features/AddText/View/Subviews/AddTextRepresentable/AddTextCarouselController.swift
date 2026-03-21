@@ -189,6 +189,7 @@ private extension AddTextCarouselController {
         view.addSubview(pageIndicator)
 
         pageIndicator.translatesAutoresizingMaskIntoConstraints = false
+        pageIndicator.isHidden = true
 
         NSLayoutConstraint.activate([
             pageIndicator.topAnchor.constraint(equalTo: view.topAnchor, constant: -12),

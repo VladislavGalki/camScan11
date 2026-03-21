@@ -11,6 +11,8 @@ final class AddTextViewModel: ObservableObject {
     @Published var textItems: [DocumentTextItem] = []
     @Published var selectedTextID: UUID?
 
+    @Published var isSaveEnabled = false
+    
     @Published var shouldFreezeBubbleAnchor = false
     @Published var bubbleAnchor: AddTextBubbleAnchor?
 
@@ -21,6 +23,8 @@ final class AddTextViewModel: ObservableObject {
     @Published var styleDraft: AddTextStyleDraft = .default
 
     // MARK: - Private
+    
+    private var originalTextItems: [DocumentTextItem] = []
 
     private let store: AddTextStore
     private var textEditingSession: TextEditingSession?
@@ -38,6 +42,10 @@ final class AddTextViewModel: ObservableObject {
 // MARK: - Public
 
 extension AddTextViewModel {
+    var isEditingText: Bool {
+        editingTextID != nil
+    }
+    
     func updateCurrentPageSize(_ pageSize: CGSize) {
         guard pageSize != .zero else { return }
         currentPageSize = pageSize
@@ -97,6 +105,18 @@ extension AddTextViewModel {
     }
 
     func selectText(_ id: UUID?) {
+        guard let id else {
+            clearSelection()
+            return
+        }
+
+        if selectedTextID == id,
+           editingTextID == nil,
+           !shouldShowStyleSheet {
+            clearSelection()
+            return
+        }
+
         selectedTextID = id
         bubbleAnchor = nil
     }
@@ -129,7 +149,6 @@ extension AddTextViewModel {
     }
 
     func updateEditingDraft(_ text: String, pageSize: CGSize) {
-        let previousDraft = editingTextDraft
         currentPageSize = pageSize
         editingTextDraft = text
 
@@ -262,11 +281,6 @@ extension AddTextViewModel {
         guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
         currentPageSize = pageSize
 
-        let previousWidth = textItems[index].width
-        let previousHeight = textItems[index].height
-        let previousCenterX = textItems[index].centerX
-        let previousCenterY = textItems[index].centerY
-
         let minWidth: CGFloat = 56 / 322
         let clampedWidth = max(width, minWidth)
 
@@ -326,14 +340,23 @@ extension AddTextViewModel {
     }
 
     func saveTextItems() {
-        try? store.saveTextItems(textItems)
+        do {
+            try store.saveTextItems(textItems)
+            originalTextItems = textItems
+            updateSaveState()
+        } catch {
+        }
+    }
+    
+    private func updateSaveState() {
+        isSaveEnabled = textItems != originalTextItems
     }
 }
 
 // MARK: - Subscriptions
 
 private extension AddTextViewModel {
-    func subscribe() {
+    private func subscribe() {
         store.previewModelsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] models in
@@ -347,7 +370,19 @@ private extension AddTextViewModel {
         store.textItemsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] items in
-                self?.textItems = items
+                guard let self else { return }
+
+                self.textItems = items
+                self.originalTextItems = items
+                self.updateSaveState()
+            }
+            .store(in: &cancellables)
+
+        $textItems
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateSaveState()
             }
             .store(in: &cancellables)
     }
