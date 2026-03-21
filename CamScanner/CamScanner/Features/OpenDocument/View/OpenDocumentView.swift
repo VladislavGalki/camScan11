@@ -80,6 +80,11 @@ private extension OpenDocumentView {
                     size: .m
                 ),
                 action: {
+                    router.presentSheet(
+                        OpenDocumentRoute.share(
+                            viewModel.makeShareInputModel()
+                        )
+                    )
                 }
             )
         }

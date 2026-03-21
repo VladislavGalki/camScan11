@@ -144,6 +144,15 @@ extension OpenDocumentViewModel {
         store.reloadTextItems()
     }
 
+    func makeShareInputModel() -> ShareInputModel {
+        let shareModel = try? documentRepository.loadShareModel(id: inputModel.documentID)
+        return shareModel ?? ShareInputModel(
+            documentName: title,
+            documentType: models.first?.documentType ?? .documents,
+            pages: models
+        )
+    }
+
     func rotatePage(at index: Int) {
         guard models.indices.contains(index) else { return }
         

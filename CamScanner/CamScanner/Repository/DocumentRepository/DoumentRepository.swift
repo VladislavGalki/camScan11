@@ -775,10 +775,18 @@ extension DocumentRepository {
             rawValue: first.documentTypeRaw ?? ""
         ) ?? .documents
 
+        var allTextItems: [DocumentTextItem] = []
+        for document in documents {
+            guard let docID = document.id else { continue }
+            let items = try fetchTextOverlays(documentID: docID)
+            allTextItems.append(contentsOf: items)
+        }
+
         return ShareInputModel(
             documentName: first.title,
             documentType: firstType,
-            pages: pages
+            pages: pages,
+            textItems: allTextItems
         )
     }
     

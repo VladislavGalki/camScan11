@@ -44,10 +44,11 @@ final class ShareViewModel: ObservableObject {
     }
     
     private func covertInputModel() -> [SharePreviewModel] {
-        inputModel.pages.map {
+        inputModel.pages.enumerated().map { index, page in
             SharePreviewModel(
-                documentType: $0.documentType,
-                frames: $0.frames,
+                documentType: page.documentType,
+                frames: page.frames,
+                textItems: inputModel.textItems.filter { $0.pageIndex == index },
                 isSelected: true
             )
         }
