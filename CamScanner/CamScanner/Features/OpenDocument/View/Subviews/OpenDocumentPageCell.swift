@@ -92,6 +92,7 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     // MARK: Configure
 
     func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = []) {
+        print("📝 OpenDocPageCell | configure docType=\(model.documentType) frames=\(model.frames.count) textItems=\(textItems.count) cellBounds=\(contentView.bounds)")
         scrollView.zoomScale = 1
 
         imageView1.isHidden = true
@@ -156,6 +157,7 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     }
 
     func updateTextOverlay(textItems: [DocumentTextItem]) {
+        print("📝 OpenDocPageCell | updateTextOverlay items=\(textItems.count) zoomContainer=\(zoomContainerView.bounds)")
         let overlay = OpenDocumentTextOverlayView(items: textItems)
 
         if let overlayHostingController {

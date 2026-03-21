@@ -306,6 +306,10 @@ extension PDFRendererService {
                 height: imageHeightInCell
             )
 
+            print("🖨️ Renderer | drawForDocuments: items=\(items.count) fittedRect=\(fittedRect)")
+            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) imageHeightInCell=\(imageHeightInCell)")
+            print("🖨️ Renderer |   screenContent=\(screenContent)")
+
             drawItems(items, in: ctx, cellHeight: cellHeight,
                       screenContent: screenContent, renderRect: fittedRect)
         }
@@ -325,6 +329,10 @@ extension PDFRendererService {
                 width: idCardContentSize.width,
                 height: idCardContentSize.height
             )
+
+            print("🖨️ Renderer | drawForIDCard: items=\(items.count) contentRect=\(contentRect)")
+            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) idCardContentSize=\(idCardContentSize)")
+            print("🖨️ Renderer |   screenContent=\(screenContent)")
 
             drawItems(items, in: ctx, cellHeight: cellHeight,
                       screenContent: screenContent, renderRect: contentRect)
@@ -346,6 +354,10 @@ extension PDFRendererService {
                 height: passportContentSize.height
             )
 
+            print("🖨️ Renderer | drawForPassport: items=\(items.count) imageRect=\(imageRect)")
+            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) passportContentSize=\(passportContentSize)")
+            print("🖨️ Renderer |   screenContent=\(screenContent)")
+
             drawItems(items, in: ctx, cellHeight: cellHeight,
                       screenContent: screenContent, renderRect: imageRect)
         }
@@ -364,7 +376,17 @@ extension PDFRendererService {
             let scaleX = renderRect.width / screenContent.width
             let scaleY = renderRect.height / screenContent.height
 
+            print("🖨️ Renderer | drawItems: scaleX=\(scaleX) scaleY=\(scaleY) renderRect=\(renderRect)")
+
             for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+                let pdfX = renderRect.origin.x + (cellX - screenContent.origin.x) * scaleX
+                let pdfY = renderRect.origin.y + (cellY - screenContent.origin.y) * scaleY
+                let blockW = item.width * cellWidth * scaleX
+                let blockH = item.height * cellHeight * scaleY
+                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → pdfPos=(\(pdfX), \(pdfY)) blockSize=(\(blockW), \(blockH)) fontSize=\(item.style.fontSize)*\(scaleX)=\(item.style.fontSize * scaleX)")
+
                 drawItem(
                     item,
                     cellHeight: cellHeight,
@@ -470,14 +492,19 @@ extension PDFRendererService {
         /// item.height = measuredHeightPts / cellHeight  →  cellHeight = measuredHeightPts / item.height
         private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
             guard let item = items.first, item.height > 0.001 else {
-                return 456 // fallback: maxCardHeight from AddTextCarouselController
+                print("🖨️ Renderer | deriveCellHeight: no valid items, fallback=456")
+                return 456
             }
 
             let widthPoints = item.width * cellWidth
             let heightPoints = measureTextBlockHeight(item: item, widthPoints: widthPoints)
 
             let derived = heightPoints / item.height
-            guard derived > 100, derived < 2000 else { return 456 }
+            print("🖨️ Renderer | deriveCellHeight: text=\"\(item.text)\" widthPts=\(widthPoints) heightPts=\(heightPoints) item.height=\(item.height) → derived=\(derived)")
+            guard derived > 100, derived < 2000 else {
+                print("🖨️ Renderer | deriveCellHeight: out of range, fallback=456")
+                return 456
+            }
             return derived
         }
 

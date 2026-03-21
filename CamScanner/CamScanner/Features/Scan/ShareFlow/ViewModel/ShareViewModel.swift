@@ -44,11 +44,17 @@ final class ShareViewModel: ObservableObject {
     }
     
     private func covertInputModel() -> [SharePreviewModel] {
-        inputModel.pages.enumerated().map { index, page in
-            SharePreviewModel(
+        print("📤 ShareVM | covertInputModel: pages=\(inputModel.pages.count) textItems=\(inputModel.textItems.count) docType=\(inputModel.documentType)")
+        return inputModel.pages.enumerated().map { index, page in
+            let pageTextItems = inputModel.textItems.filter { $0.pageIndex == index }
+            print("📤 ShareVM |   page[\(index)] docType=\(page.documentType) frames=\(page.frames.count) textItems=\(pageTextItems.count)")
+            for item in pageTextItems {
+                print("📤 ShareVM |     \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) fontSize=\(item.style.fontSize)")
+            }
+            return SharePreviewModel(
                 documentType: page.documentType,
                 frames: page.frames,
-                textItems: inputModel.textItems.filter { $0.pageIndex == index },
+                textItems: pageTextItems,
                 isSelected: true
             )
         }
@@ -101,7 +107,15 @@ final class ShareViewModel: ObservableObject {
     func share() {
         guard let format = selectedFormatDocument else { return }
         let selected = sharePreviewModel.filter(\.isSelected)
-        
+
+        print("📤 ShareVM | share: format=\(format.type) selectedPages=\(selected.count)")
+        for (i, doc) in selected.enumerated() {
+            print("📤 ShareVM |   doc[\(i)] docType=\(doc.documentType) frames=\(doc.frames.count) textItems=\(doc.textItems.count)")
+            for item in doc.textItems {
+                print("📤 ShareVM |     \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) fontSize=\(item.style.fontSize)")
+            }
+        }
+
         isLoading = true
         
         Task {

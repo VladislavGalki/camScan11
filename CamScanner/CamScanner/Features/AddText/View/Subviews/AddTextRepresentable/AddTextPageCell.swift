@@ -76,6 +76,7 @@ final class AddTextPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
         scrollView.frame = contentView.bounds
         zoomContainerView.frame = scrollView.bounds
+        print("📝 AddTextCell | layoutSubviews cellBounds=\(contentView.bounds) zoomContainer=\(zoomContainerView.bounds)")
 
         if stackView.superview != nil, stackView.constraints.isEmpty {
             NSLayoutConstraint.activate([

@@ -14,6 +14,16 @@ struct OpenDocumentTextOverlayView: View {
                         )
                 }
             }
+            .onAppear {
+                print("📝 TextOverlay | geo.size=\(geo.size) items=\(items.count)")
+                for item in items {
+                    let posX = item.centerX * geo.size.width
+                    let posY = item.centerY * geo.size.height
+                    let w = item.width * geo.size.width
+                    let h = item.height * geo.size.height
+                    print("📝 TextOverlay |   \"\(item.text)\" pos=(\(posX), \(posY)) blockSize=(\(w), \(h)) fontSize=\(item.style.fontSize)")
+                }
+            }
         }
         .allowsHitTesting(false)
     }
