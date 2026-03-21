@@ -90,10 +90,10 @@ final class JPGRendererService {
 
             compressed.draw(in: rect)
 
-            PDFRendererService.TextItemRenderer.draw(
+            PDFRendererService.TextItemRenderer.drawForDocuments(
                 items: document.textItems,
                 in: ctx.cgContext,
-                imageRect: rect
+                fittedRect: rect
             )
 
             PDFRendererService.WatermarkRenderer
@@ -179,10 +179,10 @@ final class JPGRendererService {
                 height: CGFloat(images.count) * imageHeight + CGFloat(images.count - 1) * spacing
             )
 
-            PDFRendererService.TextItemRenderer.draw(
+            PDFRendererService.TextItemRenderer.drawForIDCard(
                 items: document.textItems,
                 in: ctx.cgContext,
-                imageRect: boundingRect
+                contentRect: boundingRect
             )
 
             PDFRendererService.WatermarkRenderer
@@ -242,7 +242,7 @@ final class JPGRendererService {
 
             image.draw(in: rect)
 
-            PDFRendererService.TextItemRenderer.draw(
+            PDFRendererService.TextItemRenderer.drawForPassport(
                 items: document.textItems,
                 in: ctx.cgContext,
                 imageRect: rect
