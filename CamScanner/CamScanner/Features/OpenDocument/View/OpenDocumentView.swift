@@ -108,6 +108,9 @@ private extension OpenDocumentView {
             },
             onRotatePage: { index in
                 viewModel.rotatePage(at: index)
+            },
+            onCellHeightChanged: { height in
+                viewModel.updateCellHeight(height)
             }
         )
     }
