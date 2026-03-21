@@ -69,6 +69,10 @@ final class OpenDocumentViewModel: ObservableObject {
 
         store.textItemsPublisher
             .sink { [weak self] items in
+                print("📝 OpenDocumentVM | textItems received: \(items.count)")
+                for item in items {
+                    print("📝 OpenDocumentVM |   [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) fontSize=\(item.style.fontSize) rotation=\(item.rotation)")
+                }
                 self?.textItems = items
             }
             .store(in: &cancellables)
@@ -146,11 +150,16 @@ extension OpenDocumentViewModel {
 
     func makeShareInputModel() -> ShareInputModel {
         let shareModel = try? documentRepository.loadShareModel(id: inputModel.documentID)
-        return shareModel ?? ShareInputModel(
+        let result = shareModel ?? ShareInputModel(
             documentName: title,
             documentType: models.first?.documentType ?? .documents,
             pages: models
         )
+        print("📝 OpenDocumentVM | makeShareInputModel: docType=\(result.documentType) pages=\(result.pages.count) textItems=\(result.textItems.count)")
+        for item in result.textItems {
+            print("📝 OpenDocumentVM |   share textItem [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height))")
+        }
+        return result
     }
 
     func rotatePage(at index: Int) {

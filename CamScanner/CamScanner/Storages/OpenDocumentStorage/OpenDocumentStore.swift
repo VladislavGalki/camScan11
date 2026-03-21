@@ -31,6 +31,10 @@ final class OpenDocumentStore: NSObject {
 
     func reloadTextItems() {
         let items = (try? documentRepository.fetchTextOverlays(documentID: documentID)) ?? []
+        print("📝 OpenDocStore | reloadTextItems: docID=\(documentID) count=\(items.count)")
+        for item in items {
+            print("📝 OpenDocStore |   [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) fontSize=\(item.style.fontSize)")
+        }
         textItemsSubject.send(items)
     }
 }
