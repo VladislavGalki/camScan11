@@ -286,6 +286,12 @@ extension PDFRendererService {
         private static let idCardSpacing: CGFloat = 8
         private static let passportImageViewSize = CGSize(width: 360, height: 250)
 
+        /// Round to screen pixel grid (Auto Layout rounds layout coordinates)
+        private static func px(_ v: CGFloat) -> CGFloat {
+            let scale = UIScreen.main.scale   // 3 on @3x devices
+            return round(v * scale) / scale
+        }
+
         // MARK: - Public
 
         static func drawForDocuments(
@@ -302,7 +308,7 @@ extension PDFRendererService {
 
             let screenContent = CGRect(
                 x: 0,
-                y: (cellHeight - imageHeightInCell) / 2,
+                y: px((cellHeight - imageHeightInCell) / 2),
                 width: cellWidth,
                 height: imageHeightInCell
             )
@@ -329,10 +335,11 @@ extension PDFRendererService {
             let imageCount = imageRects.count
 
             // Build screen image rects (same layout as AddTextPageCell)
+            // Auto Layout rounds centerX/centerY → origins snap to pixel grid
             let totalH = CGFloat(imageCount) * imgSize.height
                 + CGFloat(imageCount - 1) * idCardSpacing
-            let originX = (cellWidth - imgSize.width) / 2
-            var y = (cellHeight - totalH) / 2
+            let originX = px((cellWidth - imgSize.width) / 2)
+            var y = px((cellHeight - totalH) / 2)
             var screenRects: [CGRect] = []
             for _ in 0..<imageCount {
                 screenRects.append(CGRect(x: originX, y: y,
@@ -373,8 +380,9 @@ extension PDFRendererService {
             }
 
             // ImageView centered in cell → visible image centered in imageView
-            let ivOriginX = (cellWidth - ivSize.width) / 2
-            let ivOriginY = (cellHeight - ivSize.height) / 2
+            // Auto Layout rounds center constraints → origins snap to pixel grid
+            let ivOriginX = px((cellWidth - ivSize.width) / 2)
+            let ivOriginY = px((cellHeight - ivSize.height) / 2)
             let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
             let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
 
