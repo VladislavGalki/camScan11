@@ -44,7 +44,7 @@ final class ShareViewModel: ObservableObject {
     }
     
     private func covertInputModel() -> [SharePreviewModel] {
-        print("📤 ShareVM | covertInputModel: pages=\(inputModel.pages.count) textItems=\(inputModel.textItems.count) docType=\(inputModel.documentType)")
+        print("📤 ShareVM | covertInputModel: pages=\(inputModel.pages.count) textItems=\(inputModel.textItems.count) docType=\(inputModel.documentType) cellHeight=\(inputModel.cellHeight)")
         return inputModel.pages.enumerated().map { index, page in
             let pageTextItems = inputModel.textItems.filter { $0.pageIndex == index }
             print("📤 ShareVM |   page[\(index)] docType=\(page.documentType) frames=\(page.frames.count) textItems=\(pageTextItems.count)")
@@ -55,6 +55,7 @@ final class ShareViewModel: ObservableObject {
                 documentType: page.documentType,
                 frames: page.frames,
                 textItems: pageTextItems,
+                cellHeight: inputModel.cellHeight,
                 isSelected: true
             )
         }

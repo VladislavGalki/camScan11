@@ -19,6 +19,7 @@ final class OpenDocumentCarouselController: UIViewController {
 
     private let onPageChanged: (Int) -> Void
     private let onRotatePage: (Int) -> Void
+    private let onCellHeightChanged: (CGFloat) -> Void
 
     // MARK: Init
 
@@ -26,12 +27,14 @@ final class OpenDocumentCarouselController: UIViewController {
         models: [ScanPreviewModel],
         textItems: [DocumentTextItem],
         onPageChanged: @escaping (Int) -> Void,
-        onRotatePage: @escaping (Int) -> Void
+        onRotatePage: @escaping (Int) -> Void,
+        onCellHeightChanged: @escaping (CGFloat) -> Void = { _ in }
     ) {
         self.models = models
         self.textItems = textItems
         self.onPageChanged = onPageChanged
         self.onRotatePage = onRotatePage
+        self.onCellHeightChanged = onCellHeightChanged
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -49,6 +52,7 @@ final class OpenDocumentCarouselController: UIViewController {
         super.viewDidLayoutSubviews()
         updateHorizontalInsets()
         updateVerticalInsets()
+        onCellHeightChanged(collectionView.bounds.height)
     }
 
     // MARK: Public

@@ -24,6 +24,7 @@ final class OpenDocumentViewModel: ObservableObject {
     private let documentRepository = DocumentRepository.shared
     private let filterRenderer = FilterRenderer.shared
 
+    private var currentCellHeight: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
 
     init(inputModel: OpenDocumentInputModel) {
@@ -113,6 +114,11 @@ extension OpenDocumentViewModel {
 // MARK: - Public
 
 extension OpenDocumentViewModel {
+    func updateCellHeight(_ height: CGFloat) {
+        guard height > 0 else { return }
+        currentCellHeight = height
+    }
+
     func updateSelectedIndex(_ index: Int) {
         guard selectedIndex != index else { return }
         selectedIndex = index
@@ -149,13 +155,14 @@ extension OpenDocumentViewModel {
     }
 
     func makeShareInputModel() -> ShareInputModel {
-        let shareModel = try? documentRepository.loadShareModel(id: inputModel.documentID)
-        let result = shareModel ?? ShareInputModel(
-            documentName: title,
-            documentType: models.first?.documentType ?? .documents,
-            pages: models
-        )
-        print("📝 OpenDocumentVM | makeShareInputModel: docType=\(result.documentType) pages=\(result.pages.count) textItems=\(result.textItems.count)")
+        var result = (try? documentRepository.loadShareModel(id: inputModel.documentID))
+            ?? ShareInputModel(
+                documentName: title,
+                documentType: models.first?.documentType ?? .documents,
+                pages: models
+            )
+        result.cellHeight = currentCellHeight
+        print("📝 OpenDocumentVM | makeShareInputModel: docType=\(result.documentType) pages=\(result.pages.count) textItems=\(result.textItems.count) cellHeight=\(result.cellHeight)")
         for item in result.textItems {
             print("📝 OpenDocumentVM |   share textItem [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height))")
         }

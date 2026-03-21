@@ -96,7 +96,8 @@ final class PDFRendererService {
         TextItemRenderer.drawForDocuments(
             items: document.textItems,
             in: ctx,
-            fittedRect: fittedRect
+            fittedRect: fittedRect,
+            cellHeight: document.cellHeight
         )
 
         if watermark {
@@ -152,7 +153,8 @@ final class PDFRendererService {
         TextItemRenderer.drawForIDCard(
             items: document.textItems,
             in: ctx,
-            imageRects: imageRects
+            imageRects: imageRects,
+            cellHeight: document.cellHeight
         )
 
         if watermark {
@@ -194,7 +196,8 @@ final class PDFRendererService {
         TextItemRenderer.drawForPassport(
             items: document.textItems,
             in: ctx,
-            imageRect: rect
+            imageRect: rect,
+            cellHeight: document.cellHeight
         )
 
         if watermark {
@@ -288,11 +291,12 @@ extension PDFRendererService {
         static func drawForDocuments(
             items: [DocumentTextItem],
             in ctx: CGContext,
-            fittedRect: CGRect
+            fittedRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
         ) {
             guard !items.isEmpty else { return }
 
-            let cellHeight = deriveCellHeight(from: items)
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
             let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
 
             let screenContent = CGRect(
@@ -313,11 +317,12 @@ extension PDFRendererService {
         static func drawForIDCard(
             items: [DocumentTextItem],
             in ctx: CGContext,
-            imageRects: [CGRect]
+            imageRects: [CGRect],
+            cellHeight providedCellHeight: CGFloat = 0
         ) {
             guard !items.isEmpty, !imageRects.isEmpty else { return }
 
-            let cellHeight = deriveCellHeight(from: items)
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
             let imgSize = idCardImageViewSize
             let imageCount = imageRects.count
 
@@ -344,11 +349,12 @@ extension PDFRendererService {
         static func drawForPassport(
             items: [DocumentTextItem],
             in ctx: CGContext,
-            imageRect: CGRect
+            imageRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
         ) {
             guard !items.isEmpty else { return }
 
-            let cellHeight = deriveCellHeight(from: items)
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : deriveCellHeight(from: items)
 
             // Compute visible image rect on screen (aspect fit inside 360×250 imageView)
             let ivSize = passportImageViewSize

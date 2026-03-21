@@ -8,13 +8,15 @@ struct OpenDocumentCarouselRepresentable: UIViewControllerRepresentable {
 
     var onPageChanged: (Int) -> Void
     var onRotatePage: (Int) -> Void
+    var onCellHeightChanged: (CGFloat) -> Void = { _ in }
 
     func makeUIViewController(context: Context) -> OpenDocumentCarouselController {
         OpenDocumentCarouselController(
             models: models,
             textItems: textItems,
             onPageChanged: onPageChanged,
-            onRotatePage: onRotatePage
+            onRotatePage: onRotatePage,
+            onCellHeightChanged: onCellHeightChanged
         )
     }
 
