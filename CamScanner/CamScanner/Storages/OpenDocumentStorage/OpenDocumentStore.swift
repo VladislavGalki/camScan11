@@ -8,10 +8,16 @@ final class OpenDocumentStore: NSObject {
         previewModelsSubject.eraseToAnyPublisher()
     }
 
+    var textItemsPublisher: AnyPublisher<[DocumentTextItem], Never> {
+        textItemsSubject.eraseToAnyPublisher()
+    }
+
     private let previewModelsSubject = CurrentValueSubject<[ScanPreviewModel], Never>([])
+    private let textItemsSubject = CurrentValueSubject<[DocumentTextItem], Never>([])
 
     private let context = PersistenceController.shared.container.viewContext
     private let documentID: UUID
+    private let documentRepository = DocumentRepository.shared
 
     private var frc: NSFetchedResultsController<DocumentEntity>!
 
@@ -21,6 +27,11 @@ final class OpenDocumentStore: NSObject {
         configureFRC()
         performFetch()
         rebuild()
+    }
+
+    func reloadTextItems() {
+        let items = (try? documentRepository.fetchTextOverlays(documentID: documentID)) ?? []
+        textItemsSubject.send(items)
     }
 }
 
@@ -64,6 +75,7 @@ private extension OpenDocumentStore {
         }
 
         previewModelsSubject.send(models)
+        reloadTextItems()
     }
 }
 

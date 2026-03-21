@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 
 final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
@@ -17,6 +18,8 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     private var image1HeightConstraint: NSLayoutConstraint?
     private var image2WidthConstraint: NSLayoutConstraint?
     private var image2HeightConstraint: NSLayoutConstraint?
+
+    private var overlayHostingController: UIHostingController<OpenDocumentTextOverlayView>?
 
     var onZoomChanged: ((Bool) -> Void)?
 
@@ -88,7 +91,7 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     // MARK: Configure
 
-    func configure(model: ScanPreviewModel) {
+    func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = []) {
         scrollView.zoomScale = 1
 
         imageView1.isHidden = true
@@ -148,7 +151,31 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
             break
         }
 
+        updateTextOverlay(textItems: textItems)
         layoutIfNeeded()
+    }
+
+    func updateTextOverlay(textItems: [DocumentTextItem]) {
+        let overlay = OpenDocumentTextOverlayView(items: textItems)
+
+        if let overlayHostingController {
+            overlayHostingController.rootView = overlay
+        } else {
+            let hosting = UIHostingController(rootView: overlay)
+            hosting.view.backgroundColor = .clear
+            hosting.view.isUserInteractionEnabled = false
+            hosting.view.translatesAutoresizingMaskIntoConstraints = false
+
+            overlayHostingController = hosting
+            zoomContainerView.addSubview(hosting.view)
+
+            NSLayoutConstraint.activate([
+                hosting.view.topAnchor.constraint(equalTo: zoomContainerView.topAnchor),
+                hosting.view.bottomAnchor.constraint(equalTo: zoomContainerView.bottomAnchor),
+                hosting.view.leadingAnchor.constraint(equalTo: zoomContainerView.leadingAnchor),
+                hosting.view.trailingAnchor.constraint(equalTo: zoomContainerView.trailingAnchor)
+            ])
+        }
     }
 
     // MARK: Zoom

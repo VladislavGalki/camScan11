@@ -32,6 +32,9 @@ struct OpenDocumentView: View {
             Color.bg(.main).ignoresSafeArea()
         )
         .ignoresSafeArea(.keyboard, edges: .all)
+        .onAppear {
+            viewModel.reloadTextItems()
+        }
     }
 }
 
@@ -93,6 +96,7 @@ private extension OpenDocumentView {
     var carouselView: some View {
         OpenDocumentCarouselRepresentable(
             models: viewModel.models,
+            textItems: viewModel.textItems,
             actionBottomBarAction: $bottomBarAction,
             onPageChanged: { index in
                 viewModel.updateSelectedIndex(index)
