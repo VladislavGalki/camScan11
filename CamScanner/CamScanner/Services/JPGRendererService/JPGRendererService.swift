@@ -154,7 +154,7 @@ final class JPGRendererService {
                 (pageSize.height - totalHeight)
                 / 2
 
-            let startY = y
+            var imageRects: [CGRect] = []
 
             for image in images {
 
@@ -168,21 +168,15 @@ final class JPGRendererService {
                 )
 
                 image.draw(in: rect)
+                imageRects.append(rect)
 
                 y += imageHeight + spacing
             }
 
-            let boundingRect = CGRect(
-                x: (pageSize.width - imageWidth) / 2,
-                y: startY,
-                width: imageWidth,
-                height: CGFloat(images.count) * imageHeight + CGFloat(images.count - 1) * spacing
-            )
-
             PDFRendererService.TextItemRenderer.drawForIDCard(
                 items: document.textItems,
                 in: ctx.cgContext,
-                contentRect: boundingRect
+                imageRects: imageRects
             )
 
             PDFRendererService.WatermarkRenderer

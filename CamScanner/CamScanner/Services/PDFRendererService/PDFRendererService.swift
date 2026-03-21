@@ -132,6 +132,7 @@ final class PDFRendererService {
             (pageSize.height - totalHeight) / 2
 
         var y = startY
+        var imageRects: [CGRect] = []
 
         for image in images {
 
@@ -143,21 +144,15 @@ final class PDFRendererService {
             )
 
             drawImage(image, in: rect, ctx: ctx)
+            imageRects.append(rect)
 
             y += imageHeight + spacing
         }
 
-        let boundingRect = CGRect(
-            x: (pageSize.width - imageWidth) / 2,
-            y: startY,
-            width: imageWidth,
-            height: totalHeight
-        )
-
         TextItemRenderer.drawForIDCard(
             items: document.textItems,
             in: ctx,
-            contentRect: boundingRect
+            imageRects: imageRects
         )
 
         if watermark {
@@ -283,9 +278,10 @@ extension PDFRendererService {
         /// Fixed cell width from AddTextCarouselController
         private static let cellWidth: CGFloat = 322
 
-        /// Screen content sizes from AddTextPageCell.configure
-        private static let idCardContentSize = CGSize(width: 171, height: 108 * 2 + 8)
-        private static let passportContentSize = CGSize(width: 360, height: 250)
+        /// Screen imageView sizes from AddTextPageCell.configure
+        private static let idCardImageViewSize = CGSize(width: 171, height: 108)
+        private static let idCardSpacing: CGFloat = 8
+        private static let passportImageViewSize = CGSize(width: 360, height: 250)
 
         // MARK: - Public
 
@@ -310,32 +306,39 @@ extension PDFRendererService {
             print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) imageHeightInCell=\(imageHeightInCell)")
             print("🖨️ Renderer |   screenContent=\(screenContent)")
 
-            drawItems(items, in: ctx, cellHeight: cellHeight,
-                      screenContent: screenContent, renderRect: fittedRect)
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: fittedRect)
         }
 
         static func drawForIDCard(
             items: [DocumentTextItem],
             in ctx: CGContext,
-            contentRect: CGRect
+            imageRects: [CGRect]
         ) {
-            guard !items.isEmpty else { return }
+            guard !items.isEmpty, !imageRects.isEmpty else { return }
 
             let cellHeight = deriveCellHeight(from: items)
+            let imgSize = idCardImageViewSize
+            let imageCount = imageRects.count
 
-            let screenContent = CGRect(
-                x: (cellWidth - idCardContentSize.width) / 2,
-                y: (cellHeight - idCardContentSize.height) / 2,
-                width: idCardContentSize.width,
-                height: idCardContentSize.height
-            )
+            // Build screen image rects (same layout as AddTextPageCell)
+            let totalH = CGFloat(imageCount) * imgSize.height
+                + CGFloat(imageCount - 1) * idCardSpacing
+            let originX = (cellWidth - imgSize.width) / 2
+            var y = (cellHeight - totalH) / 2
+            var screenRects: [CGRect] = []
+            for _ in 0..<imageCount {
+                screenRects.append(CGRect(x: originX, y: y,
+                                          width: imgSize.width, height: imgSize.height))
+                y += imgSize.height + idCardSpacing
+            }
 
-            print("🖨️ Renderer | drawForIDCard: items=\(items.count) contentRect=\(contentRect)")
-            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) idCardContentSize=\(idCardContentSize)")
-            print("🖨️ Renderer |   screenContent=\(screenContent)")
+            print("🖨️ Renderer | drawForIDCard: items=\(items.count) imageRects=\(imageRects)")
+            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight)")
+            print("🖨️ Renderer |   screenRects=\(screenRects)")
 
-            drawItems(items, in: ctx, cellHeight: cellHeight,
-                      screenContent: screenContent, renderRect: contentRect)
+            drawPerImage(items, in: ctx, cellHeight: cellHeight,
+                         screenRects: screenRects, renderRects: imageRects)
         }
 
         static func drawForPassport(
@@ -347,24 +350,40 @@ extension PDFRendererService {
 
             let cellHeight = deriveCellHeight(from: items)
 
-            let screenContent = CGRect(
-                x: (cellWidth - passportContentSize.width) / 2,
-                y: (cellHeight - passportContentSize.height) / 2,
-                width: passportContentSize.width,
-                height: passportContentSize.height
-            )
+            // Compute visible image rect on screen (aspect fit inside 360×250 imageView)
+            let ivSize = passportImageViewSize
+            let imageAspect = imageRect.width / imageRect.height
+
+            let visibleSize: CGSize
+            if imageAspect > ivSize.width / ivSize.height {
+                visibleSize = CGSize(width: ivSize.width,
+                                     height: ivSize.width / imageAspect)
+            } else {
+                visibleSize = CGSize(width: ivSize.height * imageAspect,
+                                     height: ivSize.height)
+            }
+
+            // ImageView centered in cell → visible image centered in imageView
+            let ivOriginX = (cellWidth - ivSize.width) / 2
+            let ivOriginY = (cellHeight - ivSize.height) / 2
+            let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
+            let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
+
+            let screenContent = CGRect(origin: CGPoint(x: visOriginX, y: visOriginY),
+                                       size: visibleSize)
 
             print("🖨️ Renderer | drawForPassport: items=\(items.count) imageRect=\(imageRect)")
-            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) passportContentSize=\(passportContentSize)")
+            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) imageAspect=\(imageAspect)")
+            print("🖨️ Renderer |   ivSize=\(ivSize) visibleSize=\(visibleSize)")
             print("🖨️ Renderer |   screenContent=\(screenContent)")
 
-            drawItems(items, in: ctx, cellHeight: cellHeight,
-                      screenContent: screenContent, renderRect: imageRect)
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: imageRect)
         }
 
-        // MARK: - Core drawing
+        // MARK: - Core drawing (single rect mapping)
 
-        private static func drawItems(
+        private static func drawMapped(
             _ items: [DocumentTextItem],
             in ctx: CGContext,
             cellHeight: CGFloat,
@@ -376,53 +395,75 @@ extension PDFRendererService {
             let scaleX = renderRect.width / screenContent.width
             let scaleY = renderRect.height / screenContent.height
 
-            print("🖨️ Renderer | drawItems: scaleX=\(scaleX) scaleY=\(scaleY) renderRect=\(renderRect)")
+            print("🖨️ Renderer | drawMapped: scaleX=\(scaleX) scaleY=\(scaleY)")
 
             for item in items {
                 let cellX = item.centerX * cellWidth
                 let cellY = item.centerY * cellHeight
                 let pdfX = renderRect.origin.x + (cellX - screenContent.origin.x) * scaleX
                 let pdfY = renderRect.origin.y + (cellY - screenContent.origin.y) * scaleY
-                let blockW = item.width * cellWidth * scaleX
-                let blockH = item.height * cellHeight * scaleY
-                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → pdfPos=(\(pdfX), \(pdfY)) blockSize=(\(blockW), \(blockH)) fontSize=\(item.style.fontSize)*\(scaleX)=\(item.style.fontSize * scaleX)")
+                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → pdfPos=(\(pdfX), \(pdfY)) fontScale=\(scaleX)")
 
-                drawItem(
-                    item,
-                    cellHeight: cellHeight,
-                    screenContent: screenContent,
-                    renderRect: renderRect,
-                    scaleX: scaleX,
-                    scaleY: scaleY
-                )
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
             }
 
             UIGraphicsPopContext()
         }
 
-        private static func drawItem(
-            _ item: DocumentTextItem,
+        // MARK: - Core drawing (per-image mapping for ID cards)
+
+        private static func drawPerImage(
+            _ items: [DocumentTextItem],
+            in ctx: CGContext,
             cellHeight: CGFloat,
-            screenContent: CGRect,
-            renderRect: CGRect,
+            screenRects: [CGRect],
+            renderRects: [CGRect]
+        ) {
+            UIGraphicsPushContext(ctx)
+
+            for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+
+                // Find the closest screen image to this text item
+                var bestIdx = 0
+                var bestDist = CGFloat.greatestFiniteMagnitude
+                for (i, sr) in screenRects.enumerated() {
+                    let d = abs(cellY - sr.midY)
+                    if d < bestDist { bestDist = d; bestIdx = i }
+                }
+
+                let sr = screenRects[bestIdx]
+                let rr = renderRects[bestIdx]
+                let scaleX = rr.width / sr.width
+                let scaleY = rr.height / sr.height
+
+                let pdfX = rr.origin.x + (cellX - sr.origin.x) * scaleX
+                let pdfY = rr.origin.y + (cellY - sr.origin.y) * scaleY
+
+                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → img[\(bestIdx)] pdfPos=(\(pdfX), \(pdfY)) scale=(\(scaleX), \(scaleY))")
+
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        // MARK: - Single item drawing
+
+        private static func drawItemAt(
+            _ item: DocumentTextItem,
+            centerX: CGFloat,
+            centerY: CGFloat,
+            cellHeight: CGFloat,
             scaleX: CGFloat,
             scaleY: CGFloat
         ) {
-            // Text position in cell coordinates (pts)
-            let cellX = item.centerX * cellWidth
-            let cellY = item.centerY * cellHeight
-
-            // Map from cell coords → render coords through content alignment
-            let centerX = renderRect.origin.x
-                + (cellX - screenContent.origin.x) * scaleX
-            let centerY = renderRect.origin.y
-                + (cellY - screenContent.origin.y) * scaleY
-
-            // Text block size scaled to render space
             let blockWidth = item.width * cellWidth * scaleX
             let blockHeight = item.height * cellHeight * scaleY
 
-            // Use width-based scale for font (preserves line-break behavior)
             let fontScale = scaleX
             let padding: CGFloat = 8 * fontScale
             let contentWidth = max(blockWidth - padding * 2, 0)
@@ -488,8 +529,6 @@ extension PDFRendererService {
 
         // MARK: - Cell height derivation
 
-        /// Derives the original cell height by reverse-engineering from a stored text item.
-        /// item.height = measuredHeightPts / cellHeight  →  cellHeight = measuredHeightPts / item.height
         private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
             guard let item = items.first, item.height > 0.001 else {
                 print("🖨️ Renderer | deriveCellHeight: no valid items, fallback=456")
@@ -508,7 +547,6 @@ extension PDFRendererService {
             return derived
         }
 
-        /// Replicates AddTextViewModel.measuredEditingSize height computation
         private static func measureTextBlockHeight(item: DocumentTextItem, widthPoints: CGFloat) -> CGFloat {
             let horizontalInset: CGFloat = 8
             let verticalInset: CGFloat = 8
