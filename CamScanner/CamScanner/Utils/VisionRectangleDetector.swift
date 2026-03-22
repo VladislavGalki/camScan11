@@ -249,14 +249,20 @@ enum VisionRectangleDetector {
         guard points.count == 4 else { return false }
         let cgPoints = points.map { CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)) }
 
+        var positiveCount = 0
+        var negativeCount = 0
+
         for i in 0..<4 {
             let a = cgPoints[i]
             let b = cgPoints[(i + 1) % 4]
             let c = cgPoints[(i + 2) % 4]
 
             let cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)
-            if cross < 0 { return false }
+            if cross > 0 { positiveCount += 1 }
+            else if cross < 0 { negativeCount += 1 }
         }
-        return true
+
+        // Convex if all same sign (all CW or all CCW)
+        return positiveCount == 0 || negativeCount == 0
     }
 }
