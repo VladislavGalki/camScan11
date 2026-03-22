@@ -467,6 +467,9 @@ extension PDFRendererService {
 
         // MARK: - Single item drawing
 
+        /// Renders text at the ORIGINAL screen font size using CGContext scaling.
+        /// This ensures the correct SF Pro font variant is used (Text ≤19pt vs Display ≥20pt),
+        /// matching the on-screen SwiftUI rendering exactly.
         private static func drawItemAt(
             _ item: DocumentTextItem,
             centerX: CGFloat,
@@ -475,18 +478,15 @@ extension PDFRendererService {
             scaleX: CGFloat,
             scaleY: CGFloat
         ) {
-            let blockWidth = item.width * cellWidth * scaleX
-            let blockHeight = item.height * cellHeight * scaleY
+            // Screen-space block dimensions (as in AddText/OpenDocument overlay)
+            let screenBlockW = item.width * cellWidth
+            let screenBlockH = item.height * cellHeight
+            let screenPadding: CGFloat = 8
+            let screenContentW = max(screenBlockW - screenPadding * 2, 0)
+            let screenContentH = max(screenBlockH - screenPadding * 2, 0)
 
-            let fontScale = scaleX
-            let padding: CGFloat = 8 * fontScale
-            let contentWidth = max(blockWidth - padding * 2, 0)
-            let contentHeight = max(blockHeight - padding * 2, 0)
-
-            let fontSize = item.style.fontSize * fontScale
-            let letterSpacing = item.style.letterSpacing * fontScale
-
-            let font = UIFont.systemFont(ofSize: fontSize, weight: .regular)
+            // Use ORIGINAL screen font size → correct SF Pro variant (Text vs Display)
+            let font = UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular)
             let color = UIColor(rgbaHex: item.style.textColorHex) ?? .black
 
             let paragraphStyle = NSMutableParagraphStyle()
@@ -502,52 +502,56 @@ extension PDFRendererService {
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: color,
-                .kern: letterSpacing,
+                .kern: item.style.letterSpacing,
                 .paragraphStyle: paragraphStyle
             ]
 
-            // Measure actual text height to vertically center within content area
+            // Measure actual text height at screen size to vertically center within content area
             // (SwiftUI .frame(alignment: .leading) = left + vertically centered)
             let textBounds = (item.text as NSString).boundingRect(
-                with: CGSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude),
+                with: CGSize(width: screenContentW, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
             )
-            let vCenterOffset = max((contentHeight - ceil(textBounds.height)) / 2, 0)
+            let vCenterOffset = max((screenContentH - ceil(textBounds.height)) / 2, 0)
 
-            print("🖨️ Renderer | drawItemAt \"\(item.text)\" fontSize=\(item.style.fontSize) pdfFontSize=\(fontSize)")
-            print("🖨️ Renderer |   block=(\(blockWidth), \(blockHeight)) content=(\(contentWidth), \(contentHeight)) padding=\(padding)")
+            print("🖨️ Renderer | drawItemAt \"\(item.text)\" fontSize=\(item.style.fontSize) scale=(\(scaleX), \(scaleY))")
+            print("🖨️ Renderer |   screenBlock=(\(screenBlockW), \(screenBlockH)) screenContent=(\(screenContentW), \(screenContentH))")
             print("🖨️ Renderer |   textBounds=\(textBounds) vCenterOffset=\(vCenterOffset)")
 
-            let contentRect = CGRect(
-                x: centerX - blockWidth / 2 + padding,
-                y: centerY - blockHeight / 2 + padding + vCenterOffset,
-                width: contentWidth,
-                height: contentHeight
+            // Screen-space rects relative to block center (0,0)
+            let screenContentRect = CGRect(
+                x: -screenBlockW / 2 + screenPadding,
+                y: -screenBlockH / 2 + screenPadding + vCenterOffset,
+                width: screenContentW,
+                height: screenContentH
             )
-            print("🖨️ Renderer |   contentRect=\(contentRect)")
 
-            let clipRect = CGRect(
-                x: centerX - blockWidth / 2,
-                y: centerY - blockHeight / 2,
-                width: blockWidth,
-                height: blockHeight
+            let screenClipRect = CGRect(
+                x: -screenBlockW / 2,
+                y: -screenBlockH / 2,
+                width: screenBlockW,
+                height: screenBlockH
             )
+
+            print("🖨️ Renderer |   screenContentRect=\(screenContentRect) screenClipRect=\(screenClipRect)")
 
             guard let context = UIGraphicsGetCurrentContext() else { return }
             context.saveGState()
 
+            // Translate to PDF center, then scale from screen to PDF
+            context.translateBy(x: centerX, y: centerY)
+            context.scaleBy(x: scaleX, y: scaleY)
+
             if item.rotation != 0 {
-                context.translateBy(x: centerX, y: centerY)
                 context.rotate(by: item.rotation * .pi / 180)
-                context.translateBy(x: -centerX, y: -centerY)
             }
 
-            context.clip(to: clipRect)
+            context.clip(to: screenClipRect)
 
             (item.text as NSString).draw(
-                with: contentRect,
+                with: screenContentRect,
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
