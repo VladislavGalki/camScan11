@@ -17,7 +17,7 @@ struct AppRootView: View {
             switch r {
             case .openDocument(let id):
                 return AnyView(
-                    DocumentPreviewEntryView(documentID: id)
+                    OpenDocumentView(inputModel: OpenDocumentInputModel(documentID: id))
                 )
             }
             
@@ -58,6 +58,10 @@ struct AppRootView: View {
             case let .share(inputModel):
                 return AnyView(
                     ShareView(inputModel: inputModel)
+                )
+            case let .scanFlow(inputModel, onDismiss):
+                return AnyView(
+                    ScanFlowContainerView(inputModel: inputModel, onDismiss: onDismiss)
                 )
             }
 

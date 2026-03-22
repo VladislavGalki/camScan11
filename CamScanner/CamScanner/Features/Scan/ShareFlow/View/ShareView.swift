@@ -185,16 +185,8 @@ struct ShareView: View {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()
-                                    .overlay {
-                                        OpenDocumentTextOverlayView(
-                                            items: document.textItems,
-                                            referenceWidth: 322
-                                        )
-                                    }
                             }
                         case .idCard, .driverLicense:
-                            // Text overlay covers the full container (not individual images)
-                            // to match the OpenDocument/AddText coordinate system
                             VStack(spacing: 4) {
                                 if let image = document.frames.first?.preview {
                                     Image(uiImage: image)
@@ -210,24 +202,12 @@ struct ShareView: View {
                                         .scaledToFit()
                                 }
                             }
-                            .overlay {
-                                OpenDocumentTextOverlayView(
-                                    items: document.textItems,
-                                    referenceWidth: 322
-                                )
-                            }
                         case .passport:
                             if let image = document.frames.first?.preview {
                                 Image(uiImage: image)
                                     .resizable()
                                     .frame(width: 88, height: 125)
                                     .scaledToFit()
-                                    .overlay {
-                                        OpenDocumentTextOverlayView(
-                                            items: document.textItems,
-                                            referenceWidth: 322
-                                        )
-                                    }
                             }
                         default:
                             EmptyView()

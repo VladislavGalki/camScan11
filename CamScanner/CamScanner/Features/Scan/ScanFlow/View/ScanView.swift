@@ -10,12 +10,17 @@ struct ScanView: View {
     @State private var navigationViewHeight: CGFloat = .zero
     
     @EnvironmentObject private var router: Router
-    
-    let oncloseClick: () -> Void
 
-    init(oncloseClick: @escaping () -> Void) {
+    let oncloseClick: () -> Void
+    private let existingDocumentID: UUID?
+
+    init(
+        inputModel: ScanInputModel = ScanInputModel(),
+        oncloseClick: @escaping () -> Void
+    ) {
         self.oncloseClick = oncloseClick
-        
+        self.existingDocumentID = inputModel.existingDocumentID
+
         let store = ScanStore()
         _store = StateObject(wrappedValue: store)
         _vm = StateObject(wrappedValue: ScanViewModel(settings: store.settings, ui: store.ui))
@@ -206,9 +211,10 @@ struct ScanView: View {
                     image: vm.miniPreviewImageForSelectedDocument,
                     count: vm.miniPreviewCountForSelectedDocument,
                     onPreviewClick: {
-                        if let inputModel = vm.buildPreviewInputModel() {
+                        if var inputModel = vm.buildPreviewInputModel() {
+                            inputModel.existingDocumentID = existingDocumentID
                             vm.shouldStartAutoShootCountdown = false
-                            
+
                             router.push(
                                 ScanRoute.scanPreview(inputModel) { [weak vm] outputModel in
                                     vm?.buildOutputPreview(outputModel)
@@ -330,58 +336,3 @@ struct ScanView: View {
         vm.shouldShowQuickPreview ? 0 : 1
     }
 }
-
-
-//        }
-//        .fullScreenCover(isPresented: $showPreview) {
-//            if ui.getSelectedDocumentType() == .documents {
-//                DocumentPreviewView(
-//                    inputModel: .scan(
-//                        pages: vm.scanResult,
-//                        previewMode: .newFromCamera,
-//                        rememberedFilterKey: nil
-//                    ),
-//                    onDone: {
-//                        if ui.captureMode == .group {
-//                            vm.resetGroup()
-//                        } else {
-//                            vm.resetSingle()
-//                        }
-//                        showPreview = false
-//                        onClose()
-//                    },
-//                    onRetake: {
-//                        if ui.captureMode == .group {
-//                            vm.resetGroup()
-//                        } else {
-//                            vm.resetSingle()
-//                        }
-//                        showPreview = false
-//                    },
-//                    onEditPage: { index, croppedFull, quad in
-//                        vm.applyManualEditForScan(index: index, croppedOriginal: croppedFull, quad: quad)
-//                    }
-//                )
-//            } else {
-//                DocumentPreviewView(
-//                    inputModel: .id(
-//                        result: vm.idResult,
-//                        previewMode: .newFromCamera,
-//                        rememberedFilterKey: nil
-//                    ),
-//                    onDone: {
-//                        vm.resetIdCaptures()
-//                        showPreview = false
-//                        onClose()
-//                    },
-//                    onRetake: {
-//                        vm.resetIdCaptures()
-//                        showPreview = false
-//                    },
-//                    onEditPage: { index, croppedFull, quad in
-//                        let side: IdCaptureSide = (index == 0 ? .front : .back)
-//                        vm.applyManualEditForId(side: side, croppedOriginal: croppedFull, quad: quad)
-//                    }
-//                )
-//            }
-//        }

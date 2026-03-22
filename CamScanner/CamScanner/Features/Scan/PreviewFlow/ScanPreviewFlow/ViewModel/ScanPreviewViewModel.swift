@@ -34,9 +34,7 @@ final class ScanPreviewViewModel: ObservableObject {
         bootstrap()
     }
     
-    deinit {
-        print("!!! DEINITED !!! ScanPreviewViewModel")
-    }
+    deinit { }
 
     // MARK: - Public
 
@@ -85,12 +83,13 @@ final class ScanPreviewViewModel: ObservableObject {
                     documentType: $0.documentType,
                     frames: $0.frames
                 )
-            }
+            },
+            existingDocumentID: inputModel.existingDocumentID
         )
     }
-    
+
     func buildOutputClearModel() -> ScanPreviewInputModel {
-        ScanPreviewInputModel(pageGroups: [])
+        ScanPreviewInputModel(pageGroups: [], existingDocumentID: inputModel.existingDocumentID)
     }
     
     func saveDocument() throws {
@@ -109,18 +108,22 @@ final class ScanPreviewViewModel: ObservableObject {
         }
 
         do {
-            let displayType = scanPreviewModel.first?.documentType ?? .documents
+            if let existingID = inputModel.existingDocumentID {
+                try documentRepository.addPagesToDocument(
+                    documentID: existingID,
+                    pages: pages
+                )
+            } else {
+                let displayType = scanPreviewModel.first?.documentType ?? .documents
 
-            let docID = try documentRepository.saveDocument(
-                documentType: displayType,
-                pages: pages
-            )
+                try documentRepository.saveDocument(
+                    documentType: displayType,
+                    pages: pages
+                )
+            }
 
-            print("Document saved:", docID)
             onSuccessFlow()
-        } catch {
-            print("Save error:", error)
-        }
+        } catch { }
     }
     
     func onFinishFlow(_ outputModel: ScanPreviewInputModel) {
@@ -152,7 +155,7 @@ final class ScanPreviewViewModel: ObservableObject {
         return removedIndex
     }
 
-    // MARK: - Rotation (через state!)
+    // MARK: - Rotation
 
     func rotatePage(at index: Int) {
         guard scanPreviewModel.indices.contains(index) else { return }
@@ -233,7 +236,6 @@ final class ScanPreviewViewModel: ObservableObject {
             var newState = f.currentFilter
             newState.adjustment = CGFloat(slider)
 
-            // 👇 сохраняем значение для текущего фильтра
             f.filterAdjustments[newState.type] = newState.adjustment
 
             f.applyFilter(newState)

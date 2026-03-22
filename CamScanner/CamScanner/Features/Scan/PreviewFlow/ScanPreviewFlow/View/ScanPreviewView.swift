@@ -86,9 +86,7 @@ struct ScanPreviewView: View {
                     action: {
                         do {
                             try viewModel.saveDocument()
-                        } catch {
-                            // Мб вьюху с ошибкой
-                        }
+                        } catch { }
                     }
                 )
             }

@@ -202,6 +202,84 @@ extension DocumentRepository {
         return docID
     }
     
+    func addPagesToDocument(
+        documentID: UUID,
+        pages: [DocumentPagePayload]
+    ) throws {
+        guard !pages.isEmpty else { return }
+
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8003,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let existingPages = (document.pages as? Set<PageEntity>) ?? []
+        var nextIndex = (existingPages.map { Int($0.index) }.max() ?? -1) + 1
+
+        for payload in pages {
+            let frame = payload.frame
+
+            guard
+                let original = frame.original,
+                let preview = frame.preview
+            else { continue }
+
+            let pageID = UUID()
+
+            let displayURL = try FileStore.shared.saveJPEG(
+                image: preview,
+                docID: documentID,
+                pageID: pageID,
+                fileName: "\(pageID.uuidString)_display.jpg"
+            )
+
+            let originalURL = try FileStore.shared.saveJPEG(
+                image: original,
+                docID: documentID,
+                pageID: pageID,
+                fileName: "\(pageID.uuidString)_original.jpg"
+            )
+
+            let page = PageEntity(context: context)
+            page.id = pageID
+            page.index = Int16(nextIndex)
+            page.imagePath = FileStore.shared.relativePath(fromAbsolute: displayURL)
+            page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
+            page.sourceDocumentTypeRaw = payload.sourceDocumentType.rawValue
+
+            page.quadData = frame.quad.flatMap { QuadCodec.encode($0) }
+            page.drawingData = frame.drawingData
+
+            if let drawingBase = frame.drawingBase {
+                let drawingURL = try FileStore.shared.saveJPEG(
+                    image: drawingBase,
+                    docID: documentID,
+                    pageID: pageID,
+                    fileName: "\(pageID.uuidString)_drawingBase.jpg"
+                )
+                page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: drawingURL)
+            }
+
+            page.filterTypeRaw = frame.currentFilter.type.rawValue
+            page.filterAdjustment = Double(frame.currentFilter.adjustment)
+            page.rotationAngle = Double(frame.currentFilter.rotationAngle)
+            page.document = document
+
+            nextIndex += 1
+        }
+
+        document.pageCount = Int16(existingPages.count + pages.count)
+        document.lastViewed = Date()
+
+        let totalSize = FileStore.shared.documentFolderSize(docID: documentID)
+        document.cachedSize = totalSize
+
+        try context.save()
+    }
+
     @discardableResult
     func mergeDocuments(
         ids: [UUID],

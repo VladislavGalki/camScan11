@@ -5,10 +5,12 @@ enum OpenDocumentRoute: Route {
         ScanCropperInputModel,
         onFinish: (ScanPreviewInputModel) -> Void
     )
-    
+
     case addText(AddTextInputModel)
-    
+
     case share(ShareInputModel)
+
+    case scanFlow(ScanInputModel, onDismiss: () -> Void)
 }
 
 extension OpenDocumentRoute: Equatable {
@@ -20,6 +22,8 @@ extension OpenDocumentRoute: Equatable {
             return lModel == rModel
         case let (.share(lModel), .share(rModel)):
             return lModel == rModel
+        case (.scanFlow, .scanFlow):
+            return true
         default:
             return false
         }
@@ -38,6 +42,8 @@ extension OpenDocumentRoute: Hashable {
         case let .share(model):
             hasher.combine("share")
             hasher.combine(model)
+        case .scanFlow:
+            hasher.combine("scanFlow")
         }
     }
 }

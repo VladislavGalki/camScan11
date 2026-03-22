@@ -70,10 +70,6 @@ final class OpenDocumentViewModel: ObservableObject {
 
         store.textItemsPublisher
             .sink { [weak self] items in
-                print("📝 OpenDocumentVM | textItems received: \(items.count)")
-                for item in items {
-                    print("📝 OpenDocumentVM |   [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) fontSize=\(item.style.fontSize) rotation=\(item.rotation)")
-                }
                 self?.textItems = items
             }
             .store(in: &cancellables)
@@ -162,10 +158,6 @@ extension OpenDocumentViewModel {
                 pages: models
             )
         result.cellHeight = currentCellHeight
-        print("📝 OpenDocumentVM | makeShareInputModel: docType=\(result.documentType) pages=\(result.pages.count) textItems=\(result.textItems.count) cellHeight=\(result.cellHeight)")
-        for item in result.textItems {
-            print("📝 OpenDocumentVM |   share textItem [\(item.pageIndex)] \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height))")
-        }
         return result
     }
 
@@ -243,16 +235,6 @@ extension OpenDocumentViewModel {
 
         let cellSize = CGSize(width: cellW, height: cellH)
 
-        print("📐 ── ROTATE BEGIN ──────────────────────────────")
-        print("📐 cell=\(cellW)×\(cellH) docType=\(model.documentType) framesCount=\(model.frames.count)")
-        for (fi, frame) in model.frames.enumerated() {
-            let pSize = frame.preview?.size ?? .zero
-            let dSize = frame.displayBase?.size ?? .zero
-            let angle = frame.currentFilter.rotationAngle
-            print("📐 frame[\(fi)] preview=\(pSize.width)×\(pSize.height) displayBase=\(dSize.width)×\(dSize.height) rotAngle=\(angle)rad (\(angle * 180 / .pi)°)")
-        }
-        print("📐 textItems count=\(textItems.count) (pageIndex=\(pageIndex) items=\(textItems.filter { $0.pageIndex == pageIndex }.count))")
-
         var updatedItems = textItems
         var changed = false
 
@@ -263,31 +245,17 @@ extension OpenDocumentViewModel {
             guard let (beforeRect, afterRect) = contentRectsForRotation(
                 model: model, position: pos, cellSize: cellSize
             ) else {
-                print("📐 [\(i)] contentRectsForRotation returned nil – skipping")
                 continue
             }
 
-            // Cell pixel → content-normalized [0,1], clamped to image bounds.
-            // Text placed slightly outside the image area (e.g. near edges when
-            // image doesn't fill the cell) must be clamped to avoid mapping
-            // outside cell bounds after rotation.
             let nx = min(1, max(0, (pos.x - beforeRect.minX) / beforeRect.width))
             let ny = min(1, max(0, (pos.y - beforeRect.minY) / beforeRect.height))
 
-            // 90° CW in normalized content space
             let rx = 1 - ny
             let ry = nx
 
-            // Content-normalized → cell-normalized
             let newCX = (afterRect.minX + rx * afterRect.width) / cellW
             let newCY = (afterRect.minY + ry * afterRect.height) / cellH
-
-            print("📐 [\(i)] \"\(item.text)\" BEFORE center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) rot=\(item.rotation)")
-            print("📐 [\(i)] pixelPos=(\(pos.x), \(pos.y))")
-            print("📐 [\(i)] beforeRect=(x:\(beforeRect.minX) y:\(beforeRect.minY) w:\(beforeRect.width) h:\(beforeRect.height))")
-            print("📐 [\(i)] afterRect =(x:\(afterRect.minX) y:\(afterRect.minY) w:\(afterRect.width) h:\(afterRect.height))")
-            print("📐 [\(i)] contentNorm=(\(nx), \(ny)) → rotated90CW=(\(rx), \(ry))")
-            print("📐 [\(i)] AFTER  center=(\(newCX), \(newCY)) rot=\((item.rotation + 90).truncatingRemainder(dividingBy: 360))")
 
             updatedItems[i].centerX = newCX
             updatedItems[i].centerY = newCY
@@ -296,7 +264,6 @@ extension OpenDocumentViewModel {
             changed = true
         }
 
-        print("📐 ── ROTATE END ────────────────────────────────")
         return changed ? updatedItems : nil
     }
 
@@ -349,10 +316,6 @@ extension OpenDocumentViewModel {
         let imgTop2 = (cellSize.height - dispH2) / 2
         let after = CGRect(x: 0, y: imgTop2, width: cellSize.width, height: dispH2)
 
-        print("📐 documentsRects | imgSize=\(imgW)×\(imgH) ratio=\(imgW/imgH)")
-        print("📐 documentsRects | before: dispH=\(dispH) imgTop=\(imgTop)")
-        print("📐 documentsRects | after:  dispH=\(dispH2) imgTop=\(imgTop2)")
-
         return (before, after)
     }
 
@@ -370,7 +333,6 @@ extension OpenDocumentViewModel {
         let frame1 = CGRect(x: startX, y: startY, width: frameSize.width, height: frameSize.height)
         let frame2 = CGRect(x: startX, y: startY + frameSize.height + spacing, width: frameSize.width, height: frameSize.height)
 
-        // Determine which image the text is over
         let frameIndex: Int
         let imageFrame: CGRect
         if position.y < frame2.minY {
@@ -391,12 +353,6 @@ extension OpenDocumentViewModel {
         let rotatedSize = CGSize(width: imgSize.height, height: imgSize.width)
         let after = aspectFitRect(imageSize: rotatedSize, in: imageFrame)
 
-        print("📐 idCardRects | position=\(position) → frameIndex=\(frameIndex)")
-        print("📐 idCardRects | imageFrame=\(imageFrame)")
-        print("📐 idCardRects | imgSize=\(imgSize.width)×\(imgSize.height) rotatedSize=\(rotatedSize.width)×\(rotatedSize.height)")
-        print("📐 idCardRects | before=\(before)")
-        print("📐 idCardRects | after =\(after)")
-
         return (before, after)
     }
 
@@ -416,11 +372,6 @@ extension OpenDocumentViewModel {
         let before = aspectFitRect(imageSize: imgSize, in: frame)
         let rotatedSize = CGSize(width: imgSize.height, height: imgSize.width)
         let after = aspectFitRect(imageSize: rotatedSize, in: frame)
-
-        print("📐 passportRects | imgSize=\(imgSize.width)×\(imgSize.height) rotatedSize=\(rotatedSize.width)×\(rotatedSize.height)")
-        print("📐 passportRects | passportFrame=\(frame)")
-        print("📐 passportRects | before=\(before)")
-        print("📐 passportRects | after =\(after)")
 
         return (before, after)
     }

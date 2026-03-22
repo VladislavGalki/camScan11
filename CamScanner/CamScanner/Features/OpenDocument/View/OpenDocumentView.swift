@@ -58,9 +58,7 @@ private extension OpenDocumentView {
                 .underline(true, color: .text(.secondary))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .onTapGesture {
-                    //viewModel.shareActiveSheet = .renameFileSheet
-                }
+                .onTapGesture { }
 
             AppButton(
                 config: AppButtonConfig(
@@ -68,9 +66,7 @@ private extension OpenDocumentView {
                     style: .secondary,
                     size: .m
                 ),
-                action: {
-                    // что то хз что
-                }
+                action: { }
             )
 
             AppButton(
@@ -243,7 +239,14 @@ private extension OpenDocumentView {
         case .rotate:
             bottomBarAction = .rotate
         case .addPage:
-            break
+            router.present(
+                OpenDocumentRoute.scanFlow(
+                    ScanInputModel(existingDocumentID: viewModel.documentId),
+                    onDismiss: {
+                        viewModel.reloadTextItems()
+                    }
+                )
+            )
         case .addText:
             router.push(
                 OpenDocumentRoute.addText(

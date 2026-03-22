@@ -8,4 +8,5 @@ struct PreviewPageGroup: Identifiable, Equatable, Hashable {
 
 struct ScanPreviewInputModel: Equatable, Hashable {
     let pageGroups: [PreviewPageGroup]
+    var existingDocumentID: UUID?
 }
