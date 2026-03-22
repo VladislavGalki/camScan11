@@ -186,21 +186,21 @@ struct ShareView: View {
                                     .resizable()
                                     .scaledToFit()
                                     .overlay {
-                                        OpenDocumentTextOverlayView(items: document.textItems)
+                                        OpenDocumentTextOverlayView(
+                                            items: document.textItems,
+                                            referenceWidth: 322
+                                        )
                                     }
                             }
                         case .idCard, .driverLicense:
-                            VStack(spacing: 8) {
+                            // Text overlay covers the full container (not individual images)
+                            // to match the OpenDocument/AddText coordinate system
+                            VStack(spacing: 4) {
                                 if let image = document.frames.first?.preview {
                                     Image(uiImage: image)
                                         .resizable()
                                         .frame(width: 85.5, height: 55)
                                         .scaledToFit()
-                                        .overlay {
-                                            OpenDocumentTextOverlayView(
-                                                items: document.textItems.filter { $0.pageIndex == 0 }
-                                            )
-                                        }
                                 }
 
                                 if let secondImage = document.frames.last?.preview {
@@ -208,12 +208,13 @@ struct ShareView: View {
                                         .resizable()
                                         .frame(width: 85.5, height: 55)
                                         .scaledToFit()
-                                        .overlay {
-                                            OpenDocumentTextOverlayView(
-                                                items: document.textItems.filter { $0.pageIndex == 1 }
-                                            )
-                                        }
                                 }
+                            }
+                            .overlay {
+                                OpenDocumentTextOverlayView(
+                                    items: document.textItems,
+                                    referenceWidth: 322
+                                )
                             }
                         case .passport:
                             if let image = document.frames.first?.preview {
@@ -222,7 +223,10 @@ struct ShareView: View {
                                     .frame(width: 88, height: 125)
                                     .scaledToFit()
                                     .overlay {
-                                        OpenDocumentTextOverlayView(items: document.textItems)
+                                        OpenDocumentTextOverlayView(
+                                            items: document.textItems,
+                                            referenceWidth: 322
+                                        )
                                     }
                             }
                         default:
