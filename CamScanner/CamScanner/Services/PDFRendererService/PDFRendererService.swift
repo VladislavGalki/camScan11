@@ -286,6 +286,12 @@ extension PDFRendererService {
         private static let idCardSpacing: CGFloat = 8
         private static let passportImageViewSize = CGSize(width: 360, height: 250)
 
+        /// Round to screen pixel grid (Auto Layout snaps origins to nearest pixel)
+        private static func px(_ v: CGFloat) -> CGFloat {
+            let scale = UIScreen.main.scale
+            return round(v * scale) / scale
+        }
+
         // MARK: - Public
 
         static func drawForDocuments(
@@ -327,10 +333,11 @@ extension PDFRendererService {
             let imageCount = imageRects.count
 
             // Build screen image rects (same layout as AddTextPageCell)
+            // px() matches Auto Layout pixel-snapping of center constraints
             let totalH = CGFloat(imageCount) * imgSize.height
                 + CGFloat(imageCount - 1) * idCardSpacing
-            let originX = (cellWidth - imgSize.width) / 2
-            var y = (cellHeight - totalH) / 2
+            let originX = px((cellWidth - imgSize.width) / 2)
+            var y = px((cellHeight - totalH) / 2)
             var screenRects: [CGRect] = []
             for _ in 0..<imageCount {
                 screenRects.append(CGRect(x: originX, y: y,
@@ -370,8 +377,9 @@ extension PDFRendererService {
             }
 
             // ImageView centered in cell → visible image centered in imageView
-            let ivOriginX = (cellWidth - ivSize.width) / 2
-            let ivOriginY = (cellHeight - ivSize.height) / 2
+            // px() matches Auto Layout pixel-snapping of center constraints
+            let ivOriginX = px((cellWidth - ivSize.width) / 2)
+            let ivOriginY = px((cellHeight - ivSize.height) / 2)
             let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
             let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
 
