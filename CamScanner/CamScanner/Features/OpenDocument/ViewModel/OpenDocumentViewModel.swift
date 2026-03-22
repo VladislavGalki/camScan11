@@ -11,6 +11,9 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
     @Published var sliderValue: Double = 0.5
 
+    @Published var isExtractingText: Bool = false
+    @Published var extractedText: String?
+
     private var sliderRenderTask: Task<Void, Never>?
     private var scheduledFilterPreviewTask: Task<Void, Never>?
     private var filterPreviewGenerationTask: Task<Void, Never>?
@@ -23,6 +26,7 @@ final class OpenDocumentViewModel: ObservableObject {
     private let store: OpenDocumentStore
     private let documentRepository = DocumentRepository.shared
     private let filterRenderer = FilterRenderer.shared
+    private let ocrService = OCRService.shared
 
     private var currentCellHeight: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
@@ -148,6 +152,24 @@ extension OpenDocumentViewModel {
 
     func reloadTextItems() {
         store.reloadTextItems()
+    }
+
+    func extractText() {
+        guard let image = currentFrame?.preview else { return }
+
+        isExtractingText = true
+
+        Task {
+            do {
+                let result = try await ocrService.recognizeText(in: image)
+                let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                extractedText = trimmed.isEmpty ? nil : trimmed
+            } catch {
+                extractedText = nil
+            }
+            
+            isExtractingText = false
+        }
     }
 
     func makeShareInputModel() -> ShareInputModel {

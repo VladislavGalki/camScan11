@@ -32,6 +32,36 @@ struct OpenDocumentView: View {
             Color.bg(.main).ignoresSafeArea()
         )
         .ignoresSafeArea(.keyboard, edges: .all)
+        .overlay {
+            if viewModel.isExtractingText {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+                    .transaction { $0.animation = nil }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if viewModel.isExtractingText {
+                extractingOverlay
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.isExtractingText)
+        .sheet(isPresented: Binding(
+            get: { viewModel.extractedText != nil },
+            set: { if !$0 { viewModel.extractedText = nil } }
+        )) {
+            ExtractTextSheetView(
+                text: Binding(
+                    get: { viewModel.extractedText ?? "" },
+                    set: { viewModel.extractedText = $0 }
+                ),
+                documentName: viewModel.title,
+                onDismiss: { viewModel.extractedText = nil }
+            )
+            .presentationDetents([.large])
+            .presentationCornerRadius(38)
+            .presentationDragIndicator(.hidden)
+        }
         .onAppear {
             viewModel.reloadTextItems()
         }
@@ -225,6 +255,34 @@ private extension OpenDocumentView {
         .contentShape(Rectangle())
     }
     
+    var extractingOverlay: some View {
+        VStack(spacing: 0) {
+            ExtractSpinnerView()
+                .padding(.top, 45)
+                .padding(.bottom, 24)
+
+            Text("Recognizing text")
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+
+            Text("You’ll get editable text that you can easily share")
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .multilineTextAlignment(.center)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .frame(height: 227)
+        .background(
+            Color.bg(.surface)
+                .cornerRadius(24, corners: [.topLeft, .topRight])
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
     private func handleBottomBarTap(_ action: OpenDocumentBottomBarActionType) {
         switch action {
         case .crop:
@@ -260,7 +318,7 @@ private extension OpenDocumentView {
         case .watermark:
             break
         case .extract:
-            break
+            viewModel.extractText()
         case .translate:
             break
         case .delete:

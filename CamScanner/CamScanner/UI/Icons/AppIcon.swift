@@ -53,6 +53,8 @@ public enum AppIcon: String, CaseIterable {
     case extract = "extract"
     case addText = "addText"
     case translate = "translate"
+    case copy = "copy"
+    case keyboard = "keyboard"
     
     // MARK: - Fill
     case homeFill = "home_fill"
