@@ -516,12 +516,17 @@ extension PDFRendererService {
             )
             let vCenterOffset = max((contentHeight - ceil(textBounds.height)) / 2, 0)
 
+            print("🖨️ Renderer | drawItemAt \"\(item.text)\" fontSize=\(item.style.fontSize) pdfFontSize=\(fontSize)")
+            print("🖨️ Renderer |   block=(\(blockWidth), \(blockHeight)) content=(\(contentWidth), \(contentHeight)) padding=\(padding)")
+            print("🖨️ Renderer |   textBounds=\(textBounds) vCenterOffset=\(vCenterOffset)")
+
             let contentRect = CGRect(
                 x: centerX - blockWidth / 2 + padding,
                 y: centerY - blockHeight / 2 + padding + vCenterOffset,
                 width: contentWidth,
                 height: contentHeight
             )
+            print("🖨️ Renderer |   contentRect=\(contentRect)")
 
             let clipRect = CGRect(
                 x: centerX - blockWidth / 2,
