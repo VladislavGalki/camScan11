@@ -391,6 +391,9 @@ extension PDFRendererService {
 
         // MARK: - Core drawing (single rect mapping)
 
+        /// Maps coordinates using screen/render rect CENTERS (not origins).
+        /// Center-constrained views have pixel-exact centers in UIKit,
+        /// while origins are subject to pixel-rounding that varies by device.
         private static func drawMapped(
             _ items: [DocumentTextItem],
             in ctx: CGContext,
@@ -408,8 +411,8 @@ extension PDFRendererService {
             for item in items {
                 let cellX = item.centerX * cellWidth
                 let cellY = item.centerY * cellHeight
-                let pdfX = renderRect.origin.x + (cellX - screenContent.origin.x) * scaleX
-                let pdfY = renderRect.origin.y + (cellY - screenContent.origin.y) * scaleY
+                let pdfX = renderRect.midX + (cellX - screenContent.midX) * scaleX
+                let pdfY = renderRect.midY + (cellY - screenContent.midY) * scaleY
                 print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → pdfPos=(\(pdfX), \(pdfY)) fontScale=\(scaleX)")
 
                 drawItemAt(item, centerX: pdfX, centerY: pdfY,
@@ -421,6 +424,7 @@ extension PDFRendererService {
 
         // MARK: - Core drawing (per-image mapping for ID cards)
 
+        /// Maps coordinates using screen/render rect CENTERS (not origins).
         private static func drawPerImage(
             _ items: [DocumentTextItem],
             in ctx: CGContext,
@@ -447,8 +451,8 @@ extension PDFRendererService {
                 let scaleX = rr.width / sr.width
                 let scaleY = rr.height / sr.height
 
-                let pdfX = rr.origin.x + (cellX - sr.origin.x) * scaleX
-                let pdfY = rr.origin.y + (cellY - sr.origin.y) * scaleY
+                let pdfX = rr.midX + (cellX - sr.midX) * scaleX
+                let pdfY = rr.midY + (cellY - sr.midY) * scaleY
 
                 print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → img[\(bestIdx)] pdfPos=(\(pdfX), \(pdfY)) scale=(\(scaleX), \(scaleY))")
 
