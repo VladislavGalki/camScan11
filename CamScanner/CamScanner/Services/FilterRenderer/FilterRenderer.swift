@@ -84,7 +84,9 @@ final class FilterRenderer {
         to image: CIImage
     ) -> CIImage {
 
-        let transform = CGAffineTransform(rotationAngle: angle)
+        // Negate angle: CIImage Y-up coordinate system makes positive angle = CCW,
+        // but we need CW rotation to match OpenCV path (ROTATE_90_CLOCKWISE).
+        let transform = CGAffineTransform(rotationAngle: -angle)
         let rotated = image.transformed(by: transform)
 
         let originalExtent = image.extent

@@ -676,6 +676,68 @@ extension DocumentRepository {
         try context.save()
     }
     
+    func updateTextOverlayCoordinates(_ items: [DocumentTextItem]) throws {
+        for item in items {
+            let request: NSFetchRequest<TextOverlayEntity> = TextOverlayEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else { continue }
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+        }
+        try context.save()
+    }
+
+    /// Saves rotated text coordinates, page rotation angles **and** the rotated
+    /// preview images to disk in a single CoreData transaction so everything
+    /// stays in sync on reload.
+    func saveRotationState(
+        documentID: UUID,
+        textItems: [DocumentTextItem],
+        pageIndices: [Int],
+        rotationAngleDelta: Double,
+        pageImages: [(pageIndex: Int, image: UIImage)]
+    ) throws {
+        // 1. Update text overlay coordinates
+        for item in textItems {
+            let request: NSFetchRequest<TextOverlayEntity> = TextOverlayEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else { continue }
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+        }
+
+        // 2. Increment page rotation angles + save rotated images to disk
+        guard let document = try fetchDocument(id: documentID) else { return }
+        let pages = (document.pages as? Set<PageEntity>) ?? []
+
+        for page in pages where pageIndices.contains(Int(page.index)) {
+            // Rotation is baked into the saved JPEG, so reset angle to 0.
+            // This prevents double-rotation when filter re-renders from displayBase on reload.
+            page.rotationAngle = 0
+
+            // Overwrite the display JPEG with the newly rotated preview
+            if let entry = pageImages.first(where: { $0.pageIndex == Int(page.index) }),
+               let relativePath = page.imagePath {
+                let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+                if let data = entry.image.jpegData(compressionQuality: 0.92) {
+                    try? data.write(to: fileURL, options: [.atomic])
+                }
+            }
+        }
+
+        try context.save()
+    }
+
     func deleteTextOverlay(
         documentID: UUID,
         overlayID: UUID

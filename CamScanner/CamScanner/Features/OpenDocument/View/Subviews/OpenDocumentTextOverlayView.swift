@@ -27,7 +27,7 @@ struct OpenDocumentTextOverlayView: View {
                     let posY = item.centerY * geo.size.height
                     let w = item.width * geo.size.width
                     let h = item.height * geo.size.height
-                    print("📝 TextOverlay |   \"\(item.text)\" pos=(\(posX), \(posY)) blockSize=(\(w), \(h)) fontSize=\(item.style.fontSize)")
+                    print("📝 TextOverlay |   \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) pos=(\(posX), \(posY)) blockSize=(\(w), \(h)) fontSize=\(item.style.fontSize) rot=\(item.rotation)")
                 }
             }
         }

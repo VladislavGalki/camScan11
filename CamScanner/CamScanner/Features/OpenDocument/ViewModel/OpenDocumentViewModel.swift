@@ -171,29 +171,265 @@ extension OpenDocumentViewModel {
 
     func rotatePage(at index: Int) {
         guard models.indices.contains(index) else { return }
-        
+
+        // 1. Compute rotated text positions (sync, uses current preview sizes)
+        let updatedTextItems = computeRotatedTextItems(forPageIndex: index)
+        let pageIndices = pageIndicesForModel(at: index)
+
+        // Defer ALL @Published mutations to escape the current SwiftUI view update
         DispatchQueue.main.async { [weak self] in
-            self?.updatePage(at: index) { frame in
+            guard let self else { return }
+
+            // 2. Apply text changes in-memory
+            if let items = updatedTextItems {
+                self.textItems = items
+            }
+
+            // 3. Update in-memory model (re-render preview)
+            self.updatePage(at: index) { frame in
                 var updated = frame
                 var newState = updated.currentFilter
-                newState.rotationAngle += .pi / 2
+                newState.rotationAngle = (newState.rotationAngle + .pi / 2)
+                    .truncatingRemainder(dividingBy: 2 * .pi)
                 updated.applyFilter(newState)
-                
+
                 if let base = updated.displayBase {
-                    updated.preview = self?.filterRenderer.render(
+                    updated.preview = self.filterRenderer.render(
                         image: base,
                         state: newState
                     )
                 }
-                
+
                 return updated
             }
+
+            if index == self.selectedIndex {
+                self.rebuildFilterPreviewItems()
+                self.updateSliderFromCurrentFrame()
+            }
+
+            // 4. Collect rotated preview images for saving to disk
+            var pageImages: [(pageIndex: Int, image: UIImage)] = []
+            if let model = self.models[safe: index] {
+                for (frameIdx, dbPageIndex) in pageIndices.enumerated() {
+                    if let preview = model.frames[safe: frameIdx]?.preview {
+                        pageImages.append((pageIndex: dbPageIndex, image: preview))
+                    }
+                }
+            }
+
+            // 5. Save text coords + page rotation + images atomically
+            let pageItems = (updatedTextItems ?? self.textItems)
+                .filter { $0.pageIndex == index }
+            try? self.documentRepository.saveRotationState(
+                documentID: self.inputModel.documentID,
+                textItems: pageItems,
+                pageIndices: pageIndices,
+                rotationAngleDelta: .pi / 2,
+                pageImages: pageImages
+            )
         }
-        
-        if index == selectedIndex {
-            rebuildFilterPreviewItems()
-            updateSliderFromCurrentFrame()
+    }
+
+    private static let cardWidth: CGFloat = 322
+
+    /// Returns updated text items with rotated coordinates, or nil if nothing changed.
+    private func computeRotatedTextItems(forPageIndex pageIndex: Int) -> [DocumentTextItem]? {
+        guard let model = models[safe: pageIndex] else { return nil }
+
+        let cellW = Self.cardWidth
+        let cellH = currentCellHeight
+        guard cellW > 0, cellH > 0 else { return nil }
+
+        let cellSize = CGSize(width: cellW, height: cellH)
+
+        print("📐 ── ROTATE BEGIN ──────────────────────────────")
+        print("📐 cell=\(cellW)×\(cellH) docType=\(model.documentType) framesCount=\(model.frames.count)")
+        for (fi, frame) in model.frames.enumerated() {
+            let pSize = frame.preview?.size ?? .zero
+            let dSize = frame.displayBase?.size ?? .zero
+            let angle = frame.currentFilter.rotationAngle
+            print("📐 frame[\(fi)] preview=\(pSize.width)×\(pSize.height) displayBase=\(dSize.width)×\(dSize.height) rotAngle=\(angle)rad (\(angle * 180 / .pi)°)")
         }
+        print("📐 textItems count=\(textItems.count) (pageIndex=\(pageIndex) items=\(textItems.filter { $0.pageIndex == pageIndex }.count))")
+
+        var updatedItems = textItems
+        var changed = false
+
+        for i in updatedItems.indices where updatedItems[i].pageIndex == pageIndex {
+            let item = updatedItems[i]
+            let pos = CGPoint(x: item.centerX * cellW, y: item.centerY * cellH)
+
+            guard let (beforeRect, afterRect) = contentRectsForRotation(
+                model: model, position: pos, cellSize: cellSize
+            ) else {
+                print("📐 [\(i)] contentRectsForRotation returned nil – skipping")
+                continue
+            }
+
+            // Cell pixel → content-normalized [0,1], clamped to image bounds.
+            // Text placed slightly outside the image area (e.g. near edges when
+            // image doesn't fill the cell) must be clamped to avoid mapping
+            // outside cell bounds after rotation.
+            let nx = min(1, max(0, (pos.x - beforeRect.minX) / beforeRect.width))
+            let ny = min(1, max(0, (pos.y - beforeRect.minY) / beforeRect.height))
+
+            // 90° CW in normalized content space
+            let rx = 1 - ny
+            let ry = nx
+
+            // Content-normalized → cell-normalized
+            let newCX = (afterRect.minX + rx * afterRect.width) / cellW
+            let newCY = (afterRect.minY + ry * afterRect.height) / cellH
+
+            print("📐 [\(i)] \"\(item.text)\" BEFORE center=(\(item.centerX), \(item.centerY)) size=(\(item.width), \(item.height)) rot=\(item.rotation)")
+            print("📐 [\(i)] pixelPos=(\(pos.x), \(pos.y))")
+            print("📐 [\(i)] beforeRect=(x:\(beforeRect.minX) y:\(beforeRect.minY) w:\(beforeRect.width) h:\(beforeRect.height))")
+            print("📐 [\(i)] afterRect =(x:\(afterRect.minX) y:\(afterRect.minY) w:\(afterRect.width) h:\(afterRect.height))")
+            print("📐 [\(i)] contentNorm=(\(nx), \(ny)) → rotated90CW=(\(rx), \(ry))")
+            print("📐 [\(i)] AFTER  center=(\(newCX), \(newCY)) rot=\((item.rotation + 90).truncatingRemainder(dividingBy: 360))")
+
+            updatedItems[i].centerX = newCX
+            updatedItems[i].centerY = newCY
+            updatedItems[i].rotation = (item.rotation + 90).truncatingRemainder(dividingBy: 360)
+
+            changed = true
+        }
+
+        print("📐 ── ROTATE END ────────────────────────────────")
+        return changed ? updatedItems : nil
+    }
+
+    /// Maps a model index to the corresponding PageEntity indices in the DB.
+    private func pageIndicesForModel(at modelIndex: Int) -> [Int] {
+        var startIndex = 0
+        for i in 0..<modelIndex {
+            startIndex += models[i].frames.count
+        }
+        let count = models[safe: modelIndex]?.frames.count ?? 0
+        return Array(startIndex..<(startIndex + count))
+    }
+
+    // MARK: - Content rect helpers
+
+    private func contentRectsForRotation(
+        model: ScanPreviewModel,
+        position: CGPoint,
+        cellSize: CGSize
+    ) -> (before: CGRect, after: CGRect)? {
+        switch model.documentType {
+        case .documents:
+            return documentsContentRects(model: model, cellSize: cellSize)
+
+        case .idCard, .driverLicense:
+            return idCardContentRects(model: model, position: position, cellSize: cellSize)
+
+        case .passport:
+            return passportContentRects(model: model, cellSize: cellSize)
+
+        case .qrCode:
+            return nil
+        }
+    }
+
+    private func documentsContentRects(
+        model: ScanPreviewModel,
+        cellSize: CGSize
+    ) -> (before: CGRect, after: CGRect)? {
+        guard let preview = model.frames.first?.preview else { return nil }
+        let imgW = preview.size.width
+        let imgH = preview.size.height
+        guard imgW > 0, imgH > 0 else { return nil }
+
+        let dispH = cellSize.width * imgH / imgW
+        let imgTop = (cellSize.height - dispH) / 2
+        let before = CGRect(x: 0, y: imgTop, width: cellSize.width, height: dispH)
+
+        let dispH2 = cellSize.width * imgW / imgH
+        let imgTop2 = (cellSize.height - dispH2) / 2
+        let after = CGRect(x: 0, y: imgTop2, width: cellSize.width, height: dispH2)
+
+        print("📐 documentsRects | imgSize=\(imgW)×\(imgH) ratio=\(imgW/imgH)")
+        print("📐 documentsRects | before: dispH=\(dispH) imgTop=\(imgTop)")
+        print("📐 documentsRects | after:  dispH=\(dispH2) imgTop=\(imgTop2)")
+
+        return (before, after)
+    }
+
+    private func idCardContentRects(
+        model: ScanPreviewModel,
+        position: CGPoint,
+        cellSize: CGSize
+    ) -> (before: CGRect, after: CGRect)? {
+        let frameSize = CGSize(width: 171, height: 108)
+        let spacing: CGFloat = 8
+        let totalH = frameSize.height * 2 + spacing
+        let startY = (cellSize.height - totalH) / 2
+        let startX = (cellSize.width - frameSize.width) / 2
+
+        let frame1 = CGRect(x: startX, y: startY, width: frameSize.width, height: frameSize.height)
+        let frame2 = CGRect(x: startX, y: startY + frameSize.height + spacing, width: frameSize.width, height: frameSize.height)
+
+        // Determine which image the text is over
+        let frameIndex: Int
+        let imageFrame: CGRect
+        if position.y < frame2.minY {
+            frameIndex = 0
+            imageFrame = frame1
+        } else {
+            frameIndex = min(1, model.frames.count - 1)
+            imageFrame = frame2
+        }
+
+        guard model.frames.indices.contains(frameIndex),
+              let preview = model.frames[frameIndex].preview else { return nil }
+
+        let imgSize = preview.size
+        guard imgSize.width > 0, imgSize.height > 0 else { return nil }
+
+        let before = aspectFitRect(imageSize: imgSize, in: imageFrame)
+        let rotatedSize = CGSize(width: imgSize.height, height: imgSize.width)
+        let after = aspectFitRect(imageSize: rotatedSize, in: imageFrame)
+
+        print("📐 idCardRects | position=\(position) → frameIndex=\(frameIndex)")
+        print("📐 idCardRects | imageFrame=\(imageFrame)")
+        print("📐 idCardRects | imgSize=\(imgSize.width)×\(imgSize.height) rotatedSize=\(rotatedSize.width)×\(rotatedSize.height)")
+        print("📐 idCardRects | before=\(before)")
+        print("📐 idCardRects | after =\(after)")
+
+        return (before, after)
+    }
+
+    private func passportContentRects(
+        model: ScanPreviewModel,
+        cellSize: CGSize
+    ) -> (before: CGRect, after: CGRect)? {
+        guard let preview = model.frames.first?.preview else { return nil }
+        let imgSize = preview.size
+        guard imgSize.width > 0, imgSize.height > 0 else { return nil }
+
+        let frameSize = CGSize(width: 360, height: 250)
+        let frameX = (cellSize.width - frameSize.width) / 2
+        let frameY = (cellSize.height - frameSize.height) / 2
+        let frame = CGRect(x: frameX, y: frameY, width: frameSize.width, height: frameSize.height)
+
+        let before = aspectFitRect(imageSize: imgSize, in: frame)
+        let rotatedSize = CGSize(width: imgSize.height, height: imgSize.width)
+        let after = aspectFitRect(imageSize: rotatedSize, in: frame)
+
+        print("📐 passportRects | imgSize=\(imgSize.width)×\(imgSize.height) rotatedSize=\(rotatedSize.width)×\(rotatedSize.height)")
+        print("📐 passportRects | passportFrame=\(frame)")
+        print("📐 passportRects | before=\(before)")
+        print("📐 passportRects | after =\(after)")
+
+        return (before, after)
+    }
+
+    private func aspectFitRect(imageSize: CGSize, in frame: CGRect) -> CGRect {
+        let scale = min(frame.width / imageSize.width, frame.height / imageSize.height)
+        let w = imageSize.width * scale
+        let h = imageSize.height * scale
+        return CGRect(x: frame.midX - w / 2, y: frame.midY - h / 2, width: w, height: h)
     }
 }
 
