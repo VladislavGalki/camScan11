@@ -228,6 +228,25 @@ enum VisionRectangleDetector {
                 continue
             }
 
+            // Reject if contour covers >90% of the frame (it's the background, not a document)
+            let imageArea = Double(dilated.cols()) * Double(dilated.rows())
+            if area / imageArea > 0.90 {
+                print("[RectDetect]   [\(strategyName)] REJECTED: covers \(Int(area / imageArea * 100))% of frame")
+                continue
+            }
+
+            // Check angles are roughly rectangular (each corner within 30° of 90°)
+            guard hasReasonableAngles(approx) else {
+                print("[RectDetect]   [\(strategyName)] REJECTED: angles not rectangular, area=\(area)")
+                continue
+            }
+
+            // Check aspect ratio is reasonable (not too extreme like 10:1)
+            guard hasReasonableAspectRatio(approx) else {
+                print("[RectDetect]   [\(strategyName)] REJECTED: extreme aspect ratio, area=\(area)")
+                continue
+            }
+
             bestArea = area
             // OpenCV uses top-left origin; convert to bottom-left origin
             // so that the existing toCartesian() call in CaptureSessionManager works correctly.
@@ -243,6 +262,48 @@ enum VisionRectangleDetector {
             print("[RectDetect]   [\(strategyName)] ✅ NEW best quad, area=\(area)")
         }
         print("[RectDetect]   [\(strategyName)] summary: total=\(candidateCount), passedArea=\(passedAreaCount), 4pt=\(fourPointCount), convex=\(convexCount)")
+    }
+
+    /// Check that all interior angles are within 30° of 90° (i.e. 60°–120°).
+    private static func hasReasonableAngles(_ points: [Point2f]) -> Bool {
+        let minAngle: Double = 60
+        let maxAngle: Double = 120
+
+        for i in 0..<4 {
+            let a = points[i]
+            let b = points[(i + 1) % 4]
+            let c = points[(i + 2) % 4]
+
+            let v1x = Double(a.x - b.x)
+            let v1y = Double(a.y - b.y)
+            let v2x = Double(c.x - b.x)
+            let v2y = Double(c.y - b.y)
+
+            let dot = v1x * v2x + v1y * v2y
+            let mag1 = sqrt(v1x * v1x + v1y * v1y)
+            let mag2 = sqrt(v2x * v2x + v2y * v2y)
+            guard mag1 > 0, mag2 > 0 else { return false }
+
+            let cosAngle = max(-1, min(1, dot / (mag1 * mag2)))
+            let angle = acos(cosAngle) * 180.0 / .pi
+
+            if angle < minAngle || angle > maxAngle { return false }
+        }
+        return true
+    }
+
+    /// Check aspect ratio is between 1:5 and 5:1.
+    private static func hasReasonableAspectRatio(_ points: [Point2f]) -> Bool {
+        func dist(_ a: Point2f, _ b: Point2f) -> Double {
+            let dx = Double(a.x - b.x)
+            let dy = Double(a.y - b.y)
+            return sqrt(dx * dx + dy * dy)
+        }
+        let side1 = dist(points[0], points[1])
+        let side2 = dist(points[1], points[2])
+        guard side1 > 0, side2 > 0 else { return false }
+        let ratio = max(side1, side2) / min(side1, side2)
+        return ratio <= 5.0
     }
 
     private static func isConvex(_ points: [Point2f]) -> Bool {
