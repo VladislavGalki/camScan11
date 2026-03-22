@@ -12,21 +12,29 @@ enum VisionRectangleDetector {
     static func rectangle(forPixelBuffer pixelBuffer: CVPixelBuffer, completion: @escaping ((Quadrilateral?) -> Void)) {
         let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+        print("[RectDetect] rectangle(forPixelBuffer:) called, size=\(width)x\(height)")
 
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let uiImage = ciImageToUIImage(ciImage) else {
+            print("[RectDetect] ❌ ciImageToUIImage returned nil")
             completion(nil)
             return
         }
 
         let mat = Mat(uiImage: uiImage)
+        print("[RectDetect] Mat created: \(mat.cols())x\(mat.rows()), channels=\(mat.channels()), type=\(mat.type())")
         let quad = detectLargestRectangle(in: mat, width: width, height: height)
+        print("[RectDetect] result: \(quad != nil ? "FOUND quad" : "nil")")
+        if let q = quad {
+            print("[RectDetect]   tl=\(q.topLeft) tr=\(q.topRight) br=\(q.bottomRight) bl=\(q.bottomLeft)")
+        }
         completion(quad)
     }
 
     /// Detects the largest rectangle from a CIImage.
     static func rectangle(forImage image: CIImage, completion: @escaping ((Quadrilateral?) -> Void)) {
         guard let uiImage = ciImageToUIImage(image) else {
+            print("[RectDetect] ❌ ciImageToUIImage returned nil (forImage)")
             completion(nil)
             return
         }
@@ -43,6 +51,7 @@ enum VisionRectangleDetector {
     ) {
         let orientedImage = image.oriented(orientation)
         guard let uiImage = ciImageToUIImage(orientedImage) else {
+            print("[RectDetect] ❌ ciImageToUIImage returned nil (forImage+orientation)")
             completion(nil)
             return
         }
@@ -75,6 +84,7 @@ enum VisionRectangleDetector {
                 height: Int32(Double(source.rows()) * scale)
             )
         )
+        print("[RectDetect] downscaled \(source.cols())x\(source.rows()) -> \(resized.cols())x\(resized.rows()), scale=\(scale)")
         return (resized, scale)
     }
 
@@ -89,6 +99,7 @@ enum VisionRectangleDetector {
         } else {
             small.copy(to: gray)
         }
+        print("[RectDetect] gray: \(gray.cols())x\(gray.rows()), channels=\(gray.channels()), empty=\(gray.empty())")
 
         let blurred = Mat()
         Imgproc.GaussianBlur(
@@ -103,16 +114,21 @@ enum VisionRectangleDetector {
         var bestArea: Double = 0
         let imageArea = Double(small.cols()) * Double(small.rows())
         let minArea = imageArea * 0.02
+        print("[RectDetect] imageArea=\(imageArea), minArea=\(minArea)")
 
         // Strategy 1: Canny with low thresholds
         let cannyLow = Mat()
         Imgproc.Canny(image: blurred, edges: cannyLow, threshold1: 30, threshold2: 100)
-        morphAndFind(cannyLow, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
+        let cannyLowNonZero = Core.countNonZero(src: cannyLow)
+        print("[RectDetect] Strategy 1 (Canny low): nonZero=\(cannyLowNonZero)")
+        morphAndFind(cannyLow, minArea: minArea, strategyName: "CannyLow", best: &bestQuad, bestArea: &bestArea)
 
         // Strategy 2: Canny with medium thresholds
         let cannyMed = Mat()
         Imgproc.Canny(image: blurred, edges: cannyMed, threshold1: 50, threshold2: 150)
-        morphAndFind(cannyMed, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
+        let cannyMedNonZero = Core.countNonZero(src: cannyMed)
+        print("[RectDetect] Strategy 2 (Canny med): nonZero=\(cannyMedNonZero)")
+        morphAndFind(cannyMed, minArea: minArea, strategyName: "CannyMed", best: &bestQuad, bestArea: &bestArea)
 
         // Strategy 3: Adaptive threshold + morphological close
         let adaptive = Mat()
@@ -125,9 +141,14 @@ enum VisionRectangleDetector {
             blockSize: 11,
             C: 2
         )
-        morphAndFind(adaptive, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
+        let adaptiveNonZero = Core.countNonZero(src: adaptive)
+        print("[RectDetect] Strategy 3 (Adaptive): nonZero=\(adaptiveNonZero)")
+        morphAndFind(adaptive, minArea: minArea, strategyName: "Adaptive", best: &bestQuad, bestArea: &bestArea)
 
-        guard var quad = bestQuad else { return nil }
+        guard var quad = bestQuad else {
+            print("[RectDetect] ⚠️ No quad found across all strategies")
+            return nil
+        }
 
         // Scale coordinates back to original size
         if scale != 1.0 {
@@ -147,6 +168,7 @@ enum VisionRectangleDetector {
     private static func morphAndFind(
         _ edges: Mat,
         minArea: Double,
+        strategyName: String,
         best: inout Quadrilateral?,
         bestArea: inout Double
     ) {
@@ -173,18 +195,38 @@ enum VisionRectangleDetector {
             mode: .RETR_LIST,
             method: .CHAIN_APPROX_SIMPLE
         )
+        print("[RectDetect]   [\(strategyName)] contours found: \(contours.count)")
+
+        var candidateCount = 0
+        var passedAreaCount = 0
+        var fourPointCount = 0
+        var convexCount = 0
 
         for contour in contours {
+            candidateCount += 1
             let pointsMat = MatOfPoint(array: contour)
             let area = Imgproc.contourArea(contour: pointsMat)
-            guard area > minArea, area > bestArea else { continue }
+            guard area > minArea else { continue }
+            passedAreaCount += 1
+            guard area > bestArea else { continue }
 
             let contour2f: [Point2f] = contour.map { Point2f(x: Float($0.x), y: Float($0.y)) }
             let peri = Imgproc.arcLength(curve: contour2f, closed: true)
 
             var approx = [Point2f]()
             Imgproc.approxPolyDP(curve: contour2f, approxCurve: &approx, epsilon: 0.02 * peri, closed: true)
-            guard approx.count == 4, isConvex(approx) else { continue }
+
+            if approx.count == 4 {
+                fourPointCount += 1
+            }
+            guard approx.count == 4 else { continue }
+
+            let convex = isConvex(approx)
+            if convex { convexCount += 1 }
+            guard convex else {
+                print("[RectDetect]   [\(strategyName)] 4-point contour FAILED convex check, area=\(area)")
+                continue
+            }
 
             bestArea = area
             // OpenCV uses top-left origin; convert to bottom-left origin
@@ -198,7 +240,9 @@ enum VisionRectangleDetector {
             )
             quad.reorganize()
             best = quad
+            print("[RectDetect]   [\(strategyName)] ✅ NEW best quad, area=\(area)")
         }
+        print("[RectDetect]   [\(strategyName)] summary: total=\(candidateCount), passedArea=\(passedAreaCount), 4pt=\(fourPointCount), convex=\(convexCount)")
     }
 
     private static func isConvex(_ points: [Point2f]) -> Bool {
