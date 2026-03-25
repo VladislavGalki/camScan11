@@ -1,11 +1,10 @@
 import UIKit
 import SwiftUI
 
-final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
+final class WatermarkPageCell: UICollectionViewCell, UIScrollViewDelegate {
+    static let reuseId = "WatermarkPageCell"
 
-    static let reuseId = "OpenDocumentPageCell"
-
-    // MARK: Views
+    // MARK: - UI
 
     private let scrollView = UIScrollView()
     private let zoomContainerView = UIView()
@@ -14,23 +13,30 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     private let imageView1 = UIImageView()
     private let imageView2 = UIImageView()
 
+    // MARK: - Constraints
+
     private var image1WidthConstraint: NSLayoutConstraint?
     private var image1HeightConstraint: NSLayoutConstraint?
     private var image2WidthConstraint: NSLayoutConstraint?
     private var image2HeightConstraint: NSLayoutConstraint?
 
-    private var overlayHostingController: UIHostingController<OpenDocumentCombinedOverlayView>?
+    // MARK: - State
 
+    private var currentWatermarkItems: [DocumentWatermarkItem] = []
+    private var currentSelectedWatermarkID: UUID?
+    private var overlayHostingController: UIHostingController<WatermarkPageOverlayView>?
+
+    // MARK: - Callbacks
+
+    var onSelectedWatermarkFrameChanged: ((UUID, CGRect?) -> Void)?
     var onZoomChanged: ((Bool) -> Void)?
 
-    // MARK: Init
+    // MARK: - Init
 
     override init(frame: CGRect) {
         super.init(frame: frame)
 
         contentView.backgroundColor = .white
-        contentView.layer.cornerRadius = 0
-
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.15
         layer.shadowRadius = 4
@@ -41,9 +47,49 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    // MARK: Setup
+    override func prepareForReuse() {
+        super.prepareForReuse()
 
-    private func setup() {
+        overlayHostingController?.view.removeFromSuperview()
+        overlayHostingController = nil
+
+        image1WidthConstraint?.isActive = false
+        image1HeightConstraint?.isActive = false
+        image2WidthConstraint?.isActive = false
+        image2HeightConstraint?.isActive = false
+
+        imageView1.image = nil
+        imageView2.image = nil
+        imageView1.isHidden = true
+        imageView2.isHidden = true
+
+        currentWatermarkItems = []
+        currentSelectedWatermarkID = nil
+        onSelectedWatermarkFrameChanged = nil
+        onZoomChanged = nil
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        scrollView.frame = contentView.bounds
+        zoomContainerView.frame = scrollView.bounds
+
+        if stackView.superview != nil, stackView.constraints.isEmpty {
+            NSLayoutConstraint.activate([
+                stackView.centerXAnchor.constraint(equalTo: zoomContainerView.centerXAnchor),
+                stackView.centerYAnchor.constraint(equalTo: zoomContainerView.centerYAnchor)
+            ])
+        }
+
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 0).cgPath
+    }
+}
+
+// MARK: - Setup
+
+private extension WatermarkPageCell {
+    func setup() {
         scrollView.minimumZoomScale = 1
         scrollView.maximumZoomScale = 3
         scrollView.delegate = self
@@ -69,30 +115,22 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
         stackView.addArrangedSubview(imageView1)
         stackView.addArrangedSubview(imageView2)
     }
+}
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
+// MARK: - Configure
 
-        scrollView.frame = contentView.bounds
-        zoomContainerView.frame = scrollView.bounds
-
-        if stackView.superview != nil, stackView.constraints.isEmpty {
-            NSLayoutConstraint.activate([
-                stackView.centerXAnchor.constraint(equalTo: zoomContainerView.centerXAnchor),
-                stackView.centerYAnchor.constraint(equalTo: zoomContainerView.centerYAnchor)
-            ])
-        }
-
-        layer.shadowPath = UIBezierPath(
-            roundedRect: bounds,
-            cornerRadius: 0
-        ).cgPath
-    }
-
-    // MARK: Configure
-
-    func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = [], watermarkItems: [DocumentWatermarkItem] = []) {
-        print("📝 OpenDocPageCell | configure docType=\(model.documentType) frames=\(model.frames.count) textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) cellBounds=\(contentView.bounds)")
+extension WatermarkPageCell {
+    func configure(
+        model: ScanPreviewModel,
+        pageIndex: Int,
+        watermarkItems: [DocumentWatermarkItem],
+        selectedWatermarkID: UUID?,
+        editingWatermarkID: UUID?,
+        editingTextDraft: String,
+        delegate: WatermarkPageDelegate?,
+        onSelectedWatermarkFrameChanged: ((UUID, CGRect?) -> Void)?
+    ) {
+        self.onSelectedWatermarkFrameChanged = onSelectedWatermarkFrameChanged
         scrollView.zoomScale = 1
 
         imageView1.isHidden = true
@@ -108,43 +146,34 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
         switch model.documentType {
         case .documents:
             guard let image = previews.first else { return }
-
             imageView1.isHidden = false
             imageView1.image = image
-
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalTo: zoomContainerView.widthAnchor)
             image1WidthConstraint?.isActive = true
 
         case .idCard, .driverLicense:
             imageView1.isHidden = false
             imageView2.isHidden = false
-
             imageView1.image = previews.first
             imageView2.image = previews.count > 1 ? previews[1] : nil
 
             let size = CGSize(width: 171, height: 108)
-
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
             image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
             image2WidthConstraint = imageView2.widthAnchor.constraint(equalToConstant: size.width)
             image2HeightConstraint = imageView2.heightAnchor.constraint(equalToConstant: size.height)
 
-            image1WidthConstraint?.isActive = true
-            image1HeightConstraint?.isActive = true
-            image2WidthConstraint?.isActive = true
-            image2HeightConstraint?.isActive = true
+            [image1WidthConstraint, image1HeightConstraint,
+             image2WidthConstraint, image2HeightConstraint].forEach { $0?.isActive = true }
 
         case .passport:
             guard let image = previews.first else { return }
-
             imageView1.isHidden = false
             imageView1.image = image
 
             let size = CGSize(width: 360, height: 250)
-
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
             image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
-
             image1WidthConstraint?.isActive = true
             image1HeightConstraint?.isActive = true
 
@@ -152,24 +181,41 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
             break
         }
 
-        updateOverlays(textItems: textItems, watermarkItems: watermarkItems)
-        layoutIfNeeded()
+        updateOverlay(
+            pageIndex: pageIndex,
+            watermarkItems: watermarkItems,
+            selectedWatermarkID: selectedWatermarkID,
+            editingWatermarkID: editingWatermarkID,
+            editingTextDraft: editingTextDraft,
+            delegate: delegate
+        )
     }
 
-    func updateTextOverlay(textItems: [DocumentTextItem]) {
-        updateOverlays(textItems: textItems, watermarkItems: [])
-    }
+    func updateOverlay(
+        pageIndex: Int,
+        watermarkItems: [DocumentWatermarkItem],
+        selectedWatermarkID: UUID?,
+        editingWatermarkID: UUID?,
+        editingTextDraft: String,
+        delegate: WatermarkPageDelegate?
+    ) {
+        currentWatermarkItems = watermarkItems
+        currentSelectedWatermarkID = selectedWatermarkID
 
-    func updateOverlays(textItems: [DocumentTextItem], watermarkItems: [DocumentWatermarkItem]) {
-        print("📝 OpenDocPageCell | updateOverlays textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) zoomContainer=\(zoomContainerView.bounds)")
-        let overlay = OpenDocumentCombinedOverlayView(textItems: textItems, watermarkItems: watermarkItems)
+        let overlay = WatermarkPageOverlayView(
+            pageIndex: pageIndex,
+            items: watermarkItems,
+            selectedWatermarkID: selectedWatermarkID,
+            editingWatermarkID: editingWatermarkID,
+            editingTextDraft: editingTextDraft,
+            delegate: delegate
+        )
 
         if let overlayHostingController {
             overlayHostingController.rootView = overlay
         } else {
             let hosting = UIHostingController(rootView: overlay)
             hosting.view.backgroundColor = .clear
-            hosting.view.isUserInteractionEnabled = false
             hosting.view.translatesAutoresizingMaskIntoConstraints = false
 
             overlayHostingController = hosting
@@ -182,10 +228,15 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
                 hosting.view.trailingAnchor.constraint(equalTo: zoomContainerView.trailingAnchor)
             ])
         }
+
+        layoutIfNeeded()
+        reportSelectedWatermarkFrameIfNeeded(watermarkItems: watermarkItems, selectedWatermarkID: selectedWatermarkID)
     }
+}
 
-    // MARK: Zoom
+// MARK: - Zoom
 
+extension WatermarkPageCell {
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         zoomContainerView
     }
@@ -193,24 +244,35 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         onZoomChanged?(scrollView.zoomScale > 1.01)
         centerZoomContainer()
+        reportSelectedWatermarkFrameIfNeeded(watermarkItems: currentWatermarkItems, selectedWatermarkID: currentSelectedWatermarkID)
     }
+}
 
-    private func centerZoomContainer() {
+// MARK: - Helpers
+
+private extension WatermarkPageCell {
+    func centerZoomContainer() {
         let bounds = scrollView.bounds
         var frame = zoomContainerView.frame
 
-        if frame.size.width < bounds.width {
-            frame.origin.x = (bounds.width - frame.width) / 2
-        } else {
-            frame.origin.x = 0
-        }
-
-        if frame.size.height < bounds.height {
-            frame.origin.y = (bounds.height - frame.height) / 2
-        } else {
-            frame.origin.y = 0
-        }
+        frame.origin.x = frame.size.width < bounds.width ? (bounds.width - frame.width) / 2 : 0
+        frame.origin.y = frame.size.height < bounds.height ? (bounds.height - frame.height) / 2 : 0
 
         zoomContainerView.frame = frame
+    }
+
+    func reportSelectedWatermarkFrameIfNeeded(watermarkItems: [DocumentWatermarkItem], selectedWatermarkID: UUID?) {
+        guard let selectedWatermarkID,
+              let item = watermarkItems.first(where: { $0.id == selectedWatermarkID }) else { return }
+
+        let rectInZoomContainer = CGRect(
+            x: item.centerX * zoomContainerView.bounds.width - (item.width * zoomContainerView.bounds.width) / 2,
+            y: item.centerY * zoomContainerView.bounds.height - (item.height * zoomContainerView.bounds.height) / 2,
+            width: item.width * zoomContainerView.bounds.width,
+            height: item.height * zoomContainerView.bounds.height
+        )
+
+        let rectInContentView = zoomContainerView.convert(rectInZoomContainer, to: contentView)
+        onSelectedWatermarkFrameChanged?(selectedWatermarkID, rectInContentView)
     }
 }

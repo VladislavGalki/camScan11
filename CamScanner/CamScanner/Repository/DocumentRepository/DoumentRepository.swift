@@ -834,6 +834,82 @@ extension DocumentRepository {
     }
 }
 
+// MARK: - WatermarkOverlays
+extension DocumentRepository {
+    func fetchWatermarkOverlays(documentID: UUID) throws -> [DocumentWatermarkItem] {
+        guard let document = try fetchDocument(id: documentID) else { return [] }
+
+        let overlays = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
+
+        return overlays
+            .sorted {
+                if $0.pageIndex != $1.pageIndex {
+                    return $0.pageIndex < $1.pageIndex
+                }
+                return $0.createdAt < $1.createdAt
+            }
+            .map(DocumentWatermarkItem.init(entity:))
+    }
+
+    func replaceWatermarkOverlays(
+        documentID: UUID,
+        items: [DocumentWatermarkItem]
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9201,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let existing = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
+        for overlay in existing {
+            context.delete(overlay)
+        }
+
+        let now = Date()
+
+        for item in items {
+            let entity = WatermarkOverlayEntity(context: context)
+            entity.id = item.id
+            entity.pageIndex = Int16(item.pageIndex)
+            entity.text = item.text
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+            entity.opacity = item.opacity
+            entity.fontSize = item.style.fontSize
+            entity.textColorHex = item.style.textColorHex
+            entity.alignmentRaw = item.style.alignment.rawValue
+            entity.createdAt = now
+            entity.updatedAt = now
+            entity.document = document
+        }
+
+        try context.save()
+    }
+
+    func deleteWatermarkOverlay(
+        documentID: UUID,
+        overlayID: UUID
+    ) throws {
+        let request: NSFetchRequest<WatermarkOverlayEntity> = WatermarkOverlayEntity.fetchRequest()
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "document.id == %@", documentID as CVarArg),
+            NSPredicate(format: "id == %@", overlayID as CVarArg)
+        ])
+        request.fetchLimit = 1
+
+        if let entity = try context.fetch(request).first {
+            context.delete(entity)
+            try context.save()
+        }
+    }
+}
+
 // MARK: - Share
 extension DocumentRepository {
     func loadShareModel(id: UUID) throws -> ShareInputModel {

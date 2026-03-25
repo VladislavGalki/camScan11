@@ -55,6 +55,10 @@ struct AppRootView: View {
                 return AnyView(
                     AddTextView(inputModel: inputModel)
                 )
+            case let .watermark(inputModel):
+                return AnyView(
+                    WatermarkView(inputModel: inputModel)
+                )
             case let .share(inputModel):
                 return AnyView(
                     ShareView(inputModel: inputModel)

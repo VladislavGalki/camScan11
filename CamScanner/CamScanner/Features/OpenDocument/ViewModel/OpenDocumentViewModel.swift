@@ -8,6 +8,7 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var selectedIndex: Int = 0
     @Published var title: String = ""
     @Published var textItems: [DocumentTextItem] = []
+    @Published var watermarkItems: [DocumentWatermarkItem] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
     @Published var sliderValue: Double = 0.5
 
@@ -75,6 +76,12 @@ final class OpenDocumentViewModel: ObservableObject {
         store.textItemsPublisher
             .sink { [weak self] items in
                 self?.textItems = items
+            }
+            .store(in: &cancellables)
+
+        store.watermarkItemsPublisher
+            .sink { [weak self] items in
+                self?.watermarkItems = items
             }
             .store(in: &cancellables)
     }
@@ -152,6 +159,10 @@ extension OpenDocumentViewModel {
 
     func reloadTextItems() {
         store.reloadTextItems()
+    }
+
+    func reloadWatermarkItems() {
+        store.reloadWatermarkItems()
     }
 
     func extractText() {

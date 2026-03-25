@@ -128,6 +128,7 @@ private extension OpenDocumentView {
         OpenDocumentCarouselRepresentable(
             models: viewModel.models,
             textItems: viewModel.textItems,
+            watermarkItems: viewModel.watermarkItems,
             actionBottomBarAction: $bottomBarAction,
             onPageChanged: { index in
                 viewModel.updateSelectedIndex(index)
@@ -316,7 +317,11 @@ private extension OpenDocumentView {
         case .erase:
             break
         case .watermark:
-            break
+            router.push(
+                OpenDocumentRoute.watermark(
+                    WatermarkInputModel(documentID: viewModel.documentId)
+                )
+            )
         case .extract:
             viewModel.extractText()
         case .translate:

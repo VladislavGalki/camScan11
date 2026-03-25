@@ -26,6 +26,7 @@ extension DocumentEntity {
     @NSManaged public var cachedSize: Int64
     
     @NSManaged public var textOverlays: NSSet?
+    @NSManaged public var watermarkOverlays: NSSet?
 }
 
 // MARK: Generated accessors for pages
@@ -54,6 +55,18 @@ extension DocumentEntity {
 
     @objc(removeTextOverlays:)
     @NSManaged public func removeFromTextOverlays(_ values: NSSet)
+
+    @objc(addWatermarkOverlaysObject:)
+    @NSManaged public func addToWatermarkOverlays(_ value: WatermarkOverlayEntity)
+
+    @objc(removeWatermarkOverlaysObject:)
+    @NSManaged public func removeFromWatermarkOverlays(_ value: WatermarkOverlayEntity)
+
+    @objc(addWatermarkOverlays:)
+    @NSManaged public func addToWatermarkOverlays(_ values: NSSet)
+
+    @objc(removeWatermarkOverlays:)
+    @NSManaged public func removeFromWatermarkOverlays(_ values: NSSet)
 }
 
 extension DocumentEntity: Identifiable {}
