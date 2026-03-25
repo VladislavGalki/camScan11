@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Resize Models
+// MARK: - Session Models
 
 private struct MoveSession: Equatable {
     let textID: UUID
@@ -17,53 +17,44 @@ private struct ResizeSession: Equatable {
 }
 
 private enum ResizeSide {
-    case left
-    case right
+    case left, right
+}
+
+private struct ActiveResize: Equatable {
+    let textID: UUID
+    var width: CGFloat
+    var height: CGFloat
+    var centerX: CGFloat
+    var centerY: CGFloat
 }
 
 // MARK: - View
 
 struct AddTextPageOverlayView: View {
-    // MARK: Constants
-
     private enum Constants {
         static let initialWidth: CGFloat = 56
         static let initialHeight: CGFloat = 44
-
-        static let handleTouchSize = CGSize(width: 44, height: 44)
+        static let handleTouchSize: CGFloat = 44
         static let handleVisualSize: CGFloat = 12
         static let borderWidth: CGFloat = 2
     }
 
-    // MARK: State
+    // MARK: - State
 
     @State private var moveSession: MoveSession?
-    @State private var activeResizeTextID: UUID?
-    @State private var activeResizeWidth: CGFloat?
-    @State private var activeResizeHeight: CGFloat?
-    @State private var activeResizeCenterX: CGFloat?
-    @State private var activeResizeCenterY: CGFloat?
     @State private var resizeSession: ResizeSession?
+    @State private var activeResize: ActiveResize?
 
-    // MARK: Input
+    // MARK: - Input
 
     let pageIndex: Int
     let items: [DocumentTextItem]
     let selectedTextID: UUID?
     let editingTextID: UUID?
     let editingTextDraft: String
+    weak var delegate: AddTextPageDelegate?
 
-    let onPageTap: (CGPoint, CGSize) -> Void
-    let onTextTap: (UUID) -> Void
-    let onTextMove: (UUID, CGPoint) -> Void
-    let onTextResize: (UUID, CGFloat, CGFloat?, CGSize) -> Void
-    let onPageSizeChanged: (CGSize) -> Void
-    let onResizeStateChanged: (Bool) -> Void
-    
-    let onEditingTextChanged: (String, CGSize) -> Void
-    let onEditingSubmit: () -> Void
-    
-    // MARK: Body
+    // MARK: - Body
 
     var body: some View {
         GeometryReader { geo in
@@ -78,17 +69,15 @@ struct AddTextPageOverlayView: View {
                         )
                 }
             }
-            .onAppear {
-                onPageSizeChanged(geo.size)
-            }
+            .onAppear { delegate?.didChangePageSize(geo.size) }
             .onChange(of: geo.size) { _, newSize in
-                onPageSizeChanged(newSize)
+                delegate?.didChangePageSize(newSize)
             }
         }
     }
 }
 
-// MARK: - Layers
+// MARK: - Tap Layer
 
 private extension AddTextPageOverlayView {
     func pageTapLayer(in size: CGSize) -> some View {
@@ -98,17 +87,15 @@ private extension AddTextPageOverlayView {
             .gesture(
                 SpatialTapGesture()
                     .onEnded { value in
-                        let normalizedLocation = normalize(location: value.location, in: size)
-
                         if let tappedItem = hitTestItem(at: value.location, in: size) {
-                            onTextTap(tappedItem.id)
+                            delegate?.didTapText(id: tappedItem.id)
                         } else {
+                            let normalizedLocation = normalize(value.location, in: size)
                             let initialSize = CGSize(
                                 width: Constants.initialWidth / max(size.width, 1),
                                 height: Constants.initialHeight / max(size.height, 1)
                             )
-
-                            onPageTap(normalizedLocation, initialSize)
+                            delegate?.didTapPage(index: pageIndex, location: normalizedLocation, initialSize: initialSize)
                         }
                     }
             )
@@ -118,7 +105,7 @@ private extension AddTextPageOverlayView {
 // MARK: - Text Block
 
 private extension AddTextPageOverlayView {
-    private func draggableTextBlock(_ item: DocumentTextItem, in size: CGSize) -> some View {
+    func draggableTextBlock(_ item: DocumentTextItem, in size: CGSize) -> some View {
         let width = displayedWidth(for: item) * size.width
         let height = displayedHeight(for: item) * size.height
         let isSelected = item.id == selectedTextID
@@ -126,11 +113,7 @@ private extension AddTextPageOverlayView {
 
         return ZStack {
             ZStack {
-                selectionBorder(
-                    isSelected: isSelected || isEditing,
-                    width: width,
-                    height: height
-                )
+                selectionBorder(isVisible: isSelected || isEditing, width: width, height: height)
 
                 if isEditing {
                     editingContent(item, width: width, height: height, pageSize: size)
@@ -140,84 +123,52 @@ private extension AddTextPageOverlayView {
                         .contentShape(Rectangle())
                         .gesture(moveGesture(for: item, in: size))
                         .highPriorityGesture(
-                            TapGesture()
-                                .onEnded {
-                                    onTextTap(item.id)
-                                }
+                            TapGesture().onEnded { delegate?.didTapText(id: item.id) }
                         )
                 }
 
                 if isSelected && !isEditing {
-                    leftResizeHandle(item, in: size, width: width, height: height)
-                    rightResizeHandle(item, in: size, width: width, height: height)
+                    resizeHandle(item, side: .left, in: size, width: width, height: height)
+                    resizeHandle(item, side: .right, in: size, width: width, height: height)
                 }
             }
             .rotationEffect(.degrees(item.rotation))
         }
         .frame(width: width, height: height)
     }
-    
-    private func editingContent(
-        _ item: DocumentTextItem,
-        width: CGFloat,
-        height: CGFloat,
-        pageSize: CGSize
-    ) -> some View {
-        print("""
-        🟨 EDIT CONTENT
-        item.id: \(item.id)
-        item.text: \(item.text)
-        editingTextDraft: \(editingTextDraft)
-        width: \(width)
-        height: \(height)
-        pageSize: \(pageSize)
-        isEditing: \(editingTextID == item.id)
-        """)
-        
-        return AutoFocusTextView(
+
+    func editingContent(_ item: DocumentTextItem, width: CGFloat, height: CGFloat, pageSize: CGSize) -> some View {
+        AutoFocusTextView(
             text: Binding(
                 get: { editingTextDraft },
-                set: { newValue in
-                    onEditingTextChanged(newValue, pageSize)
-                }
+                set: { delegate?.didChangeEditingText($0, pageSize: pageSize) }
             ),
             fontSize: item.style.fontSize,
             textColor: UIColor(rgbaHex: item.style.textColorHex) ?? .black,
-            textAlignment: uiTextAlignment(for: item.style.alignment),
-            onPredictedTextChange: { predictedText in
-                onEditingTextChanged(predictedText, pageSize)
-            },
-            onSubmit: {
-                onEditingSubmit()
-            }
+            textAlignment: item.style.alignment.nsTextAlignment,
+            onPredictedTextChange: { delegate?.didChangeEditingText($0, pageSize: pageSize) },
+            onSubmit: { delegate?.didSubmitEditing() }
         )
         .frame(width: width, height: height)
         .clipped()
     }
 
-    func selectionBorder(isSelected: Bool, width: CGFloat, height: CGFloat) -> some View {
+    func selectionBorder(isVisible: Bool, width: CGFloat, height: CGFloat) -> some View {
         Rectangle()
-            .stroke(
-                isSelected ? .bg(.accent) : .clear,
-                lineWidth: Constants.borderWidth
-            )
+            .stroke(isVisible ? .bg(.accent) : .clear, lineWidth: Constants.borderWidth)
             .frame(width: width, height: height)
     }
 
-    private func textContent(_ item: DocumentTextItem, width: CGFloat, height: CGFloat) -> some View {
+    func textContent(_ item: DocumentTextItem, width: CGFloat, height: CGFloat) -> some View {
         Text(item.text)
             .font(.system(size: item.style.fontSize, weight: .regular))
             .kerning(item.style.letterSpacing)
             .lineSpacing(0)
             .foregroundStyle(Color(rgbaHex: item.style.textColorHex) ?? .black)
-            .multilineTextAlignment(textAlignment(for: item.style.alignment))
+            .multilineTextAlignment(item.style.alignment.textAlignment)
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(
-                width: max(width - 16, 0),
-                height: max(height - 16, 0),
-                alignment: .leading
-            )
+            .frame(width: max(width - 16, 0), height: max(height - 16, 0), alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .frame(width: width, height: height, alignment: .leading)
@@ -225,7 +176,7 @@ private extension AddTextPageOverlayView {
     }
 }
 
-// MARK: - Move
+// MARK: - Move Gesture
 
 private extension AddTextPageOverlayView {
     func moveGesture(for item: DocumentTextItem, in size: CGSize) -> some Gesture {
@@ -244,165 +195,95 @@ private extension AddTextPageOverlayView {
                 let deltaX = value.translation.width / max(size.width, 1)
                 let deltaY = value.translation.height / max(size.height, 1)
 
-                let newCenter = CGPoint(
-                    x: session.initialCenterX + deltaX,
-                    y: session.initialCenterY + deltaY
+                delegate?.didMoveText(
+                    id: item.id,
+                    to: CGPoint(x: session.initialCenterX + deltaX, y: session.initialCenterY + deltaY)
                 )
-
-                onTextMove(item.id, newCenter)
             }
-            .onEnded { _ in
-                moveSession = nil
-            }
+            .onEnded { _ in moveSession = nil }
     }
 }
 
 // MARK: - Resize
 
 private extension AddTextPageOverlayView {
-    private func leftResizeHandle(
-        _ item: DocumentTextItem,
-        in size: CGSize,
-        width: CGFloat,
-        height: CGFloat
-    ) -> some View {
-        resizeHandle
-            .position(x: 0, y: height / 2)
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onChanged { value in
-                        if resizeSession?.textID != item.id || resizeSession?.side != .left {
-                            resizeSession = ResizeSession(
-                                textID: item.id,
-                                side: .left,
-                                initialWidth: item.width,
-                                initialCenterX: item.centerX,
-                                startLocationX: value.startLocation.x
-                            )
-                            onResizeStateChanged(true)
-                        }
-
-                        guard let session = resizeSession else { return }
-
-                        let deltaXPoints = value.location.x - session.startLocationX
-                        let deltaXNormalized = deltaXPoints / max(size.width, 1)
-
-                        let minWidthNormalized = Constants.initialWidth / max(size.width, 1)
-
-                        let rightEdge = session.initialCenterX + session.initialWidth / 2
-                        let proposedWidth = session.initialWidth - deltaXNormalized
-                        let clampedWidth = max(minWidthNormalized, min(proposedWidth, rightEdge))
-
-                        let newCenterX = rightEdge - clampedWidth / 2
-                        
-                        let previewHeight = measuredPreviewHeight(
-                            for: item,
-                            widthNormalized: clampedWidth,
-                            pageSize: size
-                        )
-                        
-                        let previewCenterY = previewResizedCenterY(
-                            for: item,
-                            heightNormalized: previewHeight
-                        )
-
-                        activeResizeTextID = item.id
-                        activeResizeWidth = clampedWidth
-                        activeResizeHeight = previewHeight
-                        activeResizeCenterX = newCenterX
-                        activeResizeCenterY = previewCenterY
-                    }
-                    .onEnded { _ in
-                        onResizeStateChanged(false)
-                        finishResize(for: item, pageSize: size)
-                    }
-            )
+    func resizeHandle(_ item: DocumentTextItem, side: ResizeSide, in size: CGSize, width: CGFloat, height: CGFloat) -> some View {
+        resizeHandleVisual
+            .position(x: side == .left ? 0 : width, y: height / 2)
+            .highPriorityGesture(resizeGesture(for: item, side: side, in: size))
     }
 
-    private func rightResizeHandle(
-        _ item: DocumentTextItem,
-        in size: CGSize,
-        width: CGFloat,
-        height: CGFloat
-    ) -> some View {
-        resizeHandle
-            .position(x: width, y: height / 2)
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onChanged { value in
-                        if resizeSession?.textID != item.id || resizeSession?.side != .right {
-                            resizeSession = ResizeSession(
-                                textID: item.id,
-                                side: .right,
-                                initialWidth: item.width,
-                                initialCenterX: item.centerX,
-                                startLocationX: value.startLocation.x
-                            )
-                            onResizeStateChanged(true)
-                        }
+    func resizeGesture(for item: DocumentTextItem, side: ResizeSide, in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                if resizeSession?.textID != item.id || resizeSession?.side != side {
+                    resizeSession = ResizeSession(
+                        textID: item.id,
+                        side: side,
+                        initialWidth: item.width,
+                        initialCenterX: item.centerX,
+                        startLocationX: value.startLocation.x
+                    )
+                    delegate?.didChangeResizeState(isResizing: true)
+                }
 
-                        guard let session = resizeSession else { return }
+                guard let session = resizeSession else { return }
 
-                        let deltaXPoints = value.location.x - session.startLocationX
-                        let deltaXNormalized = deltaXPoints / max(size.width, 1)
+                let deltaXNorm = (value.location.x - session.startLocationX) / max(size.width, 1)
+                let minWidthNorm = Constants.initialWidth / max(size.width, 1)
 
-                        let minWidthNormalized = Constants.initialWidth / max(size.width, 1)
+                let clampedWidth: CGFloat
+                let newCenterX: CGFloat
 
-                        let leftEdge = session.initialCenterX - session.initialWidth / 2
-                        let proposedWidth = session.initialWidth + deltaXNormalized
-                        let maxWidth = 1 - leftEdge
-                        let clampedWidth = max(minWidthNormalized, min(proposedWidth, maxWidth))
+                switch side {
+                case .left:
+                    let rightEdge = session.initialCenterX + session.initialWidth / 2
+                    let proposed = session.initialWidth - deltaXNorm
+                    clampedWidth = max(minWidthNorm, min(proposed, rightEdge))
+                    newCenterX = rightEdge - clampedWidth / 2
 
-                        let newCenterX = leftEdge + clampedWidth / 2
-                        
-                        let previewHeight = measuredPreviewHeight(
-                            for: item,
-                            widthNormalized: clampedWidth,
-                            pageSize: size
-                        )
-                        
-                        let previewCenterY = previewResizedCenterY(
-                            for: item,
-                            heightNormalized: previewHeight
-                        )
+                case .right:
+                    let leftEdge = session.initialCenterX - session.initialWidth / 2
+                    let proposed = session.initialWidth + deltaXNorm
+                    let maxWidth = 1 - leftEdge
+                    clampedWidth = max(minWidthNorm, min(proposed, maxWidth))
+                    newCenterX = leftEdge + clampedWidth / 2
+                }
 
-                        activeResizeTextID = item.id
-                        activeResizeWidth = clampedWidth
-                        activeResizeHeight = previewHeight
-                        activeResizeCenterX = newCenterX
-                        activeResizeCenterY = previewCenterY
-                    }
-                    .onEnded { _ in
-                        onResizeStateChanged(false)
-                        finishResize(for: item, pageSize: size)
-                    }
-            )
+                let previewHeight = previewMeasuredHeight(for: item, widthNorm: clampedWidth, pageSize: size)
+                let topEdgeY = item.centerY - item.height / 2
+
+                activeResize = ActiveResize(
+                    textID: item.id,
+                    width: clampedWidth,
+                    height: previewHeight,
+                    centerX: newCenterX,
+                    centerY: topEdgeY + previewHeight / 2
+                )
+            }
+            .onEnded { _ in
+                delegate?.didChangeResizeState(isResizing: false)
+                finishResize(for: item, pageSize: size)
+            }
     }
 
     func finishResize(for item: DocumentTextItem, pageSize: CGSize) {
         guard let session = resizeSession else { return }
 
-        let finalWidth = activeResizeWidth ?? session.initialWidth
-        let finalCenterX = activeResizeCenterX ?? session.initialCenterX
+        let finalWidth = activeResize?.width ?? session.initialWidth
+        let finalCenterX = activeResize?.centerX ?? session.initialCenterX
 
-        onTextResize(item.id, finalWidth, finalCenterX, pageSize)
+        delegate?.didResizeText(id: item.id, width: finalWidth, centerX: finalCenterX, pageSize: pageSize)
 
         resizeSession = nil
-        activeResizeTextID = nil
-        activeResizeWidth = nil
-        activeResizeHeight = nil
-        activeResizeCenterX = nil
-        activeResizeCenterY = nil
+        activeResize = nil
     }
 
-    private var resizeHandle: some View {
+    var resizeHandleVisual: some View {
         ZStack {
             Circle()
                 .fill(Color.clear)
-                .frame(
-                    width: Constants.handleTouchSize.width,
-                    height: Constants.handleTouchSize.height
-                )
+                .frame(width: Constants.handleTouchSize, height: Constants.handleTouchSize)
 
             Circle()
                 .fill(.white)
@@ -410,10 +291,7 @@ private extension AddTextPageOverlayView {
 
             Circle()
                 .stroke(.bg(.accent), lineWidth: 4)
-                .frame(
-                    width: Constants.handleVisualSize,
-                    height: Constants.handleVisualSize
-                )
+                .frame(width: Constants.handleVisualSize, height: Constants.handleVisualSize)
         }
         .contentShape(Rectangle())
     }
@@ -423,68 +301,34 @@ private extension AddTextPageOverlayView {
 
 private extension AddTextPageOverlayView {
     func displayedWidth(for item: DocumentTextItem) -> CGFloat {
-        guard activeResizeTextID == item.id else { return item.width }
-        return activeResizeWidth ?? item.width
+        activeResize?.textID == item.id ? (activeResize?.width ?? item.width) : item.width
     }
-    
+
     func displayedHeight(for item: DocumentTextItem) -> CGFloat {
-        guard activeResizeTextID == item.id else { return item.height }
-        return activeResizeHeight ?? item.height
+        activeResize?.textID == item.id ? (activeResize?.height ?? item.height) : item.height
     }
 
     func displayedCenterX(for item: DocumentTextItem) -> CGFloat {
-        guard activeResizeTextID == item.id else { return item.centerX }
-        return activeResizeCenterX ?? item.centerX
+        activeResize?.textID == item.id ? (activeResize?.centerX ?? item.centerX) : item.centerX
     }
-    
+
     func displayedCenterY(for item: DocumentTextItem) -> CGFloat {
-        guard activeResizeTextID == item.id else { return item.centerY }
-        return activeResizeCenterY ?? item.centerY
+        activeResize?.textID == item.id ? (activeResize?.centerY ?? item.centerY) : item.centerY
     }
-    
-    func measuredPreviewHeight(
-        for item: DocumentTextItem,
-        widthNormalized: CGFloat,
-        pageSize: CGSize
-    ) -> CGFloat {
-        let minHeightPoints: CGFloat = 44
-        let horizontalInset: CGFloat = 8
-        let verticalInset: CGFloat = 8
 
-        let widthPoints = widthNormalized * max(pageSize.width, 1)
-        let availableTextWidth = max(widthPoints - horizontalInset * 2, 1)
+    func previewMeasuredHeight(for item: DocumentTextItem, widthNorm: CGFloat, pageSize: CGSize) -> CGFloat {
+        let minHeightPt: CGFloat = 44
+        let widthPt = widthNorm * max(pageSize.width, 1)
 
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byWordWrapping
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular),
-            .kern: item.style.letterSpacing,
-            .paragraphStyle: paragraph
-        ]
-
-        let sourceText = item.text.isEmpty ? " " : item.text
-        let attributed = NSAttributedString(string: sourceText, attributes: attributes)
-
-        let wrappedRect = attributed.boundingRect(
-            with: CGSize(
-                width: availableTextWidth,
-                height: CGFloat.greatestFiniteMagnitude
-            ),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
+        let measuredHeight = TextMeasurer.measureHeight(
+            text: item.text,
+            fontSize: item.style.fontSize,
+            kern: item.style.letterSpacing,
+            availableWidth: widthPt
         )
 
-        let heightPoints = max(ceil(wrappedRect.height) + verticalInset * 2, minHeightPoints)
-        return heightPoints / max(pageSize.height, 1)
-    }
-    
-    func previewResizedCenterY(
-        for item: DocumentTextItem,
-        heightNormalized: CGFloat
-    ) -> CGFloat {
-        let topEdgeY = item.centerY - item.height / 2
-        return topEdgeY + heightNormalized / 2
+        let heightPt = max(measuredHeight, minHeightPt)
+        return heightPt / max(pageSize.height, 1)
     }
 }
 
@@ -495,31 +339,17 @@ private extension AddTextPageOverlayView {
         items.reversed().first { item in
             let width = item.width * size.width
             let height = item.height * size.height
-
             let rect = CGRect(
                 x: item.centerX * size.width - width / 2,
                 y: item.centerY * size.height - height / 2,
                 width: width,
                 height: height
             )
-
             return rect.contains(location)
         }
     }
-}
 
-// MARK: - Layout Helpers
-
-private extension AddTextPageOverlayView {
-    func textAlignment(for alignment: DocumentTextAlignment) -> TextAlignment {
-        switch alignment {
-        case .left: return .leading
-        case .center: return .center
-        case .right: return .trailing
-        }
-    }
-
-    func normalize(location: CGPoint, in size: CGSize) -> CGPoint {
+    func normalize(_ location: CGPoint, in size: CGSize) -> CGPoint {
         CGPoint(
             x: min(max(location.x / max(size.width, 1), 0), 1),
             y: min(max(location.y / max(size.height, 1), 0), 1)
@@ -527,13 +357,22 @@ private extension AddTextPageOverlayView {
     }
 }
 
-// MARK: - Helper
-extension AddTextPageOverlayView {
-    private func uiTextAlignment(for alignment: DocumentTextAlignment) -> NSTextAlignment {
-        switch alignment {
-        case .left: return .left
-        case .center: return .center
-        case .right: return .right
+// MARK: - Alignment Helpers
+
+private extension DocumentTextAlignment {
+    var textAlignment: TextAlignment {
+        switch self {
+        case .left: .leading
+        case .center: .center
+        case .right: .trailing
+        }
+    }
+
+    var nsTextAlignment: NSTextAlignment {
+        switch self {
+        case .left: .left
+        case .center: .center
+        case .right: .right
         }
     }
 }

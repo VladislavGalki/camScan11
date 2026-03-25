@@ -17,24 +17,13 @@ final class AddTextCarouselController: UIViewController {
     private var models: [ScanPreviewModel]
     private var textItems: [DocumentTextItem]
     private var selectedTextID: UUID?
-    private var currentIndex: Int = 0
-    
     private var editingTextID: UUID?
     private var editingTextDraft: String
+    private var currentIndex: Int = 0
 
-    // MARK: - Callbacks
+    // MARK: - Delegate
 
-    private let onPageChanged: (Int) -> Void
-    private let onPageTap: (Int, CGPoint, CGSize) -> Void
-    private let onTextTap: (UUID) -> Void
-    private let onSelectedTextFrameChanged: (UUID, CGRect?) -> Void
-    private let onTextMove: (UUID, CGPoint) -> Void
-    private let onTextResize: (UUID, CGFloat, CGFloat?, CGSize) -> Void
-    private let onPageSizeChanged: (CGSize) -> Void
-    private let onResizeStateChanged: (Bool) -> Void
-    private let onEditingTextChanged: (String, CGSize) -> Void
-    private let onEditingSubmit: () -> Void
-    private let onScrollStarted: () -> Void
+    private weak var delegate: AddTextPageDelegate?
 
     // MARK: - Init
 
@@ -44,34 +33,14 @@ final class AddTextCarouselController: UIViewController {
         selectedTextID: UUID?,
         editingTextID: UUID?,
         editingTextDraft: String,
-        onPageChanged: @escaping (Int) -> Void,
-        onPageTap: @escaping (Int, CGPoint, CGSize) -> Void,
-        onTextTap: @escaping (UUID) -> Void,
-        onSelectedTextFrameChanged: @escaping (UUID, CGRect?) -> Void,
-        onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
-        onPageSizeChanged: @escaping (CGSize) -> Void,
-        onResizeStateChanged: @escaping (Bool) -> Void,
-        onEditingTextChanged: @escaping (String, CGSize) -> Void,
-        onEditingSubmit: @escaping () -> Void,
-        onScrollStarted: @escaping () -> Void
+        delegate: AddTextPageDelegate?
     ) {
         self.models = models
         self.textItems = textItems
         self.selectedTextID = selectedTextID
         self.editingTextID = editingTextID
         self.editingTextDraft = editingTextDraft
-        self.onPageChanged = onPageChanged
-        self.onPageTap = onPageTap
-        self.onTextTap = onTextTap
-        self.onSelectedTextFrameChanged = onSelectedTextFrameChanged
-        self.onTextMove = onTextMove
-        self.onTextResize = onTextResize
-        self.onPageSizeChanged = onPageSizeChanged
-        self.onResizeStateChanged = onResizeStateChanged
-        self.onEditingTextChanged = onEditingTextChanged
-        self.onEditingSubmit = onEditingSubmit
-        self.onScrollStarted = onScrollStarted
+        self.delegate = delegate
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -111,7 +80,7 @@ final class AddTextCarouselController: UIViewController {
         selectedTextID = newSelectedTextID
         editingTextID = newEditingTextID
         editingTextDraft = newEditingTextDraft
-        
+
         collectionView.isScrollEnabled = (editingTextID == nil)
 
         if didModelsChange {
@@ -120,10 +89,7 @@ final class AddTextCarouselController: UIViewController {
             return
         }
 
-        if didTextItemsChange ||
-            didSelectionChange ||
-            didEditingIDChange ||
-            didEditingDraftChange {
+        if didTextItemsChange || didSelectionChange || didEditingIDChange || didEditingDraftChange {
             updateVisibleOverlays()
             updateIndicator(index: min(currentIndex, max(newModels.count - 1, 0)))
         }
@@ -140,9 +106,8 @@ private extension AddTextCarouselController {
 
     func updateHorizontalInsets() {
         let inset = (collectionView.bounds.width - cardWidth) / 2
-
-        guard collectionView.contentInset.left != inset ||
-              collectionView.contentInset.right != inset else { return }
+        guard collectionView.contentInset.left != inset
+                || collectionView.contentInset.right != inset else { return }
 
         collectionView.contentInset.left = inset
         collectionView.contentInset.right = inset
@@ -151,9 +116,8 @@ private extension AddTextCarouselController {
     func updateVerticalInsets() {
         let height = cardHeight()
         let inset = max(0, (collectionView.bounds.height - height) / 2)
-
-        guard collectionView.contentInset.top != inset ||
-              collectionView.contentInset.bottom != inset else { return }
+        guard collectionView.contentInset.top != inset
+                || collectionView.contentInset.bottom != inset else { return }
 
         collectionView.contentInset.top = inset
         collectionView.contentInset.bottom = inset
@@ -208,36 +172,15 @@ private extension AddTextCarouselController {
                   let indexPath = collectionView.indexPath(for: pageCell),
                   models.indices.contains(indexPath.item) else { continue }
 
+            let pageItems = textItems.filter { $0.pageIndex == indexPath.item }
+
             pageCell.updateOverlay(
                 pageIndex: indexPath.item,
-                textItems: textItems.filter { $0.pageIndex == indexPath.item },
+                textItems: pageItems,
                 selectedTextID: selectedTextID,
                 editingTextID: editingTextID,
                 editingTextDraft: editingTextDraft,
-                onPageTap: { [weak self] point, initialSize in
-                    self?.onPageTap(indexPath.item, point, initialSize)
-                },
-                onTextTap: { [weak self] id in
-                    self?.onTextTap(id)
-                },
-                onTextMove: { [weak self] id, center in
-                    self?.onTextMove(id, center)
-                },
-                onTextResize: { [weak self] id, width, centerX, size in
-                    self?.onTextResize(id, width, centerX, size)
-                },
-                onPageSizeChanged: { [weak self] size in
-                    self?.onPageSizeChanged(size)
-                },
-                onResizeStateChanged: { [weak self] value in
-                    self?.onResizeStateChanged(value)
-                },
-                onEditingTextChanged: { [weak self] text, size in
-                    self?.onEditingTextChanged(text, size)
-                },
-                onEditingSubmit: { [weak self] in
-                    self?.onEditingSubmit()
-                }
+                delegate: delegate
             )
         }
     }
@@ -258,37 +201,21 @@ extension AddTextCarouselController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
 
+        let pageItems = textItems.filter { $0.pageIndex == indexPath.item }
+
         cell.configure(
             model: models[indexPath.item],
             pageIndex: indexPath.item,
-            textItems: textItems.filter { $0.pageIndex == indexPath.item },
+            textItems: pageItems,
             selectedTextID: selectedTextID,
             editingTextID: editingTextID,
             editingTextDraft: editingTextDraft,
-            parent: self,
-            onPageTap: { [weak self] point, initialSize in
-                self?.onPageTap(indexPath.item, point, initialSize)
-            },
-            onTextTap: { [weak self] id in
-                self?.onTextTap(id)
-            },
-            onTextMove: { [weak self] id, center in
-                self?.onTextMove(id, center)
-            },
-            onTextResize: { [weak self] id, width, centerX, size in
-                self?.onTextResize(id, width, centerX, size)
-            },
-            onResizeStateChanged: { [weak self] value in
-                self?.onResizeStateChanged(value)
-            },
-            onPageSizeChanged: { [weak self] size in
-                self?.onPageSizeChanged(size)
-            },
+            delegate: delegate,
             onSelectedTextFrameChanged: { [weak self] id, rect in
                 guard let self else { return }
 
                 guard let rect else {
-                    self.onSelectedTextFrameChanged(id, nil)
+                    self.delegate?.didChangeSelectedTextFrame(id: id, rect: nil)
                     return
                 }
 
@@ -296,14 +223,7 @@ extension AddTextCarouselController: UICollectionViewDataSource {
 
                 let rectInController = cell.contentView.convert(rect, to: self.view)
                 let rectInWindow = self.view.convert(rectInController, to: window)
-
-                self.onSelectedTextFrameChanged(id, rectInWindow)
-            },
-            onEditingTextChanged: { [weak self] text, size in
-                self?.onEditingTextChanged(text, size)
-            },
-            onEditingSubmit: { [weak self] in
-                self?.onEditingSubmit()
+                self.delegate?.didChangeSelectedTextFrame(id: id, rect: rectInWindow)
             }
         )
 
@@ -335,10 +255,9 @@ extension AddTextCarouselController: UICollectionViewDelegateFlowLayout {
 
         let fullWidth = cardWidth + layout.minimumLineSpacing
         let offset = scrollView.contentOffset.x + scrollView.contentInset.left
-
         let currentPage = offset / fullWidth
-        let targetIndex: CGFloat
 
+        let targetIndex: CGFloat
         if velocity.x > 0.2 {
             targetIndex = ceil(currentPage)
         } else if velocity.x < -0.2 {
@@ -347,19 +266,16 @@ extension AddTextCarouselController: UICollectionViewDelegateFlowLayout {
             targetIndex = round(currentPage)
         }
 
-        let clampedIndex = max(
-            0,
-            min(targetIndex, CGFloat(collectionView.numberOfItems(inSection: 0) - 1))
-        )
-
+        let clampedIndex = max(0, min(targetIndex, CGFloat(collectionView.numberOfItems(inSection: 0) - 1)))
         let newOffset = clampedIndex * fullWidth - scrollView.contentInset.left
         targetContentOffset.pointee.x = newOffset
-        onPageChanged(Int(clampedIndex))
+
+        delegate?.didChangePage(index: Int(clampedIndex))
     }
-    
+
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard editingTextID == nil else { return }
-        onScrollStarted()
+        delegate?.didStartScroll()
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

@@ -2,6 +2,21 @@ import Foundation
 import Combine
 import UIKit
 
+// MARK: - Editing Session
+
+struct EditingSession {
+    let textID: UUID
+    let initialWidth: CGFloat
+    let initialHeight: CGFloat
+    let initialCenterX: CGFloat
+    let initialCenterY: CGFloat
+    let leftEdgeX: CGFloat
+    let topEdgeY: CGFloat
+    let shouldLockWidth: Bool
+}
+
+// MARK: - ViewModel
+
 @MainActor
 final class AddTextViewModel: ObservableObject {
     // MARK: - Published
@@ -12,23 +27,26 @@ final class AddTextViewModel: ObservableObject {
     @Published var selectedTextID: UUID?
 
     @Published var isSaveEnabled = false
-    
-    @Published var shouldFreezeBubbleAnchor = false
     @Published var bubbleAnchor: AddTextBubbleAnchor?
 
     @Published var editingTextID: UUID?
     @Published var editingTextDraft: String = ""
-    
+
     @Published var shouldShowStyleSheet = false
     @Published var styleDraft: AddTextStyleDraft = .default
 
+    // MARK: - Internal
+
+    var isEditingText: Bool { editingTextID != nil }
+    var isBubbleFrozen = false
+
     // MARK: - Private
-    
+
     private var originalTextItems: [DocumentTextItem] = []
+    private var editingSession: EditingSession?
+    private var currentPageSize: CGSize = .zero
 
     private let store: AddTextStore
-    private var textEditingSession: TextEditingSession?
-    private var currentPageSize: CGSize = .zero
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
@@ -39,52 +57,20 @@ final class AddTextViewModel: ObservableObject {
     }
 }
 
-// MARK: - Public
+// MARK: - Public Actions
 
 extension AddTextViewModel {
-    var isEditingText: Bool {
-        editingTextID != nil
-    }
-    
-    func updateCurrentPageSize(_ pageSize: CGSize) {
-        guard pageSize != .zero else { return }
-        currentPageSize = pageSize
+    func updateCurrentPageSize(_ size: CGSize) {
+        guard size != .zero else { return }
+        currentPageSize = size
     }
 
-    func setBubbleAnchorFrozen(_ isFrozen: Bool) {
-        shouldFreezeBubbleAnchor = isFrozen
-    }
-
-    func updateBubbleAnchor(_ anchor: AddTextBubbleAnchor?) {
-        guard selectedTextID != nil else {
-            if bubbleAnchor != nil {
-                bubbleAnchor = nil
-            }
-            return
-        }
-
-        guard bubbleAnchor != anchor else { return }
-        bubbleAnchor = anchor
-    }
-
-    func updateSelectedIndex(_ index: Int) {
-        guard models.indices.contains(index) else { return }
-
-        selectedIndex = index
-        selectedTextID = nil
-        bubbleAnchor = nil
-    }
-    
     func clearSelection() {
         selectedTextID = nil
         bubbleAnchor = nil
     }
 
-    func handlePageTap(
-        pageIndex: Int,
-        location: CGPoint,
-        initialSize: CGSize
-    ) {
+    func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
         selectedIndex = pageIndex
         bubbleAnchor = nil
 
@@ -110,9 +96,7 @@ extension AddTextViewModel {
             return
         }
 
-        if selectedTextID == id,
-           editingTextID == nil,
-           !shouldShowStyleSheet {
+        if selectedTextID == id, editingTextID == nil, !shouldShowStyleSheet {
             clearSelection()
             return
         }
@@ -122,9 +106,8 @@ extension AddTextViewModel {
     }
 
     func startEditingSelectedText() {
-        guard let selectedTextID else { return }
-        guard currentPageSize != .zero else { return }
-        guard let item = textItems.first(where: { $0.id == selectedTextID }) else { return }
+        guard let selectedTextID, currentPageSize != .zero,
+              let item = textItems.first(where: { $0.id == selectedTextID }) else { return }
 
         editingTextID = selectedTextID
         editingTextDraft = item.text
@@ -132,11 +115,9 @@ extension AddTextViewModel {
 
         let leftEdgeX = item.centerX - item.width / 2
         let topEdgeY = item.centerY - item.height / 2
-
         let baseHeightNormalized = 44.0 / max(currentPageSize.height, 1)
-        let shouldLockWidth = item.height > baseHeightNormalized + 0.001
 
-        textEditingSession = TextEditingSession(
+        editingSession = EditingSession(
             textID: selectedTextID,
             initialWidth: item.width,
             initialHeight: item.height,
@@ -144,7 +125,7 @@ extension AddTextViewModel {
             initialCenterY: item.centerY,
             leftEdgeX: leftEdgeX,
             topEdgeY: topEdgeY,
-            shouldLockWidth: shouldLockWidth
+            shouldLockWidth: item.height > baseHeightNormalized + 0.001
         )
     }
 
@@ -153,82 +134,54 @@ extension AddTextViewModel {
         editingTextDraft = text
 
         guard let editingTextID,
-              let session = textEditingSession,
-              session.textID == editingTextID,
-              let index = textItems.firstIndex(where: { $0.id == editingTextID }) else {
-            return
-        }
+              let session = editingSession, session.textID == editingTextID,
+              let index = textItems.firstIndex(where: { $0.id == editingTextID }) else { return }
 
         textItems[index].text = text
 
         let fontSize = textItems[index].style.fontSize
+        let minWidthPt: CGFloat = 56
+        let minHeightPt: CGFloat = 44
 
-        let minWidthPoints: CGFloat = 56
-        let minHeightPoints: CGFloat = 44
+        let leftEdgePt = session.leftEdgeX * pageSize.width
+        let availableWidthPt = max(pageSize.width - leftEdgePt, minWidthPt)
+        let lockedWidthPt = session.initialWidth * pageSize.width
 
-        let leftEdgePoints = session.leftEdgeX * pageSize.width
-        let availableWidthPoints = max(pageSize.width - leftEdgePoints, minWidthPoints)
-        let lockedWidthPoints = session.initialWidth * pageSize.width
-
-        let measuredAtAvailableWidth = measuredEditingSize(
-            text: text,
-            fontSize: fontSize,
-            maxWidth: availableWidthPoints
+        let measuredAtAvailable = TextMeasurer.measure(
+            text: text, fontSize: fontSize, maxWidth: availableWidthPt
+        )
+        let measuredAtLocked = TextMeasurer.measure(
+            text: text, fontSize: fontSize, maxWidth: lockedWidthPt
         )
 
-        let measuredAtLockedWidth = measuredEditingSize(
-            text: text,
-            fontSize: fontSize,
-            maxWidth: lockedWidthPoints
-        )
+        let keepLocked = session.shouldLockWidth && measuredAtLocked.height > minHeightPt + 1
 
-        let shouldKeepWidthLocked =
-            session.shouldLockWidth &&
-            measuredAtLockedWidth.height > minHeightPoints + 1
-
-        let widthPoints: CGFloat
-        if shouldKeepWidthLocked {
-            widthPoints = lockedWidthPoints
-        } else {
-            widthPoints = max(
-                minWidthPoints,
-                min(measuredAtAvailableWidth.width, availableWidthPoints)
-            )
-        }
-
-        let isMultilineAtCurrentWidth: Bool
-        if shouldKeepWidthLocked {
-            isMultilineAtCurrentWidth = measuredAtLockedWidth.height > minHeightPoints + 1
-        } else {
-            isMultilineAtCurrentWidth = measuredAtAvailableWidth.height > minHeightPoints + 1
-        }
-
+        let widthPt: CGFloat
         let measuredHeight: CGFloat
-        if shouldKeepWidthLocked {
-            measuredHeight = measuredAtLockedWidth.height
+
+        if keepLocked {
+            widthPt = lockedWidthPt
+            measuredHeight = measuredAtLocked.height
         } else {
-            measuredHeight = measuredAtAvailableWidth.height
+            widthPt = max(minWidthPt, min(measuredAtAvailable.width, availableWidthPt))
+            measuredHeight = measuredAtAvailable.height
         }
 
-        let heightPoints = isMultilineAtCurrentWidth
-            ? max(minHeightPoints, measuredHeight)
-            : minHeightPoints
+        let isMultiline = measuredHeight > minHeightPt + 1
+        let heightPt = isMultiline ? max(minHeightPt, measuredHeight) : minHeightPt
 
-        let widthNormalized = widthPoints / max(pageSize.width, 1)
-        let heightNormalized = heightPoints / max(pageSize.height, 1)
+        let widthNorm = widthPt / max(pageSize.width, 1)
+        let heightNorm = heightPt / max(pageSize.height, 1)
+        let newCenterX = session.leftEdgeX + widthNorm / 2
+        let newCenterY = session.topEdgeY + heightNorm / 2
 
-        let newCenterX = session.leftEdgeX + widthNormalized / 2
-        let newCenterY = session.topEdgeY + heightNormalized / 2
+        guard textItems[index].width != widthNorm
+                || textItems[index].height != heightNorm
+                || textItems[index].centerX != newCenterX
+                || textItems[index].centerY != newCenterY else { return }
 
-        guard textItems[index].width != widthNormalized ||
-              textItems[index].height != heightNormalized ||
-              textItems[index].centerX != newCenterX ||
-              textItems[index].centerY != newCenterY else {
-            return
-        }
-
-        textItems[index].width = widthNormalized
-        textItems[index].height = heightNormalized
+        textItems[index].width = widthNorm
+        textItems[index].height = heightNorm
         textItems[index].centerX = newCenterX
         textItems[index].centerY = newCenterY
     }
@@ -236,9 +189,7 @@ extension AddTextViewModel {
     func applyTextEditing() {
         guard let editingTextID,
               let index = textItems.firstIndex(where: { $0.id == editingTextID }) else {
-            self.editingTextID = nil
-            self.editingTextDraft = ""
-            self.textEditingSession = nil
+            resetEditingState()
             return
         }
 
@@ -247,57 +198,41 @@ extension AddTextViewModel {
 
         textItems[index].text = finalText
         editingTextDraft = finalText
-        self.editingTextID = nil
-        self.textEditingSession = nil
+        resetEditingState()
     }
 
     func cancelTextEditing() {
-        editingTextID = nil
-        editingTextDraft = ""
-        textEditingSession = nil
+        resetEditingState()
     }
 
     func moveText(id: UUID, to center: CGPoint) {
         guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
 
         let item = textItems[index]
+        let minCX = min(item.width / 2, 0.5)
+        let maxCX = max(1 - item.width / 2, 0.5)
+        let minCY = min(item.height / 2, 0.5)
+        let maxCY = max(1 - item.height / 2, 0.5)
 
-        let minCenterX = min(item.width / 2, 0.5)
-        let maxCenterX = max(1 - item.width / 2, 0.5)
-
-        let minCenterY = min(item.height / 2, 0.5)
-        let maxCenterY = max(1 - item.height / 2, 0.5)
-
-        textItems[index].centerX = min(max(center.x, minCenterX), maxCenterX)
-        textItems[index].centerY = min(max(center.y, minCenterY), maxCenterY)
+        textItems[index].centerX = min(max(center.x, minCX), maxCX)
+        textItems[index].centerY = min(max(center.y, minCY), maxCY)
     }
 
-    func resizeText(
-        id: UUID,
-        width: CGFloat,
-        centerX: CGFloat? = nil,
-        pageSize: CGSize
-    ) {
+    func resizeText(id: UUID, width: CGFloat, centerX: CGFloat?, pageSize: CGSize) {
         guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
         currentPageSize = pageSize
 
         let minWidth: CGFloat = 56 / 322
-        let clampedWidth = max(width, minWidth)
-
-        textItems[index].width = clampedWidth
+        textItems[index].width = max(width, minWidth)
 
         if let centerX {
             textItems[index].centerX = centerX
         }
-        
-        reflowTextItemIfNeeded(id: id, pageSize: pageSize)
+
+        reflowTextItem(at: index, pageSize: pageSize)
     }
-    
-    func updateSelectedTextStyle(
-        colorHex: String? = nil,
-        fontSize: CGFloat? = nil,
-        rotation: CGFloat? = nil
-    ) {
+
+    func updateSelectedTextStyle(colorHex: String? = nil, fontSize: CGFloat? = nil, rotation: CGFloat? = nil) {
         guard let selectedTextID,
               let index = textItems.firstIndex(where: { $0.id == selectedTextID }) else { return }
 
@@ -307,9 +242,8 @@ extension AddTextViewModel {
 
         if let fontSize {
             textItems[index].style.fontSize = fontSize
-
             if currentPageSize != .zero {
-                reflowTextItemIfNeeded(id: selectedTextID, pageSize: currentPageSize)
+                reflowTextItem(at: index, pageSize: currentPageSize)
             }
         }
 
@@ -331,7 +265,7 @@ extension AddTextViewModel {
               let item = textItems.first(where: { $0.id == selectedTextID }) else { return }
 
         styleDraft = AddTextStyleDraft(
-            colorHex: normalizedHex(item.style.textColorHex),
+            colorHex: item.style.textColorHex.normalizedRGBAHex,
             fontSize: item.style.fontSize,
             rotation: item.rotation
         )
@@ -340,28 +274,93 @@ extension AddTextViewModel {
     }
 
     func saveTextItems() {
-        do {
-            try store.saveTextItems(textItems)
-            originalTextItems = textItems
-            updateSaveState()
-        } catch {
-        }
+        try? store.saveTextItems(textItems)
+        originalTextItems = textItems
+        updateSaveState()
     }
-    
-    private func updateSaveState() {
-        isSaveEnabled = textItems != originalTextItems
+
+    func updateBubbleAnchor(_ anchor: AddTextBubbleAnchor?) {
+        guard selectedTextID != nil else {
+            if bubbleAnchor != nil { bubbleAnchor = nil }
+            return
+        }
+        guard bubbleAnchor != anchor else { return }
+        bubbleAnchor = anchor
+    }
+
+    func updateSelectedIndex(_ index: Int) {
+        guard models.indices.contains(index) else { return }
+        selectedIndex = index
+        selectedTextID = nil
+        bubbleAnchor = nil
     }
 }
 
-// MARK: - Subscriptions
+// MARK: - AddTextPageDelegate
+
+extension AddTextViewModel: AddTextPageDelegate {
+    func didTapPage(index: Int, location: CGPoint, initialSize: CGSize) {
+        handlePageTap(pageIndex: index, location: location, initialSize: initialSize)
+    }
+
+    func didTapText(id: UUID) {
+        selectText(id)
+    }
+
+    func didMoveText(id: UUID, to center: CGPoint) {
+        moveText(id: id, to: center)
+    }
+
+    func didResizeText(id: UUID, width: CGFloat, centerX: CGFloat?, pageSize: CGSize) {
+        resizeText(id: id, width: width, centerX: centerX, pageSize: pageSize)
+    }
+
+    func didChangePageSize(_ size: CGSize) {
+        updateCurrentPageSize(size)
+    }
+
+    func didChangeResizeState(isResizing: Bool) {
+        isBubbleFrozen = isResizing
+    }
+
+    func didChangeEditingText(_ text: String, pageSize: CGSize) {
+        updateEditingDraft(text, pageSize: pageSize)
+    }
+
+    func didSubmitEditing() {
+        applyTextEditing()
+    }
+
+    func didStartScroll() {
+        clearSelection()
+    }
+
+    func didChangeSelectedTextFrame(id: UUID, rect: CGRect?) {
+        guard selectedTextID == id, let rect else { return }
+        guard !isBubbleFrozen else { return }
+
+        let newAnchor = AddTextBubbleAnchor(
+            textID: id,
+            pageIndex: selectedIndex,
+            rect: rect
+        )
+
+        updateBubbleAnchor(newAnchor)
+    }
+
+    func didChangePage(index: Int) {
+        updateSelectedIndex(index)
+    }
+}
+
+// MARK: - Private
 
 private extension AddTextViewModel {
-    private func subscribe() {
+    func subscribe() {
         store.previewModelsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] models in
                 guard let self else { return }
-
                 self.models = models
                 self.selectedIndex = min(self.selectedIndex, max(models.count - 1, 0))
             }
@@ -371,7 +370,6 @@ private extension AddTextViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] items in
                 guard let self else { return }
-
                 self.textItems = items
                 self.originalTextItems = items
                 self.updateSaveState()
@@ -386,97 +384,43 @@ private extension AddTextViewModel {
             }
             .store(in: &cancellables)
     }
-}
 
-// MARK: - Helpers
-
-private extension AddTextViewModel {
-    func measuredEditingSize(
-        text: String,
-        fontSize: CGFloat,
-        maxWidth: CGFloat
-    ) -> CGSize {
-        let horizontalInset: CGFloat = 8
-        let verticalInset: CGFloat = 8
-        let kern: CGFloat = -0.43
-
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byWordWrapping
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: fontSize, weight: .regular),
-            .kern: kern,
-            .paragraphStyle: paragraph
-        ]
-
-        let sourceText = text.isEmpty ? " " : text
-        let attributed = NSAttributedString(string: sourceText, attributes: attributes)
-
-        let singleLineRect = attributed.boundingRect(
-            with: CGSize(
-                width: CGFloat.greatestFiniteMagnitude,
-                height: CGFloat.greatestFiniteMagnitude
-            ),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        )
-
-        let contentIdealWidth = ceil(singleLineRect.width)
-        let targetContentWidth = min(contentIdealWidth, max(maxWidth - horizontalInset * 2, 1))
-
-        let wrappedRect = attributed.boundingRect(
-            with: CGSize(width: targetContentWidth, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        )
-
-        let result = CGSize(
-            width: targetContentWidth + horizontalInset * 2,
-            height: ceil(wrappedRect.height) + verticalInset * 2
-        )
-
-        return result
+    func updateSaveState() {
+        isSaveEnabled = textItems != originalTextItems
     }
 
-    func reflowTextItemIfNeeded(id: UUID, pageSize: CGSize) {
-        guard let index = textItems.firstIndex(where: { $0.id == id }) else { return }
+    func resetEditingState() {
+        editingTextID = nil
+        editingTextDraft = ""
+        editingSession = nil
+    }
 
+    func reflowTextItem(at index: Int, pageSize: CGSize) {
         let item = textItems[index]
+        let minHeightPt: CGFloat = 44
+        let widthPt = item.width * max(pageSize.width, 1)
 
-        let minHeightPoints: CGFloat = 44
-        let widthPoints = item.width * max(pageSize.width, 1)
-
-        let measured = measuredEditingSize(
+        let measuredHeight = TextMeasurer.measureHeight(
             text: item.text,
             fontSize: item.style.fontSize,
-            maxWidth: widthPoints
+            availableWidth: widthPt
         )
 
-        let newHeightPoints = max(measured.height, minHeightPoints)
-        let newHeightNormalized = newHeightPoints / max(pageSize.height, 1)
+        let newHeightPt = max(measuredHeight, minHeightPt)
+        let newHeightNorm = newHeightPt / max(pageSize.height, 1)
 
         let topEdgeY = item.centerY - item.height / 2
-        let newCenterY = topEdgeY + newHeightNormalized / 2
-
-        textItems[index].height = newHeightNormalized
-        textItems[index].centerY = newCenterY
+        textItems[index].height = newHeightNorm
+        textItems[index].centerY = topEdgeY + newHeightNorm / 2
     }
-    
-    func normalizedHex(_ hex: String) -> String {
-        hex
-            .replacingOccurrences(of: "#", with: "")
+}
+
+// MARK: - String Helper
+
+private extension String {
+    var normalizedRGBAHex: String {
+        replacingOccurrences(of: "#", with: "")
             .uppercased()
             .withHashPrefixRGBA
     }
-}
-
-private struct TextEditingSession {
-    let textID: UUID
-    let initialWidth: CGFloat
-    let initialHeight: CGFloat
-    let initialCenterX: CGFloat
-    let initialCenterY: CGFloat
-    let leftEdgeX: CGFloat
-    let topEdgeY: CGFloat
-    let shouldLockWidth: Bool
 }

@@ -24,7 +24,6 @@ final class AddTextPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     private var currentTextItems: [DocumentTextItem] = []
     private var currentSelectedTextID: UUID?
-
     private var overlayHostingController: UIHostingController<AddTextPageOverlayView>?
 
     // MARK: - Callbacks
@@ -66,7 +65,6 @@ final class AddTextPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
         currentTextItems = []
         currentSelectedTextID = nil
-
         onSelectedTextFrameChanged = nil
         onZoomChanged = nil
     }
@@ -76,7 +74,6 @@ final class AddTextPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
         scrollView.frame = contentView.bounds
         zoomContainerView.frame = scrollView.bounds
-        print("📝 AddTextCell | layoutSubviews cellBounds=\(contentView.bounds) zoomContainer=\(zoomContainerView.bounds)")
 
         if stackView.superview != nil, stackView.constraints.isEmpty {
             NSLayoutConstraint.activate([
@@ -130,16 +127,8 @@ extension AddTextPageCell {
         selectedTextID: UUID?,
         editingTextID: UUID?,
         editingTextDraft: String,
-        parent: UIViewController,
-        onPageTap: @escaping (CGPoint, CGSize) -> Void,
-        onTextTap: @escaping (UUID) -> Void,
-        onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
-        onResizeStateChanged: @escaping (Bool) -> Void,
-        onPageSizeChanged: @escaping (CGSize) -> Void,
-        onSelectedTextFrameChanged: ((UUID, CGRect?) -> Void)? = nil,
-        onEditingTextChanged: @escaping (String, CGSize) -> Void,
-        onEditingSubmit: @escaping () -> Void
+        delegate: AddTextPageDelegate?,
+        onSelectedTextFrameChanged: ((UUID, CGRect?) -> Void)?
     ) {
         self.onSelectedTextFrameChanged = onSelectedTextFrameChanged
         scrollView.zoomScale = 1
@@ -157,7 +146,6 @@ extension AddTextPageCell {
         switch model.documentType {
         case .documents:
             guard let image = previews.first else { return }
-
             imageView1.isHidden = false
             imageView1.image = image
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalTo: zoomContainerView.widthAnchor)
@@ -166,32 +154,26 @@ extension AddTextPageCell {
         case .idCard, .driverLicense:
             imageView1.isHidden = false
             imageView2.isHidden = false
-
             imageView1.image = previews.first
             imageView2.image = previews.count > 1 ? previews[1] : nil
 
             let size = CGSize(width: 171, height: 108)
-
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
             image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
             image2WidthConstraint = imageView2.widthAnchor.constraint(equalToConstant: size.width)
             image2HeightConstraint = imageView2.heightAnchor.constraint(equalToConstant: size.height)
 
-            image1WidthConstraint?.isActive = true
-            image1HeightConstraint?.isActive = true
-            image2WidthConstraint?.isActive = true
-            image2HeightConstraint?.isActive = true
+            [image1WidthConstraint, image1HeightConstraint,
+             image2WidthConstraint, image2HeightConstraint].forEach { $0?.isActive = true }
 
         case .passport:
             guard let image = previews.first else { return }
-
             imageView1.isHidden = false
             imageView1.image = image
 
             let size = CGSize(width: 360, height: 250)
             image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
             image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
-
             image1WidthConstraint?.isActive = true
             image1HeightConstraint?.isActive = true
 
@@ -205,14 +187,7 @@ extension AddTextPageCell {
             selectedTextID: selectedTextID,
             editingTextID: editingTextID,
             editingTextDraft: editingTextDraft,
-            onPageTap: onPageTap,
-            onTextTap: onTextTap,
-            onTextMove: onTextMove,
-            onTextResize: onTextResize,
-            onPageSizeChanged: onPageSizeChanged,
-            onResizeStateChanged: onResizeStateChanged,
-            onEditingTextChanged: onEditingTextChanged,
-            onEditingSubmit: onEditingSubmit
+            delegate: delegate
         )
     }
 
@@ -222,14 +197,7 @@ extension AddTextPageCell {
         selectedTextID: UUID?,
         editingTextID: UUID?,
         editingTextDraft: String,
-        onPageTap: @escaping (CGPoint, CGSize) -> Void,
-        onTextTap: @escaping (UUID) -> Void,
-        onTextMove: @escaping (UUID, CGPoint) -> Void,
-        onTextResize: @escaping (UUID, CGFloat, CGFloat?, CGSize) -> Void,
-        onPageSizeChanged: @escaping (CGSize) -> Void,
-        onResizeStateChanged: @escaping (Bool) -> Void,
-        onEditingTextChanged: @escaping (String, CGSize) -> Void,
-        onEditingSubmit: @escaping () -> Void
+        delegate: AddTextPageDelegate?
     ) {
         currentTextItems = textItems
         currentSelectedTextID = selectedTextID
@@ -240,14 +208,7 @@ extension AddTextPageCell {
             selectedTextID: selectedTextID,
             editingTextID: editingTextID,
             editingTextDraft: editingTextDraft,
-            onPageTap: onPageTap,
-            onTextTap: onTextTap,
-            onTextMove: onTextMove,
-            onTextResize: onTextResize,
-            onPageSizeChanged: onPageSizeChanged,
-            onResizeStateChanged: onResizeStateChanged,
-            onEditingTextChanged: onEditingTextChanged,
-            onEditingSubmit: onEditingSubmit
+            delegate: delegate
         )
 
         if let overlayHostingController {
@@ -269,11 +230,7 @@ extension AddTextPageCell {
         }
 
         layoutIfNeeded()
-
-        reportSelectedTextFrameIfNeeded(
-            textItems: textItems,
-            selectedTextID: selectedTextID
-        )
+        reportSelectedTextFrameIfNeeded(textItems: textItems, selectedTextID: selectedTextID)
     }
 }
 
@@ -287,11 +244,7 @@ extension AddTextPageCell {
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
         onZoomChanged?(scrollView.zoomScale > 1.01)
         centerZoomContainer()
-
-        reportSelectedTextFrameIfNeeded(
-            textItems: currentTextItems,
-            selectedTextID: currentSelectedTextID
-        )
+        reportSelectedTextFrameIfNeeded(textItems: currentTextItems, selectedTextID: currentSelectedTextID)
     }
 }
 
@@ -308,10 +261,7 @@ private extension AddTextPageCell {
         zoomContainerView.frame = frame
     }
 
-    func reportSelectedTextFrameIfNeeded(
-        textItems: [DocumentTextItem],
-        selectedTextID: UUID?
-    ) {
+    func reportSelectedTextFrameIfNeeded(textItems: [DocumentTextItem], selectedTextID: UUID?) {
         guard let selectedTextID,
               let item = textItems.first(where: { $0.id == selectedTextID }) else { return }
 

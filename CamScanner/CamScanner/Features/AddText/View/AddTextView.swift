@@ -2,24 +2,20 @@ import SwiftUI
 
 struct AddTextView: View {
     @StateObject private var viewModel: AddTextViewModel
-    
-    @State private var shouldShowDeleteOverlay: Bool = false
-
+    @State private var shouldShowDeleteConfirmation = false
     @EnvironmentObject private var router: Router
 
     init(inputModel: AddTextInputModel) {
-        _viewModel = StateObject(
-            wrappedValue: AddTextViewModel(inputModel: inputModel)
-        )
+        _viewModel = StateObject(wrappedValue: AddTextViewModel(inputModel: inputModel))
     }
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                navigationView
+                navigationBar
                     .padding(.bottom, 16)
 
-                placeholderView
+                pageIndicator
                     .padding(.bottom, 51)
 
                 carouselView
@@ -30,41 +26,29 @@ struct AddTextView: View {
             }
 
             bubbleOverlay
-                .opacity(!viewModel.shouldShowStyleSheet ? 1 : 0)
+                .opacity(viewModel.shouldShowStyleSheet ? 0 : 1)
         }
         .navigationBarBackButtonHidden(true)
-        .background(
-            Color.bg(.main).ignoresSafeArea()
-        )
-        .sheet(
-            isPresented: $viewModel.shouldShowStyleSheet,
-            onDismiss: {
-                viewModel.shouldShowStyleSheet = false
-            },
-            content: {
-                AddTextStyleSheetView(
-                    draft: $viewModel.styleDraft,
-                    onColorChanged: { hex in
-                        viewModel.updateSelectedTextStyle(colorHex: hex)
-                    },
-                    onFontSizeChanged: { value in
-                        viewModel.updateSelectedTextStyle(fontSize: value)
-                    },
-                    onRotationChanged: { value in
-                        viewModel.updateSelectedTextStyle(rotation: value)
-                    },
-                    onClose: {}
-                )
-                .presentationDetents([.height(163)])
-                .presentationBackgroundInteraction(.enabled)
-                .presentationCornerRadius(0)
-                .presentationDragIndicator(.hidden)
-                .presentationContentInteraction(.scrolls)
-            }
-        )
+        .background(Color.bg(.main).ignoresSafeArea())
+        .sheet(isPresented: $viewModel.shouldShowStyleSheet) {
+            viewModel.shouldShowStyleSheet = false
+        } content: {
+            AddTextStyleSheetView(
+                draft: $viewModel.styleDraft,
+                onColorChanged: { viewModel.updateSelectedTextStyle(colorHex: $0) },
+                onFontSizeChanged: { viewModel.updateSelectedTextStyle(fontSize: $0) },
+                onRotationChanged: { viewModel.updateSelectedTextStyle(rotation: $0) },
+                onClose: {}
+            )
+            .presentationDetents([.height(163)])
+            .presentationBackgroundInteraction(.enabled)
+            .presentationCornerRadius(0)
+            .presentationDragIndicator(.hidden)
+            .presentationContentInteraction(.scrolls)
+        }
         .overlay {
-            if shouldShowDeleteOverlay {
-                deleteOverlay
+            if shouldShowDeleteConfirmation {
+                deleteConfirmationOverlay
             }
         }
     }
@@ -73,7 +57,7 @@ struct AddTextView: View {
 // MARK: - Subviews
 
 private extension AddTextView {
-    var navigationView: some View {
+    var navigationBar: some View {
         HStack(spacing: 10) {
             AppButton(
                 config: AppButtonConfig(
@@ -81,9 +65,7 @@ private extension AddTextView {
                     style: .secondary,
                     size: .m
                 ),
-                action: {
-                    router.pop()
-                }
+                action: { router.pop() }
             )
 
             Spacer(minLength: 0)
@@ -94,25 +76,9 @@ private extension AddTextView {
                     style: .primary,
                     size: .m
                 ),
-                action: {
-                    if viewModel.shouldShowStyleSheet {
-                        viewModel.shouldShowStyleSheet = false
-                        
-                        Task {
-                           try? await Task.sleep(for: .seconds(0.10))
-                            
-                            viewModel.saveTextItems()
-                            router.pop()
-                        }
-                        
-                        return
-                    }
-
-                    viewModel.saveTextItems()
-                    router.pop()
-                }
+                action: { saveAndDismiss() }
             )
-            .appButtonEnabled((viewModel.isSaveEnabled && !viewModel.isEditingText))
+            .appButtonEnabled(viewModel.isSaveEnabled && !viewModel.isEditingText)
         }
         .overlay {
             Text("Add text")
@@ -130,7 +96,7 @@ private extension AddTextView {
         )
     }
 
-    var placeholderView: some View {
+    var pageIndicator: some View {
         HStack(spacing: 0) {
             Text("\(viewModel.selectedIndex + 1)/\(viewModel.models.count)")
                 .appTextStyle(.bodySecondary)
@@ -166,63 +132,12 @@ private extension AddTextView {
             selectedTextID: viewModel.selectedTextID,
             editingTextID: viewModel.editingTextID,
             editingTextDraft: viewModel.editingTextDraft,
-            onPageChanged: { index in
-                viewModel.updateSelectedIndex(index)
-            },
-            onPageTap: { pageIndex, point, initialSize in
-                viewModel.handlePageTap(
-                    pageIndex: pageIndex,
-                    location: point,
-                    initialSize: initialSize
-                )
-            },
-            onTextTap: { id in
-                viewModel.selectText(id)
-            },
-            onSelectedTextFrameChanged: { id, rect in
-                guard viewModel.selectedTextID == id, let rect else { return }
-                guard !viewModel.shouldFreezeBubbleAnchor else { return }
-
-                let newAnchor = AddTextBubbleAnchor(
-                    textID: id,
-                    pageIndex: viewModel.selectedIndex,
-                    rect: rect
-                )
-
-                guard viewModel.bubbleAnchor != newAnchor else { return }
-                
-                Task { @MainActor in
-                    viewModel.updateBubbleAnchor(newAnchor)
-                }
-            },
-            onTextMove: { id, center in
-                viewModel.moveText(id: id, to: center)
-            },
-            onTextResize: { id, width, centerX, size in
-                viewModel.resizeText(id: id, width: width, centerX: centerX, pageSize: size)
-            },
-            onPageSizeChanged: { size in
-                viewModel.updateCurrentPageSize(size)
-            },
-            onResizeStateChanged: { isResizing in
-                viewModel.setBubbleAnchorFrozen(isResizing)
-            },
-            onEditingTextChanged: { text, pageSize in
-                Task { @MainActor in
-                    viewModel.updateEditingDraft(text, pageSize: pageSize)
-                }
-            },
-            onEditingSubmit: {
-                viewModel.applyTextEditing()
-            },
-            onScrollStarted: {
-                viewModel.clearSelection()
-            }
+            delegate: viewModel
         )
     }
 
     @ViewBuilder
-    private var bubbleOverlay: some View {
+    var bubbleOverlay: some View {
         if let anchor = viewModel.bubbleAnchor,
            viewModel.selectedTextID == anchor.textID,
            viewModel.editingTextID == nil,
@@ -237,19 +152,13 @@ private extension AddTextView {
                     max(rect.midX - bubbleSize.width / 2, horizontalPadding),
                     geo.size.width - bubbleSize.width - horizontalPadding
                 )
-
                 let y = rect.minY - bubbleSize.height - spacing
 
-                let bubbleFrame = CGRect(
-                    x: x,
-                    y: y,
-                    width: bubbleSize.width,
-                    height: bubbleSize.height
-                )
+                let bubbleFrame = CGRect(x: x, y: y, width: bubbleSize.width, height: bubbleSize.height)
 
                 BubbleOverlayHost(frame: bubbleFrame) {
                     AddTextActionBubbleView { action in
-                        handleAction(action)
+                        handleBubbleAction(action)
                     }
                     .frame(width: bubbleSize.width, height: bubbleSize.height)
                 }
@@ -258,18 +167,16 @@ private extension AddTextView {
             }
         }
     }
-    
-    private var deleteOverlay: some View {
+
+    var deleteConfirmationOverlay: some View {
         ZStack {
             Color.black.opacity(0.24)
                 .ignoresSafeArea()
-                .transaction { transaction in
-                    transaction.animation = nil
-                }
-            
+                .transaction { $0.animation = nil }
+
             VStack(spacing: 24) {
                 Text("Delete the text?")
-                
+
                 VStack(spacing: 10) {
                     AppButton(
                         config: AppButtonConfig(
@@ -281,10 +188,10 @@ private extension AddTextView {
                         ),
                         action: {
                             viewModel.deleteSelectedText()
-                            shouldShowDeleteOverlay = false
+                            shouldShowDeleteConfirmation = false
                         }
                     )
-                    
+
                     AppButton(
                         config: AppButtonConfig(
                             content: .title("Cancel"),
@@ -292,9 +199,7 @@ private extension AddTextView {
                             size: .l,
                             isFullWidth: true
                         ),
-                        action: {
-                            shouldShowDeleteOverlay = false
-                        }
+                        action: { shouldShowDeleteConfirmation = false }
                     )
                 }
             }
@@ -311,14 +216,29 @@ private extension AddTextView {
 // MARK: - Actions
 
 private extension AddTextView {
-    func handleAction(_ action: AddTextActionType) {
+    func handleBubbleAction(_ action: AddTextActionType) {
         switch action {
         case .edit:
             viewModel.startEditingSelectedText()
         case .style:
             viewModel.openStyleEditor()
         case .delete:
-            shouldShowDeleteOverlay = true
+            shouldShowDeleteConfirmation = true
         }
+    }
+
+    func saveAndDismiss() {
+        if viewModel.shouldShowStyleSheet {
+            viewModel.shouldShowStyleSheet = false
+            Task {
+                try? await Task.sleep(for: .seconds(0.10))
+                viewModel.saveTextItems()
+                router.pop()
+            }
+            return
+        }
+
+        viewModel.saveTextItems()
+        router.pop()
     }
 }

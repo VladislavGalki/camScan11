@@ -32,10 +32,8 @@ struct AutoFocusTextView: UIViewRepresentable {
         textView.scrollIndicatorInsets = .zero
 
         textView.textContainerInset = UIEdgeInsets(
-            top: verticalInset,
-            left: horizontalInset,
-            bottom: verticalInset,
-            right: horizontalInset
+            top: verticalInset, left: horizontalInset,
+            bottom: verticalInset, right: horizontalInset
         )
         textView.textContainer.lineFragmentPadding = 0
         textView.textContainer.lineBreakMode = .byWordWrapping
@@ -48,41 +46,9 @@ struct AutoFocusTextView: UIViewRepresentable {
         textView.attributedText = attributedString(for: text)
         textView.textAlignment = textAlignment
 
-        print("""
-        🟪 MAKE UI TEXT VIEW
-        inputText: \(text)
-        inputCount: \(text.count)
-        attributedLength: \(textView.attributedText?.length ?? 0)
-        bounds: \(textView.bounds)
-        textContainerInset: \(textView.textContainerInset)
-        typingAttributes: \(textView.typingAttributes)
-        """)
-
         DispatchQueue.main.async {
             textView.becomeFirstResponder()
             self.performFullReflow(on: textView)
-
-            print("""
-            🟪 MAKE UI TEXT VIEW AFTER LAYOUT
-            text: \(textView.text)
-            contentSize: \(textView.contentSize)
-            bounds: \(textView.bounds)
-            textContainer.size: \(textView.textContainer.size)
-            selectedRange: \(textView.selectedRange)
-            """)
-
-            DispatchQueue.main.async {
-                self.performFullReflow(on: textView)
-
-                print("""
-                🟪 MAKE UI TEXT VIEW AFTER SECOND LAYOUT
-                text: \(textView.text)
-                contentSize: \(textView.contentSize)
-                bounds: \(textView.bounds)
-                textContainer.size: \(textView.textContainer.size)
-                selectedRange: \(textView.selectedRange)
-                """)
-            }
         }
 
         return container
@@ -91,18 +57,6 @@ struct AutoFocusTextView: UIViewRepresentable {
     func updateUIView(_ uiView: TextViewContainer, context: Context) {
         let textView = uiView.textView
 
-        print("""
-        🟪 UPDATE UI TEXT VIEW BEFORE
-        bindingText: \(text)
-        bindingCount: \(text.count)
-        textView.text: \(textView.text)
-        textViewCount: \(textView.text.count)
-        isFocused: \(textView.isFirstResponder)
-        bounds: \(textView.bounds)
-        contentSize: \(textView.contentSize)
-        textContainer.size(before): \(textView.textContainer.size)
-        """)
-
         textView.textAlignment = textAlignment
         textView.textColor = textColor
         textView.font = .systemFont(ofSize: fontSize, weight: .regular)
@@ -110,29 +64,15 @@ struct AutoFocusTextView: UIViewRepresentable {
         textView.contentInset = .zero
         textView.scrollIndicatorInsets = .zero
         textView.textContainerInset = UIEdgeInsets(
-            top: verticalInset,
-            left: horizontalInset,
-            bottom: verticalInset,
-            right: horizontalInset
+            top: verticalInset, left: horizontalInset,
+            bottom: verticalInset, right: horizontalInset
         )
 
-        let isFocused = textView.isFirstResponder
-        if !isFocused && textView.text != text {
+        if !textView.isFirstResponder && textView.text != text {
             textView.attributedText = attributedString(for: text)
         }
 
         performFullReflow(on: textView)
-
-        print("""
-        🟪 UPDATE UI TEXT VIEW AFTER
-        textView.text: \(textView.text)
-        textViewCount: \(textView.text.count)
-        attributedLength: \(textView.attributedText?.length ?? 0)
-        bounds: \(textView.bounds)
-        contentSize: \(textView.contentSize)
-        textContainer.size(after): \(textView.textContainer.size)
-        selectedRange: \(textView.selectedRange)
-        """)
     }
 
     static func dismantleUIView(_ uiView: TextViewContainer, coordinator: Coordinator) {
@@ -148,10 +88,7 @@ struct AutoFocusTextView: UIViewRepresentable {
     }
 
     private func attributedString(for text: String) -> NSAttributedString {
-        NSAttributedString(
-            string: text,
-            attributes: typingAttributes
-        )
+        NSAttributedString(string: text, attributes: typingAttributes)
     }
 
     private func performFullReflow(on textView: UITextView) {
@@ -159,14 +96,11 @@ struct AutoFocusTextView: UIViewRepresentable {
 
         textView.textContainer.size = CGSize(
             width: availableTextWidth,
-            height: CGFloat.greatestFiniteMagnitude
+            height: .greatestFiniteMagnitude
         )
 
         let fullRange = NSRange(location: 0, length: textView.textStorage.length)
-        textView.layoutManager.invalidateLayout(
-            forCharacterRange: fullRange,
-            actualCharacterRange: nil
-        )
+        textView.layoutManager.invalidateLayout(forCharacterRange: fullRange, actualCharacterRange: nil)
         textView.layoutManager.ensureLayout(for: textView.textContainer)
 
         textView.setNeedsDisplay()
@@ -175,6 +109,8 @@ struct AutoFocusTextView: UIViewRepresentable {
         textView.setContentOffset(.zero, animated: false)
         textView.scrollRangeToVisible(textView.selectedRange)
     }
+
+    // MARK: - Coordinator
 
     final class Coordinator: NSObject, UITextViewDelegate {
         private let parent: AutoFocusTextView
@@ -187,22 +123,7 @@ struct AutoFocusTextView: UIViewRepresentable {
             if parent.text != textView.text {
                 parent.text = textView.text
             }
-
             parent.performFullReflow(on: textView)
-
-            DispatchQueue.main.async {
-                self.parent.performFullReflow(on: textView)
-
-                print("""
-                🟧 DID CHANGE
-                text: \(textView.text)
-                count: \(textView.text.count)
-                selectedRange: \(textView.selectedRange)
-                bounds: \(textView.bounds)
-                contentSize: \(textView.contentSize)
-                textContainer.size: \(textView.textContainer.size)
-                """)
-            }
         }
 
         func textView(
@@ -215,28 +136,17 @@ struct AutoFocusTextView: UIViewRepresentable {
                 return false
             }
 
-            guard let stringRange = Range(range, in: textView.text) else {
-                return true
+            if let stringRange = Range(range, in: textView.text) {
+                let predictedText = textView.text.replacingCharacters(in: stringRange, with: replacement)
+                parent.onPredictedTextChange?(predictedText)
             }
-
-            let predictedText = textView.text.replacingCharacters(in: stringRange, with: replacement)
-            parent.onPredictedTextChange?(predictedText)
-
-            print("""
-            🟥 SHOULD CHANGE
-            current: \(textView.text)
-            replacement: \(replacement)
-            range: \(range)
-            predicted: \(predictedText)
-            selectedRange(before): \(textView.selectedRange)
-            bounds: \(textView.bounds)
-            contentSize: \(textView.contentSize)
-            """)
 
             return true
         }
     }
 }
+
+// MARK: - TextViewContainer
 
 final class TextViewContainer: UIView {
     let textView = UITextView()
@@ -258,7 +168,5 @@ final class TextViewContainer: UIView {
         ])
     }
 
-    required init?(coder: NSCoder) {
-        fatalError()
-    }
+    required init?(coder: NSCoder) { fatalError() }
 }
