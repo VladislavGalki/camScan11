@@ -3,6 +3,7 @@ import SwiftUI
 struct WatermarkView: View {
     @StateObject private var viewModel: WatermarkViewModel
     @State private var shouldShowDeleteConfirmation = false
+    @State private var tileText: String = "Watermark"
     @EnvironmentObject private var router: Router
 
     init(inputModel: WatermarkInputModel) {
@@ -15,14 +16,24 @@ struct WatermarkView: View {
                 navigationBar
                     .padding(.bottom, 16)
 
+                segmentControl
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+
                 pageIndicator
                     .padding(.bottom, 51)
 
                 carouselView
                     .frame(maxHeight: .infinity)
-                    .padding(.bottom, 187)
+                    .padding(.bottom, viewModel.placementMode == .tile ? 80 : 187)
                     .allowsHitTesting(!viewModel.shouldShowStyleSheet)
                     .ignoresSafeArea(.keyboard, edges: .all)
+
+                if viewModel.placementMode == .tile {
+                    tileToolbar
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                }
             }
 
             bubbleOverlay
@@ -102,6 +113,44 @@ private extension WatermarkView {
         )
     }
 
+    var segmentControl: some View {
+        HStack(spacing: 0) {
+            ForEach(WatermarkPlacementMode.allCases, id: \.self) { mode in
+                segmentButton(mode)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.bg(.surface))
+                .appBorderModifier(.border(.primary), radius: 10)
+        )
+    }
+
+    func segmentButton(_ mode: WatermarkPlacementMode) -> some View {
+        let isSelected = viewModel.placementMode == mode
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.switchPlacementMode(mode)
+            }
+        } label: {
+            Text(mode.rawValue)
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(isSelected ? .text(.primary) : .text(.secondary))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.bg(.accent).opacity(0.12))
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
     var pageIndicator: some View {
         HStack(spacing: 0) {
             Text("\(viewModel.selectedIndex + 1)/\(viewModel.models.count)")
@@ -117,26 +166,30 @@ private extension WatermarkView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
-            Text("Tap the screen to place the watermark")
-                .appTextStyle(.bodySecondary)
-                .foregroundStyle(.text(.onHint))
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(
-                    Color.bg(.hintBlue)
-                        .appBorderModifier(.border(.hintBlue), radius: 8)
-                        .cornerRadius(8, corners: .allCorners)
-                )
-                .opacity(viewModel.watermarkItems.isEmpty ? 1 : 0)
+            Group {
+                if viewModel.placementMode == .single {
+                    Text("Tap the screen to place the watermark")
+                        .appTextStyle(.bodySecondary)
+                        .foregroundStyle(.text(.onHint))
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(
+                            Color.bg(.hintBlue)
+                                .appBorderModifier(.border(.hintBlue), radius: 8)
+                                .cornerRadius(8, corners: .allCorners)
+                        )
+                        .opacity(viewModel.watermarkItems.isEmpty ? 1 : 0)
+                }
+            }
         }
     }
 
     var carouselView: some View {
         WatermarkCarouselRepresentable(
             models: viewModel.models,
-            watermarkItems: viewModel.watermarkItems,
-            selectedWatermarkID: viewModel.selectedWatermarkID,
-            editingWatermarkID: viewModel.editingWatermarkID,
+            watermarkItems: viewModel.displayItems,
+            selectedWatermarkID: viewModel.placementMode == .single ? viewModel.selectedWatermarkID : nil,
+            editingWatermarkID: viewModel.placementMode == .single ? viewModel.editingWatermarkID : nil,
             editingTextDraft: viewModel.editingTextDraft,
             delegate: viewModel
         )
@@ -144,7 +197,8 @@ private extension WatermarkView {
 
     @ViewBuilder
     var bubbleOverlay: some View {
-        if let anchor = viewModel.bubbleAnchor,
+        if viewModel.placementMode == .single,
+           let anchor = viewModel.bubbleAnchor,
            viewModel.selectedWatermarkID == anchor.watermarkID,
            viewModel.editingWatermarkID == nil,
            !viewModel.shouldShowStyleSheet {
@@ -216,6 +270,46 @@ private extension WatermarkView {
                     .cornerRadius(24, corners: .allCorners)
             )
         }
+    }
+}
+
+// MARK: - Tile Mode
+
+private extension WatermarkView {
+    var tileToolbar: some View {
+        HStack(spacing: 12) {
+            tileTextInputField
+
+            AppButton(
+                config: AppButtonConfig(
+                    content: .title("Style"),
+                    style: .secondary,
+                    size: .m
+                ),
+                action: { viewModel.openStyleEditor() }
+            )
+        }
+    }
+
+    var tileTextInputField: some View {
+        HStack(spacing: 8) {
+            TextField("Watermark text", text: $tileText)
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.primary))
+                .onSubmit {
+                    viewModel.updateTileText(tileText)
+                }
+                .onChange(of: tileText) { _, newValue in
+                    viewModel.updateTileText(newValue)
+                }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.bg(.surface))
+                .appBorderModifier(.border(.primary), radius: 10)
+        )
     }
 }
 

@@ -37,16 +37,32 @@ final class WatermarkViewModel: ObservableObject {
 
     @Published var didAutoCreate = false
 
+    @Published var placementMode: WatermarkPlacementMode = .single
+
     // MARK: - Internal
 
     var isEditingText: Bool { editingWatermarkID != nil }
     var isBubbleFrozen = false
+
+    /// Items to display — in tile mode returns generated tile items, in single mode returns watermarkItems
+    var displayItems: [DocumentWatermarkItem] {
+        if placementMode == .tile {
+            return tileItems
+        }
+        return watermarkItems
+    }
 
     // MARK: - Private
 
     private var originalWatermarkItems: [DocumentWatermarkItem] = []
     private var editingSession: WatermarkEditingSession?
     private var currentPageSize: CGSize = .zero
+
+    /// Template item for tile mode (text, style, opacity, rotation)
+    private var tileTemplate: TileTemplate = .default
+
+    /// Cached tile items
+    @Published private(set) var tileItems: [DocumentWatermarkItem] = []
 
     private let store: WatermarkStore
     private var cancellables = Set<AnyCancellable>()
@@ -59,12 +75,34 @@ final class WatermarkViewModel: ObservableObject {
     }
 }
 
+// MARK: - Tile Template
+
+private struct TileTemplate: Equatable {
+    var text: String
+    var fontSize: CGFloat
+    var textColorHex: String
+    var rotation: CGFloat
+    var opacity: CGFloat
+
+    static let `default` = TileTemplate(
+        text: "Watermark",
+        fontSize: 22,
+        textColorHex: "#020202FF",
+        rotation: -30,
+        opacity: 0.3
+    )
+}
+
 // MARK: - Public Actions
 
 extension WatermarkViewModel {
     func updateCurrentPageSize(_ size: CGSize) {
         guard size != .zero else { return }
         currentPageSize = size
+
+        if placementMode == .tile {
+            regenerateTileItems()
+        }
     }
 
     func clearSelection() {
@@ -79,10 +117,9 @@ extension WatermarkViewModel {
         let currentPageItems = watermarkItems.filter { $0.pageIndex == selectedIndex }
         guard currentPageItems.isEmpty else { return }
 
-        let initialSize = CGSize(
-            width: 56 / max(currentPageSize.width, 322),
-            height: 44 / max(currentPageSize.height, 456)
-        )
+        guard placementMode == .single else { return }
+
+        let measuredSize = measureDefaultWatermarkSize()
 
         let item = DocumentWatermarkItem(
             id: UUID(),
@@ -90,8 +127,8 @@ extension WatermarkViewModel {
             text: "Watermark",
             centerX: 0.5,
             centerY: 0.5,
-            width: initialSize.width,
-            height: initialSize.height,
+            width: measuredSize.width,
+            height: measuredSize.height,
             rotation: 0,
             opacity: 0.3,
             style: .default
@@ -103,6 +140,8 @@ extension WatermarkViewModel {
     }
 
     func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
+        guard placementMode == .single else { return }
+
         selectedIndex = pageIndex
         bubbleAnchor = nil
 
@@ -124,6 +163,8 @@ extension WatermarkViewModel {
     }
 
     func selectWatermark(_ id: UUID?) {
+        guard placementMode == .single else { return }
+
         guard let id else {
             clearSelection()
             return
@@ -148,7 +189,8 @@ extension WatermarkViewModel {
 
         let leftEdgeX = item.centerX - item.width / 2
         let topEdgeY = item.centerY - item.height / 2
-        let baseHeightNormalized = 44.0 / max(currentPageSize.height, 1)
+        let measuredSize = measureTextSize(item.text, fontSize: item.style.fontSize)
+        let baseHeightNormalized = measuredSize.height
 
         editingSession = WatermarkEditingSession(
             watermarkID: selectedWatermarkID,
@@ -173,11 +215,12 @@ extension WatermarkViewModel {
         watermarkItems[index].text = text
 
         let fontSize = watermarkItems[index].style.fontSize
-        let minWidthPt: CGFloat = 56
-        let minHeightPt: CGFloat = 44
+        let measured = TextMeasurer.measure(
+            text: text, fontSize: fontSize, maxWidth: pageSize.width
+        )
 
         let leftEdgePt = session.leftEdgeX * pageSize.width
-        let availableWidthPt = max(pageSize.width - leftEdgePt, minWidthPt)
+        let availableWidthPt = max(pageSize.width - leftEdgePt, 1)
         let lockedWidthPt = session.initialWidth * pageSize.width
 
         let measuredAtAvailable = TextMeasurer.measure(
@@ -187,6 +230,7 @@ extension WatermarkViewModel {
             text: text, fontSize: fontSize, maxWidth: lockedWidthPt
         )
 
+        let minHeightPt = measured.height
         let keepLocked = session.shouldLockWidth && measuredAtLocked.height > minHeightPt + 1
 
         let widthPt: CGFloat
@@ -196,7 +240,7 @@ extension WatermarkViewModel {
             widthPt = lockedWidthPt
             measuredHeight = measuredAtLocked.height
         } else {
-            widthPt = max(minWidthPt, min(measuredAtAvailable.width, availableWidthPt))
+            widthPt = max(measured.width, min(measuredAtAvailable.width, availableWidthPt))
             measuredHeight = measuredAtAvailable.height
         }
 
@@ -239,6 +283,7 @@ extension WatermarkViewModel {
     }
 
     func moveWatermark(id: UUID, to center: CGPoint) {
+        guard placementMode == .single else { return }
         guard let index = watermarkItems.firstIndex(where: { $0.id == id }) else { return }
 
         let item = watermarkItems[index]
@@ -252,6 +297,11 @@ extension WatermarkViewModel {
     }
 
     func updateSelectedWatermarkStyle(colorHex: String? = nil, fontSize: CGFloat? = nil, rotation: CGFloat? = nil, opacity: CGFloat? = nil) {
+        if placementMode == .tile {
+            updateTileStyle(colorHex: colorHex, fontSize: fontSize, rotation: rotation, opacity: opacity)
+            return
+        }
+
         guard let selectedWatermarkID,
               let index = watermarkItems.firstIndex(where: { $0.id == selectedWatermarkID }) else { return }
 
@@ -284,6 +334,17 @@ extension WatermarkViewModel {
     }
 
     func openStyleEditor() {
+        if placementMode == .tile {
+            styleDraft = WatermarkStyleDraft(
+                colorHex: tileTemplate.textColorHex.normalizedRGBAHex,
+                fontSize: tileTemplate.fontSize,
+                rotation: tileTemplate.rotation,
+                opacity: tileTemplate.opacity
+            )
+            shouldShowStyleSheet = true
+            return
+        }
+
         guard let selectedWatermarkID,
               let item = watermarkItems.first(where: { $0.id == selectedWatermarkID }) else { return }
 
@@ -298,8 +359,14 @@ extension WatermarkViewModel {
     }
 
     func saveWatermarkItems() {
-        try? store.saveWatermarkItems(watermarkItems)
-        originalWatermarkItems = watermarkItems
+        let itemsToSave: [DocumentWatermarkItem]
+        if placementMode == .tile {
+            itemsToSave = generateTileItemsForAllPages()
+        } else {
+            itemsToSave = watermarkItems
+        }
+        try? store.saveWatermarkItems(itemsToSave)
+        originalWatermarkItems = itemsToSave
         updateSaveState()
     }
 
@@ -320,6 +387,45 @@ extension WatermarkViewModel {
         selectedIndex = index
         selectedWatermarkID = nil
         bubbleAnchor = nil
+
+        if placementMode == .tile {
+            regenerateTileItems()
+        }
+    }
+
+    // MARK: - Placement Mode
+
+    func switchPlacementMode(_ mode: WatermarkPlacementMode) {
+        guard mode != placementMode else { return }
+
+        clearSelection()
+        shouldShowStyleSheet = false
+        editingWatermarkID = nil
+        editingTextDraft = ""
+        bubbleAnchor = nil
+
+        placementMode = mode
+
+        if mode == .tile {
+            // Take text from first single item if available
+            if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
+                tileTemplate.text = firstItem.text
+                tileTemplate.fontSize = firstItem.style.fontSize
+                tileTemplate.textColorHex = firstItem.style.textColorHex
+                tileTemplate.opacity = firstItem.opacity
+            }
+            regenerateTileItems()
+        }
+
+        updateSaveState()
+    }
+
+    func updateTileText(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        tileTemplate.text = trimmed
+        regenerateTileItems()
+        updateSaveState()
     }
 }
 
@@ -405,7 +511,11 @@ private extension WatermarkViewModel {
     }
 
     func updateSaveState() {
-        isSaveEnabled = watermarkItems != originalWatermarkItems
+        if placementMode == .tile {
+            isSaveEnabled = !tileItems.isEmpty && tileItems != originalWatermarkItems
+        } else {
+            isSaveEnabled = watermarkItems != originalWatermarkItems
+        }
     }
 
     func resetEditingState() {
@@ -416,21 +526,144 @@ private extension WatermarkViewModel {
 
     func reflowWatermarkItem(at index: Int, pageSize: CGSize) {
         let item = watermarkItems[index]
-        let minHeightPt: CGFloat = 44
         let widthPt = item.width * max(pageSize.width, 1)
 
-        let measuredHeight = TextMeasurer.measureHeight(
+        let measured = TextMeasurer.measure(
             text: item.text,
             fontSize: item.style.fontSize,
-            availableWidth: widthPt
+            maxWidth: widthPt
         )
 
-        let newHeightPt = max(measuredHeight, minHeightPt)
-        let newHeightNorm = newHeightPt / max(pageSize.height, 1)
+        let newHeightNorm = measured.height / max(pageSize.height, 1)
 
         let topEdgeY = item.centerY - item.height / 2
+        watermarkItems[index].width = measured.width / max(pageSize.width, 1)
         watermarkItems[index].height = newHeightNorm
         watermarkItems[index].centerY = topEdgeY + newHeightNorm / 2
+    }
+
+    // MARK: - Text-fit Sizing
+
+    func measureDefaultWatermarkSize() -> CGSize {
+        let pageW = max(currentPageSize.width, 322)
+        let pageH = max(currentPageSize.height, 456)
+
+        let measured = TextMeasurer.measure(
+            text: "Watermark",
+            fontSize: DocumentWatermarkStyle.default.fontSize,
+            maxWidth: pageW
+        )
+
+        return CGSize(
+            width: measured.width / pageW,
+            height: measured.height / pageH
+        )
+    }
+
+    func measureTextSize(_ text: String, fontSize: CGFloat) -> CGSize {
+        let pageW = max(currentPageSize.width, 322)
+        let pageH = max(currentPageSize.height, 456)
+
+        let measured = TextMeasurer.measure(
+            text: text.isEmpty ? " " : text,
+            fontSize: fontSize,
+            maxWidth: pageW
+        )
+
+        return CGSize(
+            width: measured.width / pageW,
+            height: measured.height / pageH
+        )
+    }
+
+    // MARK: - Tile Generation
+
+    func updateTileStyle(colorHex: String?, fontSize: CGFloat?, rotation: CGFloat?, opacity: CGFloat?) {
+        if let colorHex { tileTemplate.textColorHex = colorHex }
+        if let fontSize { tileTemplate.fontSize = fontSize }
+        if let rotation { tileTemplate.rotation = rotation }
+        if let opacity { tileTemplate.opacity = opacity }
+        regenerateTileItems()
+        updateSaveState()
+    }
+
+    func generateTileItemsForAllPages() -> [DocumentWatermarkItem] {
+        guard currentPageSize != .zero else { return tileItems }
+        var allItems: [DocumentWatermarkItem] = []
+        for pageIdx in 0..<models.count {
+            let items = generateTileItemsForPage(pageIdx)
+            allItems.append(contentsOf: items)
+        }
+        return allItems
+    }
+
+    func generateTileItemsForPage(_ pageIndex: Int) -> [DocumentWatermarkItem] {
+        guard currentPageSize != .zero else { return [] }
+
+        let pageW = currentPageSize.width
+        let pageH = currentPageSize.height
+
+        let measured = TextMeasurer.measure(
+            text: tileTemplate.text,
+            fontSize: tileTemplate.fontSize,
+            maxWidth: pageW * 0.6
+        )
+
+        let itemWidthNorm = measured.width / pageW
+        let itemHeightNorm = measured.height / pageH
+
+        let spacingX = itemWidthNorm * 0.6
+        let spacingY = itemHeightNorm * 1.8
+
+        let overflowFactor: CGFloat = 0.3
+        let startX: CGFloat = -overflowFactor
+        let startY: CGFloat = -overflowFactor
+        let endX: CGFloat = 1.0 + overflowFactor
+        let endY: CGFloat = 1.0 + overflowFactor
+
+        let stepX = itemWidthNorm + spacingX
+        let stepY = itemHeightNorm + spacingY
+
+        var items: [DocumentWatermarkItem] = []
+        var row = 0
+        var y = startY
+
+        while y < endY {
+            let offsetX = (row % 2 == 0) ? 0 : stepX / 2
+            var x = startX + offsetX
+
+            while x < endX {
+                let item = DocumentWatermarkItem(
+                    id: UUID(),
+                    pageIndex: pageIndex,
+                    text: tileTemplate.text,
+                    centerX: x,
+                    centerY: y,
+                    width: itemWidthNorm,
+                    height: itemHeightNorm,
+                    rotation: tileTemplate.rotation,
+                    opacity: tileTemplate.opacity,
+                    style: DocumentWatermarkStyle(
+                        fontSize: tileTemplate.fontSize,
+                        lineHeight: 28,
+                        letterSpacing: -0.43,
+                        textColorHex: tileTemplate.textColorHex,
+                        alignment: .left
+                    )
+                )
+                items.append(item)
+                x += stepX
+            }
+
+            y += stepY
+            row += 1
+        }
+
+        return items
+    }
+
+    func regenerateTileItems() {
+        tileItems = generateTileItemsForPage(selectedIndex)
     }
 }
 

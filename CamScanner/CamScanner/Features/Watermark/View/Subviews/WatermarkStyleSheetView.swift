@@ -14,11 +14,7 @@ struct WatermarkStyleSheetView: View {
     private let presetColors: [String] = [
         "#020202FF",
         "#BFBFBFFF",
-        "#FFFFFFFF",
-        "#2961F6FF",
-        "#64C367FF",
-        "#EF8B01FF",
-        "#EA4D3EFF"
+        "#FFFFFFFF"
     ]
 
     var body: some View {

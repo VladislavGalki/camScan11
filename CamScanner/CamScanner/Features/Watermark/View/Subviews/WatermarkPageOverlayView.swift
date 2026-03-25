@@ -12,8 +12,6 @@ private struct MoveSession: Equatable {
 
 struct WatermarkPageOverlayView: View {
     private enum Constants {
-        static let initialWidth: CGFloat = 56
-        static let initialHeight: CGFloat = 44
         static let borderWidth: CGFloat = 2
     }
 
@@ -67,9 +65,14 @@ private extension WatermarkPageOverlayView {
                             delegate?.didTapWatermark(id: tappedItem.id)
                         } else {
                             let normalizedLocation = normalize(value.location, in: size)
+                            let measured = TextMeasurer.measure(
+                                text: "Watermark",
+                                fontSize: DocumentWatermarkStyle.default.fontSize,
+                                maxWidth: size.width
+                            )
                             let initialSize = CGSize(
-                                width: Constants.initialWidth / max(size.width, 1),
-                                height: Constants.initialHeight / max(size.height, 1)
+                                width: measured.width / max(size.width, 1),
+                                height: measured.height / max(size.height, 1)
                             )
                             delegate?.didTapPage(index: pageIndex, location: normalizedLocation, initialSize: initialSize)
                         }
