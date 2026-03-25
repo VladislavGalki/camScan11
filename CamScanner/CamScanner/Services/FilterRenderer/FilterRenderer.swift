@@ -15,7 +15,7 @@ final class FilterRenderer {
         image: UIImage,
         state: FilterState
     ) -> UIImage? {
-        if state.type == .blackWhite || state.type == .perfect {
+        if state.type == .blackWhite || state.type == .perfect || state.type == .inverted {
             return openCVRenderer.render(image: image, state: state)
         }
         

@@ -17,6 +17,12 @@ final class OpenCVFilterRenderer {
         case .perfect:
             return renderPerfect(source: rotated)
 
+        case .inverted:
+            return renderInverted(
+                source: rotated,
+                adjustment: state.adjustment
+            )
+
         default:
             return image
         }
@@ -70,6 +76,55 @@ private extension OpenCVFilterRenderer {
         )
 
         return cleaned.toUIImage()
+    }
+
+    func renderInverted(
+        source: Mat,
+        adjustment: CGFloat
+    ) -> UIImage? {
+        let gray = toGray(source)
+        let normalized = removeShadows(from: gray, sigmaX: 27)
+
+        let claheOutput = Mat()
+        let clahe = Imgproc.createCLAHE(
+            clipLimit: 2.2,
+            tileGridSize: Size2i(width: 8, height: 8)
+        )
+        clahe.apply(src: normalized, dst: claheOutput)
+
+        let enhanced = Mat()
+        let alpha = 1.1 + Double(adjustment) * 0.8
+        let beta = -6.0 + Double(adjustment) * 10.0
+        claheOutput.convert(
+            to: enhanced,
+            rtype: CvType.CV_8U,
+            alpha: alpha,
+            beta: beta
+        )
+
+        let sharpened = Mat()
+        let kernel = Mat(rows: 3, cols: 3, type: CvType.CV_32F)
+        try? kernel.put(row: 0, col: 0, data: [
+            Float(0), Float(-0.5), Float(0),
+            Float(-0.5), Float(3.0), Float(-0.5),
+            Float(0), Float(-0.5), Float(0)
+        ])
+        Imgproc.filter2D(
+            src: enhanced,
+            dst: sharpened,
+            ddepth: -1,
+            kernel: kernel
+        )
+
+        let inverted = Mat()
+        Core.bitwise_not(src: sharpened, dst: inverted)
+
+        let adjusted = Mat()
+        let gamma = 1.8 + Double(adjustment) * 1.2
+        let lut = buildGammaLUT(gamma: gamma)
+        Core.LUT(src: inverted, lut: lut, dst: adjusted)
+
+        return adjusted.toUIImage()
     }
 
     func renderPerfect(source: Mat) -> UIImage? {
@@ -210,6 +265,19 @@ private extension OpenCVFilterRenderer {
         )
 
         return result
+    }
+
+    func buildGammaLUT(gamma: Double) -> Mat {
+        let lut = Mat(rows: 1, cols: 256, type: CvType.CV_8U)
+        let invGamma = 1.0 / gamma
+        var table = [UInt8](repeating: 0, count: 256)
+        for i in 0..<256 {
+            table[i] = UInt8(
+                min(255, max(0, pow(Double(i) / 255.0, invGamma) * 255.0))
+            )
+        }
+        try? lut.put(row: 0, col: 0, data: table)
+        return lut
     }
 
     func rotateMatIfNeeded(_ source: Mat, angle: CGFloat) -> Mat {
