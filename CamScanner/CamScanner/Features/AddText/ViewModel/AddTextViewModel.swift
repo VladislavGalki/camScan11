@@ -285,7 +285,10 @@ extension AddTextViewModel {
             return
         }
         guard bubbleAnchor != anchor else { return }
-        bubbleAnchor = anchor
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.bubbleAnchor = anchor
+        }
     }
 
     func updateSelectedIndex(_ index: Int) {
