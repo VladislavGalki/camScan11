@@ -323,6 +323,9 @@ extension WatermarkViewModel {
     }
 
     func openStyleEditor() {
+        // Sync segment control with current page's actual mode
+        placementMode = isCurrentPageTile ? .tile : .single
+
         if isCurrentPageTile, let template = tileTemplatesByPage[selectedIndex] {
             styleDraft = WatermarkStyleDraft(
                 colorHex: template.textColorHex.normalizedRGBAHex,
