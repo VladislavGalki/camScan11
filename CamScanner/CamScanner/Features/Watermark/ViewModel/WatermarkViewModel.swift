@@ -235,9 +235,23 @@ extension WatermarkViewModel {
         watermarkItems[index].text = finalText
         editingTextDraft = finalText
 
-        // Reflow frame to fit the final text
-        if currentPageSize != .zero {
-            reflowWatermarkItem(at: index, pageSize: currentPageSize)
+        // Reflow: use the initial width from before editing started,
+        // so text wraps within the original frame width (growing height)
+        if currentPageSize != .zero, let session = editingSession {
+            let initialWidthPt = session.initialWidth * currentPageSize.width
+            let measured = TextMeasurer.measure(
+                text: finalText,
+                fontSize: watermarkItems[index].style.fontSize,
+                maxWidth: initialWidthPt
+            )
+
+            let widthNorm = measured.width / max(currentPageSize.width, 1)
+            let heightNorm = measured.height / max(currentPageSize.height, 1)
+
+            watermarkItems[index].width = widthNorm
+            watermarkItems[index].height = heightNorm
+            watermarkItems[index].centerX = session.leftEdgeX + widthNorm / 2
+            watermarkItems[index].centerY = session.topEdgeY + heightNorm / 2
         }
 
         resetEditingState()
