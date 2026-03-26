@@ -15,6 +15,7 @@ struct DocumentWatermarkItem: Identifiable, Equatable, Hashable {
     var rotation: CGFloat
     var opacity: CGFloat
     var style: DocumentWatermarkStyle
+    var isTile: Bool
 
     static func `default`(pageIndex: Int) -> DocumentWatermarkItem {
         DocumentWatermarkItem(
@@ -27,7 +28,8 @@ struct DocumentWatermarkItem: Identifiable, Equatable, Hashable {
             height: 0.08,
             rotation: 0,
             opacity: 1.0,
-            style: .default
+            style: .default,
+            isTile: false
         )
     }
 }
@@ -43,6 +45,7 @@ extension DocumentWatermarkItem {
         self.height = entity.height
         self.rotation = entity.rotation
         self.opacity = entity.opacity
+        self.isTile = entity.isTile
         self.style = DocumentWatermarkStyle(
             fontSize: entity.fontSize,
             lineHeight: 28,

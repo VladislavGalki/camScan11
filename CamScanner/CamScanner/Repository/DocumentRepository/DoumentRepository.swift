@@ -881,6 +881,7 @@ extension DocumentRepository {
             entity.height = item.height
             entity.rotation = item.rotation
             entity.opacity = item.opacity
+            entity.isTile = item.isTile
             entity.fontSize = item.style.fontSize
             entity.textColorHex = item.style.textColorHex
             entity.alignmentRaw = item.style.alignment.rawValue

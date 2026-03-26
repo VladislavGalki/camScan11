@@ -133,7 +133,8 @@ extension WatermarkViewModel {
             height: initialSize.height,
             rotation: 0,
             opacity: 1.0,
-            style: .default
+            style: .default,
+            isTile: false
         )
 
         watermarkItems.append(item)
@@ -495,9 +496,7 @@ private extension WatermarkViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] items in
                 guard let self else { return }
-                self.watermarkItems = items
-                self.originalWatermarkItems = items
-                self.updateSaveState()
+                self.restoreFromLoadedItems(items)
             }
             .store(in: &cancellables)
 
@@ -508,6 +507,34 @@ private extension WatermarkViewModel {
                 self?.updateSaveState()
             }
             .store(in: &cancellables)
+    }
+
+    func restoreFromLoadedItems(_ items: [DocumentWatermarkItem]) {
+        // Separate tile items from single items
+        let tileItems = items.filter { $0.isTile }
+        let singleItems = items.filter { !$0.isTile }
+
+        watermarkItems = singleItems
+        originalWatermarkItems = items
+
+        // Reconstruct tileItemsByPage and tileTemplatesByPage from persisted tile items
+        tileItemsByPage = Dictionary(grouping: tileItems, by: \.pageIndex)
+        tileTemplatesByPage = [:]
+
+        for (pageIndex, pageItems) in tileItemsByPage {
+            guard let first = pageItems.first else { continue }
+            tileTemplatesByPage[pageIndex] = TileTemplate(
+                text: first.text,
+                fontSize: first.style.fontSize,
+                textColorHex: first.style.textColorHex,
+                rotation: first.rotation,
+                opacity: first.opacity
+            )
+        }
+
+        // Sync placementMode with the current page
+        placementMode = tileItemsByPage[selectedIndex] != nil ? .tile : .single
+        updateSaveState()
     }
 
     func updateSaveState() {
@@ -640,7 +667,8 @@ private extension WatermarkViewModel {
                         letterSpacing: -0.43,
                         textColorHex: template.textColorHex,
                         alignment: .left
-                    )
+                    ),
+                    isTile: true
                 )
                 items.append(item)
                 x += stepX

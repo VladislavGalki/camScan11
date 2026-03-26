@@ -14,6 +14,7 @@ extension WatermarkOverlayEntity {
     @NSManaged public var width: Double
     @NSManaged public var height: Double
     @NSManaged public var rotation: Double
+    @NSManaged public var isTile: Bool
     @NSManaged public var opacity: Double
     @NSManaged public var fontSize: Double
     @NSManaged public var textColorHex: String

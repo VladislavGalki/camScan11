@@ -53,6 +53,7 @@
         <attribute name="fontSize" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="height" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isTile" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="opacity" attributeType="Double" defaultValueString="1" usesScalarValueType="YES"/>
         <attribute name="pageIndex" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="rotation" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
