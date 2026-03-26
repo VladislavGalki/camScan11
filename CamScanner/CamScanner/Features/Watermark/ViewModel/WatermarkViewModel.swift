@@ -411,16 +411,21 @@ extension WatermarkViewModel {
         placementMode = mode
 
         if mode == .tile {
-            // Take style from current draft (sheet is open)
-            tileTemplate.fontSize = styleDraft.fontSize
-            tileTemplate.textColorHex = styleDraft.colorHex
-            tileTemplate.rotation = styleDraft.rotation
-            tileTemplate.opacity = styleDraft.opacity
+            // Reset tile template to defaults, then take text from existing item if available
+            tileTemplate = .default
 
-            // Take text from first single item if available
             if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
                 tileTemplate.text = firstItem.text
             }
+
+            // Sync styleDraft with tile template
+            styleDraft = WatermarkStyleDraft(
+                colorHex: tileTemplate.textColorHex,
+                fontSize: tileTemplate.fontSize,
+                rotation: tileTemplate.rotation,
+                opacity: tileTemplate.opacity
+            )
+
             regenerateTileItems()
         }
 

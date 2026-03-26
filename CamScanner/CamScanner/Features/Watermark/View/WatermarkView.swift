@@ -40,11 +40,9 @@ struct WatermarkView: View {
                 onRotationChanged: { viewModel.updateSelectedWatermarkStyle(rotation: $0) },
                 onOpacityChanged: { viewModel.updateSelectedWatermarkStyle(opacity: $0) },
                 onModeChanged: { viewModel.switchPlacementMode($0) },
-                onTileTextChanged: { viewModel.updateTileText($0) },
-                onDeleteTile: { shouldShowDeleteConfirmation = true },
                 onClose: {}
             )
-            .presentationDetents([viewModel.placementMode == .tile ? .height(340) : .height(280)])
+            .presentationDetents([.height(280)])
             .presentationBackgroundInteraction(.enabled)
             .presentationCornerRadius(0)
             .presentationDragIndicator(.hidden)
@@ -58,7 +56,6 @@ struct WatermarkView: View {
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 viewModel.autoCreateIfNeeded()
-                viewModel.openStyleEditor()
             }
         }
     }
@@ -153,8 +150,7 @@ private extension WatermarkView {
 
     @ViewBuilder
     var bubbleOverlay: some View {
-        if viewModel.placementMode == .single,
-           let anchor = viewModel.bubbleAnchor,
+        if let anchor = viewModel.bubbleAnchor,
            viewModel.selectedWatermarkID == anchor.watermarkID,
            viewModel.editingWatermarkID == nil,
            !viewModel.shouldShowStyleSheet {
@@ -241,7 +237,9 @@ private extension WatermarkView {
     func handleBubbleAction(_ action: WatermarkActionType) {
         switch action {
         case .edit:
-            viewModel.startEditingSelectedWatermark()
+            if viewModel.placementMode == .single {
+                viewModel.startEditingSelectedWatermark()
+            }
         case .style:
             viewModel.openStyleEditor()
         case .delete:
