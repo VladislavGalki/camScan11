@@ -234,6 +234,12 @@ extension WatermarkViewModel {
 
         watermarkItems[index].text = finalText
         editingTextDraft = finalText
+
+        // Reflow frame to fit the final text
+        if currentPageSize != .zero {
+            reflowWatermarkItem(at: index, pageSize: currentPageSize)
+        }
+
         resetEditingState()
     }
 
