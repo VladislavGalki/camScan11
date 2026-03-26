@@ -42,7 +42,7 @@ struct WatermarkView: View {
                 onModeChanged: { viewModel.switchPlacementMode($0) },
                 onClose: {}
             )
-            .presentationDetents([.height(280)])
+            .presentationDetents([.height(220)])
             .presentationBackgroundInteraction(.enabled)
             .presentationCornerRadius(0)
             .presentationDragIndicator(.hidden)
@@ -112,24 +112,6 @@ private extension WatermarkView {
                 .padding(.leading, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) {
-            Group {
-                if !viewModel.isCurrentPageTile {
-                    let hasItemsOnPage = viewModel.watermarkItems.contains { $0.pageIndex == viewModel.selectedIndex }
-                    Text("Tap the screen to place the watermark")
-                        .appTextStyle(.bodySecondary)
-                        .foregroundStyle(.text(.onHint))
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(
-                            Color.bg(.hintBlue)
-                                .appBorderModifier(.border(.hintBlue), radius: 8)
-                                .cornerRadius(8, corners: .allCorners)
-                        )
-                        .opacity(hasItemsOnPage ? 0 : 1)
-                }
-            }
-        }
     }
 
     var carouselView: some View {

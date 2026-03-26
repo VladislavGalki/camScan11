@@ -21,20 +21,16 @@ struct WatermarkStyleSheetView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            capsuleHandle
-                .padding(.vertical, 8)
-
             segmentControl
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 24)
 
             colorRow
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, 23)
 
             slidersRow
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
         }
         .background(
             Color.bg(.surface)
@@ -45,63 +41,87 @@ struct WatermarkStyleSheetView: View {
 // MARK: - Subviews
 
 private extension WatermarkStyleSheetView {
-    var capsuleHandle: some View {
-        Capsule()
-            .foregroundStyle(Color(hex: "CCCCCC") ?? .gray.opacity(0.35))
-            .frame(width: 36, height: 5)
-    }
-
     var segmentControl: some View {
         HStack(spacing: 0) {
-            ForEach(WatermarkPlacementMode.allCases, id: \.self) { mode in
-                segmentButton(mode)
+            ForEach(Array(WatermarkPlacementMode.allCases.enumerated()), id: \.element) { index, mode in
+                segmentButton(mode, index: index)
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.bg(.surface))
-                .appBorderModifier(.border(.primary), radius: 10)
-        )
-    }
+        .padding(4)
+        .frame(height: 36)
+        .background {
+            GeometryReader { proxy in
+                let count = CGFloat(WatermarkPlacementMode.allCases.count)
+                let segmentWidth = proxy.size.width / max(count, 1)
+                let selectedIndex = CGFloat(selectedSegmentIndex)
 
-    func segmentButton(_ mode: WatermarkPlacementMode) -> some View {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.bg(.controlOnMain))
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.bg(.accent))
+                            .frame(width: segmentWidth - 8, height: 28)
+                            .offset(x: selectedIndex * segmentWidth + 4)
+                            .animation(.easeInOut(duration: 0.25), value: placementMode)
+                    }
+            }
+        }
+        .clipped()
+    }
+    
+    func segmentButton(_ mode: WatermarkPlacementMode, index: Int) -> some View {
         let isSelected = placementMode == mode
 
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.25)) {
                 onModeChanged(mode)
             }
         } label: {
             Text(mode.rawValue)
                 .appTextStyle(.bodySecondary)
-                .foregroundStyle(isSelected ? .text(.primary) : .text(.secondary))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.bg(.accent).opacity(0.12))
-                        }
-                    }
+                .foregroundStyle(
+                    isSelected
+                    ? Color.text(.onAccent)
+                    : Color.text(.secondary)
                 )
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
     var colorRow: some View {
-        HStack(spacing: 0) {
-            ForEach(presetColors, id: \.self) { hex in
-                presetColorItem(hex: hex)
+        HStack(spacing: 16) {
+            HStack(spacing: 0) {
+                ForEach(presetColors, id: \.self) { hex in
+                    presetColorItem(hex: hex)
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+
+                nativeColorPicker
+                    .padding(.trailing, 16)
             }
-
-            nativeColorPicker
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            sliderBlock(
+                title: "Opacity",
+                valueText: "\(Int(draft.opacity * 100))%"
+            ) {
+                AppSlider(
+                    value: Binding(
+                        get: { draft.opacity },
+                        set: { newValue in
+                            let rounded = round(newValue * 100) / 100
+                            draft.opacity = rounded
+                            onOpacityChanged(rounded)
+                        }
+                    ),
+                    range: 0...1
+                )
+            }
         }
-        .padding(.top, 16)
-        .padding(.bottom, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func presetColorItem(hex: String) -> some View {
@@ -215,23 +235,6 @@ private extension WatermarkStyleSheetView {
                     )
                 }
             }
-
-            sliderBlock(
-                title: "Opacity",
-                valueText: "\(Int(draft.opacity * 100))%"
-            ) {
-                AppSlider(
-                    value: Binding(
-                        get: { draft.opacity },
-                        set: { newValue in
-                            let rounded = round(newValue * 100) / 100
-                            draft.opacity = rounded
-                            onOpacityChanged(rounded)
-                        }
-                    ),
-                    range: 0...1
-                )
-            }
         }
     }
 
@@ -263,5 +266,9 @@ private extension WatermarkStyleSheetView {
             .replacingOccurrences(of: "#", with: "")
             .uppercased()
             .withHashPrefixRGBA
+    }
+    
+    private var selectedSegmentIndex: Int {
+        WatermarkPlacementMode.allCases.firstIndex(of: placementMode) ?? 0
     }
 }
