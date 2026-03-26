@@ -192,41 +192,23 @@ extension WatermarkViewModel {
         watermarkItems[index].text = text
 
         let fontSize = watermarkItems[index].style.fontSize
+
+        // Measure at full page width — frame stretches as wide as needed
         let measured = TextMeasurer.measure(
             text: text, fontSize: fontSize, maxWidth: pageSize.width
         )
 
-        let leftEdgePt = session.leftEdgeX * pageSize.width
-        let availableWidthPt = max(pageSize.width - leftEdgePt, 1)
-        let lockedWidthPt = session.initialWidth * pageSize.width
-
-        let measuredAtAvailable = TextMeasurer.measure(
-            text: text, fontSize: fontSize, maxWidth: availableWidthPt
-        )
-        let measuredAtLocked = TextMeasurer.measure(
-            text: text, fontSize: fontSize, maxWidth: lockedWidthPt
-        )
-
-        let minHeightPt = measured.height
-        let keepLocked = session.shouldLockWidth && measuredAtLocked.height > minHeightPt + 1
-
-        let widthPt: CGFloat
-        let measuredHeight: CGFloat
-
-        if keepLocked {
-            widthPt = lockedWidthPt
-            measuredHeight = measuredAtLocked.height
-        } else {
-            widthPt = max(measured.width, min(measuredAtAvailable.width, availableWidthPt))
-            measuredHeight = measuredAtAvailable.height
-        }
-
-        let isMultiline = measuredHeight > minHeightPt + 1
-        let heightPt = isMultiline ? max(minHeightPt, measuredHeight) : minHeightPt
+        let widthPt = min(measured.width, pageSize.width)
+        let heightPt = measured.height
 
         let widthNorm = widthPt / max(pageSize.width, 1)
         let heightNorm = heightPt / max(pageSize.height, 1)
-        let newCenterX = session.leftEdgeX + widthNorm / 2
+
+        // Keep top edge pinned, recalculate centerX so frame stays within page
+        let newCenterX = min(
+            max(session.leftEdgeX + widthNorm / 2, widthNorm / 2),
+            1 - widthNorm / 2
+        )
         let newCenterY = session.topEdgeY + heightNorm / 2
 
         guard watermarkItems[index].width != widthNorm
