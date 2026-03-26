@@ -69,7 +69,6 @@ private extension WatermarkStyleSheetView {
 
         return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
-                placementMode = mode
                 onModeChanged(mode)
             }
         } label: {

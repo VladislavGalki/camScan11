@@ -333,6 +333,9 @@ extension WatermarkViewModel {
 
     func deleteAllTileWatermarksOnCurrentPage() {
         tileItems = []
+        clearSelection()
+        placementMode = .single
+        styleDraft = .default
         updateSaveState()
     }
 
