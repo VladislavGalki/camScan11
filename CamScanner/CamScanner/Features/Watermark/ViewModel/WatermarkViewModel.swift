@@ -141,8 +141,8 @@ extension WatermarkViewModel {
 
     func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
         guard placementMode == .single else { return }
+        guard pageIndex == selectedIndex else { return }
 
-        selectedIndex = pageIndex
         bubbleAnchor = nil
 
         let item = DocumentWatermarkItem(
@@ -333,6 +333,8 @@ extension WatermarkViewModel {
 
     func deleteAllTileWatermarksOnCurrentPage() {
         tileItems = []
+        // Also remove single-mode watermarks on the current page
+        watermarkItems.removeAll { $0.pageIndex == selectedIndex }
         clearSelection()
         placementMode = .single
         styleDraft = .default
