@@ -114,7 +114,8 @@ private extension WatermarkView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) {
             Group {
-                if viewModel.placementMode == .single {
+                if !viewModel.isCurrentPageTile {
+                    let hasItemsOnPage = viewModel.watermarkItems.contains { $0.pageIndex == viewModel.selectedIndex }
                     Text("Tap the screen to place the watermark")
                         .appTextStyle(.bodySecondary)
                         .foregroundStyle(.text(.onHint))
@@ -125,7 +126,7 @@ private extension WatermarkView {
                                 .appBorderModifier(.border(.hintBlue), radius: 8)
                                 .cornerRadius(8, corners: .allCorners)
                         )
-                        .opacity(viewModel.watermarkItems.isEmpty ? 1 : 0)
+                        .opacity(hasItemsOnPage ? 0 : 1)
                 }
             }
         }
@@ -136,7 +137,7 @@ private extension WatermarkView {
             models: viewModel.models,
             watermarkItems: viewModel.displayItems,
             selectedWatermarkID: viewModel.selectedWatermarkID,
-            editingWatermarkID: viewModel.placementMode == .single ? viewModel.editingWatermarkID : nil,
+            editingWatermarkID: viewModel.isCurrentPageTile ? nil : viewModel.editingWatermarkID,
             editingTextDraft: viewModel.editingTextDraft,
             isScrollDisabled: viewModel.shouldShowStyleSheet,
             delegate: viewModel
@@ -176,7 +177,7 @@ private extension WatermarkView {
     }
 
     var deleteConfirmationOverlay: some View {
-        let isTile = viewModel.placementMode == .tile
+        let isTile = viewModel.isCurrentPageTile
 
         return ZStack {
             Color.black.opacity(0.24)
@@ -232,7 +233,7 @@ private extension WatermarkView {
     func handleBubbleAction(_ action: WatermarkActionType) {
         switch action {
         case .edit:
-            if viewModel.placementMode == .single {
+            if !viewModel.isCurrentPageTile {
                 viewModel.startEditingSelectedWatermark()
             }
         case .style:

@@ -35,6 +35,7 @@ final class WatermarkViewModel: ObservableObject {
     @Published var shouldShowStyleSheet = false
     @Published var styleDraft: WatermarkStyleDraft = .default
 
+    /// Placement mode for the CURRENT page
     @Published var placementMode: WatermarkPlacementMode = .single
 
     // MARK: - Internal
@@ -42,12 +43,19 @@ final class WatermarkViewModel: ObservableObject {
     var isEditingText: Bool { editingWatermarkID != nil }
     var isBubbleFrozen = false
 
-    /// Items to display — in tile mode returns generated tile items, in single mode returns watermarkItems
+    /// Returns items for ALL pages — single items + tile items merged
     var displayItems: [DocumentWatermarkItem] {
-        if placementMode == .tile {
-            return tileItems
-        }
-        return watermarkItems
+        let tilePageIndices = Set(tileItemsByPage.keys)
+        // Single items on pages that DON'T have tiles
+        let singleItems = watermarkItems.filter { !tilePageIndices.contains($0.pageIndex) }
+        // All tile items from all pages
+        let allTileItems = tileItemsByPage.values.flatMap { $0 }
+        return singleItems + allTileItems
+    }
+
+    /// Whether the current page is in tile mode
+    var isCurrentPageTile: Bool {
+        tileItemsByPage[selectedIndex] != nil
     }
 
     // MARK: - Private
@@ -56,14 +64,11 @@ final class WatermarkViewModel: ObservableObject {
     private var editingSession: WatermarkEditingSession?
     private var currentPageSize: CGSize = .zero
 
-    /// Template item for tile mode (text, style, opacity, rotation)
-    private var tileTemplate: TileTemplate = .default
+    /// Per-page tile templates
+    private var tileTemplatesByPage: [Int: TileTemplate] = [:]
 
-    /// The page index tile items were generated for (nil = no tile active)
-    private var tilePageIndex: Int?
-
-    /// Cached tile items
-    @Published private(set) var tileItems: [DocumentWatermarkItem] = []
+    /// Per-page tile items
+    @Published private(set) var tileItemsByPage: [Int: [DocumentWatermarkItem]] = [:]
 
     private let store: WatermarkStore
     private var cancellables = Set<AnyCancellable>()
@@ -101,8 +106,8 @@ extension WatermarkViewModel {
         guard size != .zero else { return }
         currentPageSize = size
 
-        if placementMode == .tile, selectedIndex == tilePageIndex {
-            regenerateTileItems()
+        if isCurrentPageTile {
+            regenerateTileItemsForCurrentPage()
         }
     }
 
@@ -111,13 +116,9 @@ extension WatermarkViewModel {
         bubbleAnchor = nil
     }
 
-    /// No longer auto-creates a watermark on start — user must tap to place one.
-
     func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
-        // In tile mode, allow taps only on pages OTHER than the tile page (to add single items there)
-        if placementMode == .tile {
-            guard pageIndex != tilePageIndex else { return }
-        }
+        // Block taps on pages that already have tiles
+        guard tileItemsByPage[pageIndex] == nil else { return }
         guard pageIndex == selectedIndex else { return }
 
         bubbleAnchor = nil
@@ -258,7 +259,8 @@ extension WatermarkViewModel {
     }
 
     func moveWatermark(id: UUID, to center: CGPoint) {
-        guard placementMode == .single else { return }
+        // Only allow moving single-mode watermarks (not tile items)
+        guard !isCurrentPageTile else { return }
         guard let index = watermarkItems.firstIndex(where: { $0.id == id }) else { return }
 
         let item = watermarkItems[index]
@@ -272,7 +274,7 @@ extension WatermarkViewModel {
     }
 
     func updateSelectedWatermarkStyle(colorHex: String? = nil, fontSize: CGFloat? = nil, rotation: CGFloat? = nil, opacity: CGFloat? = nil) {
-        if placementMode == .tile {
+        if isCurrentPageTile {
             updateTileStyle(colorHex: colorHex, fontSize: fontSize, rotation: rotation, opacity: opacity)
             return
         }
@@ -309,8 +311,8 @@ extension WatermarkViewModel {
     }
 
     func deleteAllTileWatermarksOnCurrentPage() {
-        tileItems = []
-        tilePageIndex = nil
+        tileItemsByPage.removeValue(forKey: selectedIndex)
+        tileTemplatesByPage.removeValue(forKey: selectedIndex)
         // Also remove single-mode watermarks on the current page
         watermarkItems.removeAll { $0.pageIndex == selectedIndex }
         clearSelection()
@@ -320,12 +322,12 @@ extension WatermarkViewModel {
     }
 
     func openStyleEditor() {
-        if placementMode == .tile {
+        if isCurrentPageTile, let template = tileTemplatesByPage[selectedIndex] {
             styleDraft = WatermarkStyleDraft(
-                colorHex: tileTemplate.textColorHex.normalizedRGBAHex,
-                fontSize: tileTemplate.fontSize,
-                rotation: tileTemplate.rotation,
-                opacity: tileTemplate.opacity
+                colorHex: template.textColorHex.normalizedRGBAHex,
+                fontSize: template.fontSize,
+                rotation: template.rotation,
+                opacity: template.opacity
             )
             shouldShowStyleSheet = true
             return
@@ -345,14 +347,12 @@ extension WatermarkViewModel {
     }
 
     func saveWatermarkItems() {
-        let itemsToSave: [DocumentWatermarkItem]
-        if placementMode == .tile {
-            // Keep existing items on other pages, replace only the current page with tile items
-            let otherPageItems = watermarkItems.filter { $0.pageIndex != selectedIndex }
-            itemsToSave = otherPageItems + tileItems
-        } else {
-            itemsToSave = watermarkItems
-        }
+        // Merge: single items on non-tile pages + tile items on tile pages
+        let tilePageIndices = Set(tileItemsByPage.keys)
+        let singleItems = watermarkItems.filter { !tilePageIndices.contains($0.pageIndex) }
+        let allTileItems = tileItemsByPage.values.flatMap { $0 }
+        let itemsToSave = singleItems + allTileItems
+
         try? store.saveWatermarkItems(itemsToSave)
         originalWatermarkItems = itemsToSave
         updateSaveState()
@@ -375,6 +375,9 @@ extension WatermarkViewModel {
         selectedIndex = index
         selectedWatermarkID = nil
         bubbleAnchor = nil
+
+        // Sync placementMode with the page we're navigating to
+        placementMode = tileItemsByPage[index] != nil ? .tile : .single
     }
 
     // MARK: - Placement Mode
@@ -390,23 +393,28 @@ extension WatermarkViewModel {
         placementMode = mode
 
         if mode == .tile {
-            // Reset tile template to defaults, then take text from existing item if available
-            tileTemplate = .default
+            // Create tile template for this page, take text from existing single item if available
+            var template = TileTemplate.default
 
             if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
-                tileTemplate.text = firstItem.text
+                template.text = firstItem.text
             }
+
+            tileTemplatesByPage[selectedIndex] = template
 
             // Sync styleDraft with tile template
             styleDraft = WatermarkStyleDraft(
-                colorHex: tileTemplate.textColorHex,
-                fontSize: tileTemplate.fontSize,
-                rotation: tileTemplate.rotation,
-                opacity: tileTemplate.opacity
+                colorHex: template.textColorHex,
+                fontSize: template.fontSize,
+                rotation: template.rotation,
+                opacity: template.opacity
             )
 
-            tilePageIndex = selectedIndex
-            regenerateTileItems()
+            regenerateTileItemsForCurrentPage()
+        } else {
+            // Switching back to single: remove tile data for this page
+            tileItemsByPage.removeValue(forKey: selectedIndex)
+            tileTemplatesByPage.removeValue(forKey: selectedIndex)
         }
 
         updateSaveState()
@@ -415,8 +423,8 @@ extension WatermarkViewModel {
     func updateTileText(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        tileTemplate.text = trimmed
-        regenerateTileItems()
+        tileTemplatesByPage[selectedIndex]?.text = trimmed
+        regenerateTileItemsForCurrentPage()
         updateSaveState()
     }
 }
@@ -503,11 +511,11 @@ private extension WatermarkViewModel {
     }
 
     func updateSaveState() {
-        if placementMode == .tile {
-            isSaveEnabled = !tileItems.isEmpty && tileItems != originalWatermarkItems
-        } else {
-            isSaveEnabled = watermarkItems != originalWatermarkItems
-        }
+        let tilePageIndices = Set(tileItemsByPage.keys)
+        let singleItems = watermarkItems.filter { !tilePageIndices.contains($0.pageIndex) }
+        let allTileItems = tileItemsByPage.values.flatMap { $0 }
+        let currentItems = singleItems + allTileItems
+        isSaveEnabled = currentItems != originalWatermarkItems
     }
 
     func resetEditingState() {
@@ -571,23 +579,24 @@ private extension WatermarkViewModel {
     // MARK: - Tile Generation
 
     func updateTileStyle(colorHex: String?, fontSize: CGFloat?, rotation: CGFloat?, opacity: CGFloat?) {
-        if let colorHex { tileTemplate.textColorHex = colorHex }
-        if let fontSize { tileTemplate.fontSize = fontSize }
-        if let rotation { tileTemplate.rotation = rotation }
-        if let opacity { tileTemplate.opacity = opacity }
-        regenerateTileItems()
+        guard tileTemplatesByPage[selectedIndex] != nil else { return }
+        if let colorHex { tileTemplatesByPage[selectedIndex]?.textColorHex = colorHex }
+        if let fontSize { tileTemplatesByPage[selectedIndex]?.fontSize = fontSize }
+        if let rotation { tileTemplatesByPage[selectedIndex]?.rotation = rotation }
+        if let opacity { tileTemplatesByPage[selectedIndex]?.opacity = opacity }
+        regenerateTileItemsForCurrentPage()
         updateSaveState()
     }
 
-    func generateTileItemsForPage(_ pageIndex: Int) -> [DocumentWatermarkItem] {
+    func generateTileItemsForPage(_ pageIndex: Int, template: TileTemplate) -> [DocumentWatermarkItem] {
         guard currentPageSize != .zero else { return [] }
 
         let pageW = currentPageSize.width
         let pageH = currentPageSize.height
 
         let measured = TextMeasurer.measure(
-            text: tileTemplate.text,
-            fontSize: tileTemplate.fontSize,
+            text: template.text,
+            fontSize: template.fontSize,
             maxWidth: pageW * 0.6
         )
 
@@ -618,18 +627,18 @@ private extension WatermarkViewModel {
                 let item = DocumentWatermarkItem(
                     id: UUID(),
                     pageIndex: pageIndex,
-                    text: tileTemplate.text,
+                    text: template.text,
                     centerX: x,
                     centerY: y,
                     width: itemWidthNorm,
                     height: itemHeightNorm,
-                    rotation: tileTemplate.rotation,
-                    opacity: tileTemplate.opacity,
+                    rotation: template.rotation,
+                    opacity: template.opacity,
                     style: DocumentWatermarkStyle(
-                        fontSize: tileTemplate.fontSize,
+                        fontSize: template.fontSize,
                         lineHeight: 28,
                         letterSpacing: -0.43,
-                        textColorHex: tileTemplate.textColorHex,
+                        textColorHex: template.textColorHex,
                         alignment: .left
                     )
                 )
@@ -644,9 +653,9 @@ private extension WatermarkViewModel {
         return items
     }
 
-    func regenerateTileItems() {
-        let pageIndex = tilePageIndex ?? selectedIndex
-        tileItems = generateTileItemsForPage(pageIndex)
+    func regenerateTileItemsForCurrentPage() {
+        guard let template = tileTemplatesByPage[selectedIndex] else { return }
+        tileItemsByPage[selectedIndex] = generateTileItemsForPage(selectedIndex, template: template)
     }
 }
 
