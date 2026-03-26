@@ -16,17 +16,12 @@ struct WatermarkView: View {
                 navigationBar
                     .padding(.bottom, 16)
 
-                segmentControl
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-
                 pageIndicator
                     .padding(.bottom, 51)
 
                 carouselView
                     .frame(maxHeight: .infinity)
                     .padding(.bottom, viewModel.placementMode == .tile ? 80 : 187)
-                    .allowsHitTesting(!viewModel.shouldShowStyleSheet)
                     .ignoresSafeArea(.keyboard, edges: .all)
 
                 if viewModel.placementMode == .tile {
@@ -46,13 +41,15 @@ struct WatermarkView: View {
         } content: {
             WatermarkStyleSheetView(
                 draft: $viewModel.styleDraft,
+                placementMode: $viewModel.placementMode,
                 onColorChanged: { viewModel.updateSelectedWatermarkStyle(colorHex: $0) },
                 onFontSizeChanged: { viewModel.updateSelectedWatermarkStyle(fontSize: $0) },
                 onRotationChanged: { viewModel.updateSelectedWatermarkStyle(rotation: $0) },
                 onOpacityChanged: { viewModel.updateSelectedWatermarkStyle(opacity: $0) },
+                onModeChanged: { viewModel.switchPlacementMode($0) },
                 onClose: {}
             )
-            .presentationDetents([.height(210)])
+            .presentationDetents([.height(280)])
             .presentationBackgroundInteraction(.enabled)
             .presentationCornerRadius(0)
             .presentationDragIndicator(.hidden)
@@ -113,44 +110,6 @@ private extension WatermarkView {
         )
     }
 
-    var segmentControl: some View {
-        HStack(spacing: 0) {
-            ForEach(WatermarkPlacementMode.allCases, id: \.self) { mode in
-                segmentButton(mode)
-            }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.bg(.surface))
-                .appBorderModifier(.border(.primary), radius: 10)
-        )
-    }
-
-    func segmentButton(_ mode: WatermarkPlacementMode) -> some View {
-        let isSelected = viewModel.placementMode == mode
-
-        return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.switchPlacementMode(mode)
-            }
-        } label: {
-            Text(mode.rawValue)
-                .appTextStyle(.bodySecondary)
-                .foregroundStyle(isSelected ? .text(.primary) : .text(.secondary))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.bg(.accent).opacity(0.12))
-                        }
-                    }
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
     var pageIndicator: some View {
         HStack(spacing: 0) {
             Text("\(viewModel.selectedIndex + 1)/\(viewModel.models.count)")
@@ -191,6 +150,7 @@ private extension WatermarkView {
             selectedWatermarkID: viewModel.placementMode == .single ? viewModel.selectedWatermarkID : nil,
             editingWatermarkID: viewModel.placementMode == .single ? viewModel.editingWatermarkID : nil,
             editingTextDraft: viewModel.editingTextDraft,
+            isScrollDisabled: viewModel.shouldShowStyleSheet,
             delegate: viewModel
         )
     }
@@ -229,13 +189,15 @@ private extension WatermarkView {
     }
 
     var deleteConfirmationOverlay: some View {
-        ZStack {
+        let isTile = viewModel.placementMode == .tile
+
+        return ZStack {
             Color.black.opacity(0.24)
                 .ignoresSafeArea()
                 .transaction { $0.animation = nil }
 
             VStack(spacing: 24) {
-                Text("Delete the watermark?")
+                Text(isTile ? "Delete all watermarks on this page?" : "Delete the watermark?")
 
                 VStack(spacing: 10) {
                     AppButton(
@@ -247,7 +209,11 @@ private extension WatermarkView {
                             isFullWidth: true
                         ),
                         action: {
-                            viewModel.deleteSelectedWatermark()
+                            if isTile {
+                                viewModel.deleteAllTileWatermarksOnCurrentPage()
+                            } else {
+                                viewModel.deleteSelectedWatermark()
+                            }
                             shouldShowDeleteConfirmation = false
                         }
                     )
@@ -287,6 +253,15 @@ private extension WatermarkView {
                     size: .m
                 ),
                 action: { viewModel.openStyleEditor() }
+            )
+
+            AppButton(
+                config: AppButtonConfig(
+                    content: .iconOnly(.trash),
+                    style: .secondary,
+                    size: .m
+                ),
+                action: { shouldShowDeleteConfirmation = true }
             )
         }
     }

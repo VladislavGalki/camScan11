@@ -4,11 +4,13 @@ import SwiftUI
 struct WatermarkStyleSheetView: View {
     @State private var didSnapToZero = false
     @Binding var draft: WatermarkStyleDraft
+    @Binding var placementMode: WatermarkPlacementMode
 
     let onColorChanged: (String) -> Void
     let onFontSizeChanged: (CGFloat) -> Void
     let onRotationChanged: (CGFloat) -> Void
     let onOpacityChanged: (CGFloat) -> Void
+    let onModeChanged: (WatermarkPlacementMode) -> Void
     let onClose: () -> Void
 
     private let presetColors: [String] = [
@@ -21,6 +23,10 @@ struct WatermarkStyleSheetView: View {
         VStack(spacing: 0) {
             capsuleHandle
                 .padding(.vertical, 8)
+
+            segmentControl
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
 
             colorRow
                 .padding(.horizontal, 16)
@@ -43,6 +49,45 @@ private extension WatermarkStyleSheetView {
         Capsule()
             .foregroundStyle(Color(hex: "CCCCCC") ?? .gray.opacity(0.35))
             .frame(width: 36, height: 5)
+    }
+
+    var segmentControl: some View {
+        HStack(spacing: 0) {
+            ForEach(WatermarkPlacementMode.allCases, id: \.self) { mode in
+                segmentButton(mode)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.bg(.surface))
+                .appBorderModifier(.border(.primary), radius: 10)
+        )
+    }
+
+    func segmentButton(_ mode: WatermarkPlacementMode) -> some View {
+        let isSelected = placementMode == mode
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                placementMode = mode
+                onModeChanged(mode)
+            }
+        } label: {
+            Text(mode.rawValue)
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(isSelected ? .text(.primary) : .text(.secondary))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.bg(.accent).opacity(0.12))
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     var colorRow: some View {

@@ -6,6 +6,7 @@ struct WatermarkCarouselRepresentable: UIViewControllerRepresentable {
     var selectedWatermarkID: UUID?
     var editingWatermarkID: UUID?
     var editingTextDraft: String
+    var isScrollDisabled: Bool = false
     weak var delegate: WatermarkPageDelegate?
 
     func makeUIViewController(context: Context) -> WatermarkCarouselController {
@@ -25,7 +26,8 @@ struct WatermarkCarouselRepresentable: UIViewControllerRepresentable {
             watermarkItems: watermarkItems,
             selectedWatermarkID: selectedWatermarkID,
             editingWatermarkID: editingWatermarkID,
-            editingTextDraft: editingTextDraft
+            editingTextDraft: editingTextDraft,
+            isScrollDisabled: isScrollDisabled
         )
     }
 }

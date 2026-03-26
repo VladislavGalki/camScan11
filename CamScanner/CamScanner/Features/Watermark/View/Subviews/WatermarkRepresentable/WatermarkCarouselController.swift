@@ -67,7 +67,8 @@ final class WatermarkCarouselController: UIViewController {
         watermarkItems newWatermarkItems: [DocumentWatermarkItem],
         selectedWatermarkID newSelectedWatermarkID: UUID?,
         editingWatermarkID newEditingWatermarkID: UUID?,
-        editingTextDraft newEditingTextDraft: String
+        editingTextDraft newEditingTextDraft: String,
+        isScrollDisabled: Bool = false
     ) {
         let didModelsChange = models != newModels
         let didItemsChange = watermarkItems != newWatermarkItems
@@ -81,7 +82,7 @@ final class WatermarkCarouselController: UIViewController {
         editingWatermarkID = newEditingWatermarkID
         editingTextDraft = newEditingTextDraft
 
-        collectionView.isScrollEnabled = (editingWatermarkID == nil)
+        collectionView.isScrollEnabled = (editingWatermarkID == nil) && !isScrollDisabled
 
         if didModelsChange {
             collectionView.reloadData()

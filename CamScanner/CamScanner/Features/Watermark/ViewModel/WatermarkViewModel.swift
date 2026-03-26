@@ -333,6 +333,11 @@ extension WatermarkViewModel {
         self.selectedWatermarkID = nil
     }
 
+    func deleteAllTileWatermarksOnCurrentPage() {
+        tileItems = []
+        updateSaveState()
+    }
+
     func openStyleEditor() {
         if placementMode == .tile {
             styleDraft = WatermarkStyleDraft(
@@ -361,7 +366,9 @@ extension WatermarkViewModel {
     func saveWatermarkItems() {
         let itemsToSave: [DocumentWatermarkItem]
         if placementMode == .tile {
-            itemsToSave = generateTileItemsForAllPages()
+            // Keep existing items on other pages, replace only the current page with tile items
+            let otherPageItems = watermarkItems.filter { $0.pageIndex != selectedIndex }
+            itemsToSave = otherPageItems + tileItems
         } else {
             itemsToSave = watermarkItems
         }
