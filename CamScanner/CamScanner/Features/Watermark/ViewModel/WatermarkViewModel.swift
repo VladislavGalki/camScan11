@@ -544,20 +544,25 @@ private extension WatermarkViewModel {
 
     func reflowWatermarkItem(at index: Int, pageSize: CGSize) {
         let item = watermarkItems[index]
-        let widthPt = item.width * max(pageSize.width, 1)
 
+        // Measure at full page width to get natural single-line or wrapped size
         let measured = TextMeasurer.measure(
             text: item.text,
             fontSize: item.style.fontSize,
-            maxWidth: widthPt
+            maxWidth: pageSize.width
         )
 
-        let newHeightNorm = measured.height / max(pageSize.height, 1)
+        let widthNorm = measured.width / max(pageSize.width, 1)
+        let heightNorm = measured.height / max(pageSize.height, 1)
 
         let topEdgeY = item.centerY - item.height / 2
-        watermarkItems[index].width = measured.width / max(pageSize.width, 1)
-        watermarkItems[index].height = newHeightNorm
-        watermarkItems[index].centerY = topEdgeY + newHeightNorm / 2
+        // Recalculate centerX so frame stays within page bounds
+        let newCenterX = min(max(widthNorm / 2, item.centerX), 1 - widthNorm / 2)
+
+        watermarkItems[index].width = widthNorm
+        watermarkItems[index].height = heightNorm
+        watermarkItems[index].centerX = newCenterX
+        watermarkItems[index].centerY = topEdgeY + heightNorm / 2
     }
 
     // MARK: - Text-fit Sizing
