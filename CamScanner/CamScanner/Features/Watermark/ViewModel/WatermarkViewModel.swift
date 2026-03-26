@@ -59,6 +59,9 @@ final class WatermarkViewModel: ObservableObject {
     /// Template item for tile mode (text, style, opacity, rotation)
     private var tileTemplate: TileTemplate = .default
 
+    /// The page index tile items were generated for (nil = no tile active)
+    private var tilePageIndex: Int?
+
     /// Cached tile items
     @Published private(set) var tileItems: [DocumentWatermarkItem] = []
 
@@ -98,7 +101,7 @@ extension WatermarkViewModel {
         guard size != .zero else { return }
         currentPageSize = size
 
-        if placementMode == .tile {
+        if placementMode == .tile, selectedIndex == tilePageIndex {
             regenerateTileItems()
         }
     }
@@ -304,6 +307,7 @@ extension WatermarkViewModel {
 
     func deleteAllTileWatermarksOnCurrentPage() {
         tileItems = []
+        tilePageIndex = nil
         // Also remove single-mode watermarks on the current page
         watermarkItems.removeAll { $0.pageIndex == selectedIndex }
         clearSelection()
@@ -368,10 +372,6 @@ extension WatermarkViewModel {
         selectedIndex = index
         selectedWatermarkID = nil
         bubbleAnchor = nil
-
-        if placementMode == .tile {
-            regenerateTileItems()
-        }
     }
 
     // MARK: - Placement Mode
@@ -402,6 +402,7 @@ extension WatermarkViewModel {
                 opacity: tileTemplate.opacity
             )
 
+            tilePageIndex = selectedIndex
             regenerateTileItems()
         }
 
@@ -641,7 +642,8 @@ private extension WatermarkViewModel {
     }
 
     func regenerateTileItems() {
-        tileItems = generateTileItemsForPage(selectedIndex)
+        let pageIndex = tilePageIndex ?? selectedIndex
+        tileItems = generateTileItemsForPage(pageIndex)
     }
 }
 
