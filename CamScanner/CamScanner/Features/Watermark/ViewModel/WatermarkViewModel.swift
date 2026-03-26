@@ -114,7 +114,10 @@ extension WatermarkViewModel {
     /// No longer auto-creates a watermark on start — user must tap to place one.
 
     func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
-        guard placementMode == .single else { return }
+        // In tile mode, allow taps only on pages OTHER than the tile page (to add single items there)
+        if placementMode == .tile {
+            guard pageIndex != tilePageIndex else { return }
+        }
         guard pageIndex == selectedIndex else { return }
 
         bubbleAnchor = nil
