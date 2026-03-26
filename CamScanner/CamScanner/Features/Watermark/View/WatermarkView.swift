@@ -3,7 +3,6 @@ import SwiftUI
 struct WatermarkView: View {
     @StateObject private var viewModel: WatermarkViewModel
     @State private var shouldShowDeleteConfirmation = false
-    @State private var tileText: String = "Watermark"
     @EnvironmentObject private var router: Router
 
     init(inputModel: WatermarkInputModel) {
@@ -21,14 +20,8 @@ struct WatermarkView: View {
 
                 carouselView
                     .frame(maxHeight: .infinity)
-                    .padding(.bottom, viewModel.placementMode == .tile ? 80 : 187)
+                    .padding(.bottom, 187)
                     .ignoresSafeArea(.keyboard, edges: .all)
-
-                if viewModel.placementMode == .tile {
-                    tileToolbar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                }
             }
 
             bubbleOverlay
@@ -47,9 +40,11 @@ struct WatermarkView: View {
                 onRotationChanged: { viewModel.updateSelectedWatermarkStyle(rotation: $0) },
                 onOpacityChanged: { viewModel.updateSelectedWatermarkStyle(opacity: $0) },
                 onModeChanged: { viewModel.switchPlacementMode($0) },
+                onTileTextChanged: { viewModel.updateTileText($0) },
+                onDeleteTile: { shouldShowDeleteConfirmation = true },
                 onClose: {}
             )
-            .presentationDetents([.height(280)])
+            .presentationDetents([viewModel.placementMode == .tile ? .height(340) : .height(280)])
             .presentationBackgroundInteraction(.enabled)
             .presentationCornerRadius(0)
             .presentationDragIndicator(.hidden)
@@ -63,6 +58,7 @@ struct WatermarkView: View {
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 viewModel.autoCreateIfNeeded()
+                viewModel.openStyleEditor()
             }
         }
     }
@@ -147,7 +143,7 @@ private extension WatermarkView {
         WatermarkCarouselRepresentable(
             models: viewModel.models,
             watermarkItems: viewModel.displayItems,
-            selectedWatermarkID: viewModel.placementMode == .single ? viewModel.selectedWatermarkID : nil,
+            selectedWatermarkID: viewModel.selectedWatermarkID,
             editingWatermarkID: viewModel.placementMode == .single ? viewModel.editingWatermarkID : nil,
             editingTextDraft: viewModel.editingTextDraft,
             isScrollDisabled: viewModel.shouldShowStyleSheet,
@@ -236,55 +232,6 @@ private extension WatermarkView {
                     .cornerRadius(24, corners: .allCorners)
             )
         }
-    }
-}
-
-// MARK: - Tile Mode
-
-private extension WatermarkView {
-    var tileToolbar: some View {
-        HStack(spacing: 12) {
-            tileTextInputField
-
-            AppButton(
-                config: AppButtonConfig(
-                    content: .title("Style"),
-                    style: .secondary,
-                    size: .m
-                ),
-                action: { viewModel.openStyleEditor() }
-            )
-
-            AppButton(
-                config: AppButtonConfig(
-                    content: .iconOnly(.trash),
-                    style: .secondary,
-                    size: .m
-                ),
-                action: { shouldShowDeleteConfirmation = true }
-            )
-        }
-    }
-
-    var tileTextInputField: some View {
-        HStack(spacing: 8) {
-            TextField("Watermark text", text: $tileText)
-                .appTextStyle(.bodySecondary)
-                .foregroundStyle(.text(.primary))
-                .onSubmit {
-                    viewModel.updateTileText(tileText)
-                }
-                .onChange(of: tileText) { _, newValue in
-                    viewModel.updateTileText(newValue)
-                }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.bg(.surface))
-                .appBorderModifier(.border(.primary), radius: 10)
-        )
     }
 }
 

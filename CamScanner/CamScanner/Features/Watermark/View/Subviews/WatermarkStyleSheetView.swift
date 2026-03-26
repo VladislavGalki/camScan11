@@ -11,7 +11,11 @@ struct WatermarkStyleSheetView: View {
     let onRotationChanged: (CGFloat) -> Void
     let onOpacityChanged: (CGFloat) -> Void
     let onModeChanged: (WatermarkPlacementMode) -> Void
+    let onTileTextChanged: (String) -> Void
+    let onDeleteTile: () -> Void
     let onClose: () -> Void
+
+    @State private var tileText: String = "Watermark"
 
     private let presetColors: [String] = [
         "#020202FF",
@@ -27,6 +31,12 @@ struct WatermarkStyleSheetView: View {
             segmentControl
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
+
+            if placementMode == .tile {
+                tileTextRow
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
 
             colorRow
                 .padding(.horizontal, 16)
@@ -88,6 +98,41 @@ private extension WatermarkStyleSheetView {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    var tileTextRow: some View {
+        HStack(spacing: 8) {
+            TextField("Watermark text", text: $tileText)
+                .appTextStyle(.bodySecondary)
+                .foregroundStyle(.text(.primary))
+                .onSubmit {
+                    onTileTextChanged(tileText)
+                }
+                .onChange(of: tileText) { _, newValue in
+                    onTileTextChanged(newValue)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.bg(.surface))
+                        .appBorderModifier(.border(.primary), radius: 10)
+                )
+
+            Button {
+                onDeleteTile()
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.text(.destructive))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.bg(.surface))
+                            .appBorderModifier(.border(.primary), radius: 10)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     var colorRow: some View {

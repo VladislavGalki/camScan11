@@ -10,6 +10,6 @@ struct WatermarkStyleDraft: Equatable {
         colorHex: "#020202FF",
         fontSize: 22,
         rotation: 0,
-        opacity: 0.3
+        opacity: 1.0
     )
 }

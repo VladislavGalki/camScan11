@@ -88,8 +88,8 @@ private struct TileTemplate: Equatable {
         text: "Watermark",
         fontSize: 22,
         textColorHex: "#020202FF",
-        rotation: -30,
-        opacity: 0.3
+        rotation: 0,
+        opacity: 1.0
     )
 }
 
@@ -130,7 +130,7 @@ extension WatermarkViewModel {
             width: measuredSize.width,
             height: measuredSize.height,
             rotation: 0,
-            opacity: 0.3,
+            opacity: 1.0,
             style: .default
         )
 
@@ -154,7 +154,7 @@ extension WatermarkViewModel {
             width: initialSize.width,
             height: initialSize.height,
             rotation: 0,
-            opacity: 0.3,
+            opacity: 1.0,
             style: .default
         )
 
@@ -163,8 +163,6 @@ extension WatermarkViewModel {
     }
 
     func selectWatermark(_ id: UUID?) {
-        guard placementMode == .single else { return }
-
         guard let id else {
             clearSelection()
             return
@@ -406,7 +404,6 @@ extension WatermarkViewModel {
         guard mode != placementMode else { return }
 
         clearSelection()
-        shouldShowStyleSheet = false
         editingWatermarkID = nil
         editingTextDraft = ""
         bubbleAnchor = nil
@@ -414,12 +411,15 @@ extension WatermarkViewModel {
         placementMode = mode
 
         if mode == .tile {
+            // Take style from current draft (sheet is open)
+            tileTemplate.fontSize = styleDraft.fontSize
+            tileTemplate.textColorHex = styleDraft.colorHex
+            tileTemplate.rotation = styleDraft.rotation
+            tileTemplate.opacity = styleDraft.opacity
+
             // Take text from first single item if available
             if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
                 tileTemplate.text = firstItem.text
-                tileTemplate.fontSize = firstItem.style.fontSize
-                tileTemplate.textColorHex = firstItem.style.textColorHex
-                tileTemplate.opacity = firstItem.opacity
             }
             regenerateTileItems()
         }
@@ -592,16 +592,6 @@ private extension WatermarkViewModel {
         if let opacity { tileTemplate.opacity = opacity }
         regenerateTileItems()
         updateSaveState()
-    }
-
-    func generateTileItemsForAllPages() -> [DocumentWatermarkItem] {
-        guard currentPageSize != .zero else { return tileItems }
-        var allItems: [DocumentWatermarkItem] = []
-        for pageIdx in 0..<models.count {
-            let items = generateTileItemsForPage(pageIdx)
-            allItems.append(contentsOf: items)
-        }
-        return allItems
     }
 
     func generateTileItemsForPage(_ pageIndex: Int) -> [DocumentWatermarkItem] {

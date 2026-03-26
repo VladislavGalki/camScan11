@@ -26,7 +26,7 @@ struct DocumentWatermarkItem: Identifiable, Equatable, Hashable {
             width: 0.35,
             height: 0.08,
             rotation: 0,
-            opacity: 0.3,
+            opacity: 1.0,
             style: .default
         )
     }
