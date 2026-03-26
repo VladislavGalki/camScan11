@@ -35,8 +35,6 @@ final class WatermarkViewModel: ObservableObject {
     @Published var shouldShowStyleSheet = false
     @Published var styleDraft: WatermarkStyleDraft = .default
 
-    @Published var didAutoCreate = false
-
     @Published var placementMode: WatermarkPlacementMode = .single
 
     // MARK: - Internal
@@ -110,34 +108,7 @@ extension WatermarkViewModel {
         bubbleAnchor = nil
     }
 
-    func autoCreateIfNeeded() {
-        guard !didAutoCreate else { return }
-        didAutoCreate = true
-
-        let currentPageItems = watermarkItems.filter { $0.pageIndex == selectedIndex }
-        guard currentPageItems.isEmpty else { return }
-
-        guard placementMode == .single else { return }
-
-        let measuredSize = measureDefaultWatermarkSize()
-
-        let item = DocumentWatermarkItem(
-            id: UUID(),
-            pageIndex: selectedIndex,
-            text: "Watermark",
-            centerX: 0.5,
-            centerY: 0.5,
-            width: measuredSize.width,
-            height: measuredSize.height,
-            rotation: 0,
-            opacity: 1.0,
-            style: .default
-        )
-
-        watermarkItems.append(item)
-        selectedWatermarkID = item.id
-        startEditingSelectedWatermark()
-    }
+    /// No longer auto-creates a watermark on start — user must tap to place one.
 
     func handlePageTap(pageIndex: Int, location: CGPoint, initialSize: CGSize) {
         guard placementMode == .single else { return }

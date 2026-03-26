@@ -53,11 +53,6 @@ struct WatermarkView: View {
                 deleteConfirmationOverlay
             }
         }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                viewModel.autoCreateIfNeeded()
-            }
-        }
     }
 }
 
