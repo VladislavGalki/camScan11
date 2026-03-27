@@ -29,9 +29,15 @@ struct WatermarkView: View {
         }
         .navigationBarBackButtonHidden(true)
         .background(Color.bg(.main).ignoresSafeArea())
-        .sheet(isPresented: $viewModel.shouldShowStyleSheet) {
-            viewModel.shouldShowStyleSheet = false
-        } content: {
+        .sheet(
+            isPresented: $viewModel.shouldShowStyleSheet,
+            onDismiss: {
+                viewModel.shouldShowStyleSheet = false
+                if viewModel.isCurrentPageTile {
+                    viewModel.clearSelection()
+                }
+            }
+        ) {
             WatermarkStyleSheetView(
                 draft: $viewModel.styleDraft,
                 placementMode: $viewModel.placementMode,
@@ -119,7 +125,7 @@ private extension WatermarkView {
             models: viewModel.models,
             watermarkItems: viewModel.displayItems,
             selectedWatermarkID: viewModel.selectedWatermarkID,
-            editingWatermarkID: viewModel.isCurrentPageTile ? nil : viewModel.editingWatermarkID,
+            editingWatermarkID: viewModel.editingWatermarkID,
             editingTextDraft: viewModel.editingTextDraft,
             isScrollDisabled: viewModel.shouldShowStyleSheet,
             delegate: viewModel
@@ -215,9 +221,7 @@ private extension WatermarkView {
     func handleBubbleAction(_ action: WatermarkActionType) {
         switch action {
         case .edit:
-            if !viewModel.isCurrentPageTile {
-                viewModel.startEditingSelectedWatermark()
-            }
+            viewModel.startEditingSelectedWatermark()
         case .style:
             viewModel.openStyleEditor()
         case .delete:
@@ -226,6 +230,8 @@ private extension WatermarkView {
     }
 
     func saveAndDismiss() {
+        viewModel.clearSelection()
+
         if viewModel.shouldShowStyleSheet {
             viewModel.shouldShowStyleSheet = false
             Task {

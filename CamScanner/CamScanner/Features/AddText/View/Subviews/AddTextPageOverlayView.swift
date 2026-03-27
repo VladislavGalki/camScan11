@@ -146,6 +146,7 @@ private extension AddTextPageOverlayView {
             fontSize: item.style.fontSize,
             textColor: UIColor(rgbaHex: item.style.textColorHex) ?? .black,
             textAlignment: item.style.alignment.nsTextAlignment,
+            selectAllOnFocus: editingTextDraft == "Text",
             onPredictedTextChange: { delegate?.didChangeEditingText($0, pageSize: pageSize) },
             onSubmit: { delegate?.didSubmitEditing() }
         )

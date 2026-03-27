@@ -120,6 +120,7 @@ private extension WatermarkPageOverlayView {
             fontSize: item.style.fontSize,
             textColor: UIColor(rgbaHex: item.style.textColorHex) ?? .black,
             textAlignment: item.style.alignment.wmNSTextAlignment,
+            selectAllOnFocus: editingTextDraft == "Watermark",
             onPredictedTextChange: { delegate?.didChangeEditingText($0, pageSize: pageSize) },
             onSubmit: { delegate?.didSubmitEditing() }
         )
@@ -141,7 +142,7 @@ private extension WatermarkPageOverlayView {
             .foregroundStyle(Color(rgbaHex: item.style.textColorHex) ?? .black)
             .multilineTextAlignment(item.style.alignment.wmTextAlignment)
             .lineLimit(nil)
-            .fixedSize(horizontal: true, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .frame(width: width, height: height, alignment: .leading)

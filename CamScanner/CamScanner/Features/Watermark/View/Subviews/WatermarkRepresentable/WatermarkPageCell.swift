@@ -202,6 +202,10 @@ extension WatermarkPageCell {
         currentWatermarkItems = watermarkItems
         currentSelectedWatermarkID = selectedWatermarkID
 
+        print(
+            "💧 WatermarkPageCell | updateOverlay page=\(pageIndex) items=\(watermarkItems.count) selected=\(selectedWatermarkID?.uuidString ?? "nil") editing=\(editingWatermarkID?.uuidString ?? "nil") zoomContainer=\(zoomContainerView.bounds)"
+        )
+
         let overlay = WatermarkPageOverlayView(
             pageIndex: pageIndex,
             items: watermarkItems,
@@ -273,6 +277,13 @@ private extension WatermarkPageCell {
         )
 
         let rectInContentView = zoomContainerView.convert(rectInZoomContainer, to: contentView)
+        print(
+            """
+            💧 WatermarkPageCell | reportFrame id=\(selectedWatermarkID.uuidString)
+            itemCenter=(\(item.centerX), \(item.centerY)) itemSize=(\(item.width), \(item.height))
+            rectInContentView=\(rectInContentView)
+            """
+        )
         onSelectedWatermarkFrameChanged?(selectedWatermarkID, rectInContentView)
     }
 }

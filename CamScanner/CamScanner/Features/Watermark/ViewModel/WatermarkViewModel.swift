@@ -104,6 +104,7 @@ private struct TileTemplate: Equatable {
 extension WatermarkViewModel {
     func updateCurrentPageSize(_ size: CGSize) {
         guard size != .zero else { return }
+        log("didChangePageSize page=\(selectedIndex) size=\(describe(size: size))")
         currentPageSize = size
 
         if isCurrentPageTile {
@@ -157,11 +158,22 @@ extension WatermarkViewModel {
     }
 
     func startEditingSelectedWatermark() {
-        guard let selectedWatermarkID, currentPageSize != .zero,
-              let item = watermarkItems.first(where: { $0.id == selectedWatermarkID }) else { return }
+        guard let selectedWatermarkID, currentPageSize != .zero else { return }
+
+        let item: DocumentWatermarkItem
+
+        if isCurrentPageTile {
+            guard let tileItem = tileItemsByPage[selectedIndex]?.first(where: { $0.id == selectedWatermarkID }) else { return }
+            item = tileItem
+        } else {
+            guard let singleItem = watermarkItems.first(where: { $0.id == selectedWatermarkID }) else { return }
+            item = singleItem
+        }
 
         editingWatermarkID = selectedWatermarkID
-        editingTextDraft = item.text
+        editingTextDraft = isCurrentPageTile
+            ? (tileTemplatesByPage[selectedIndex]?.text ?? item.text)
+            : item.text
         bubbleAnchor = nil
 
         let leftEdgeX = item.centerX - item.width / 2
@@ -179,11 +191,63 @@ extension WatermarkViewModel {
             topEdgeY: topEdgeY,
             shouldLockWidth: item.height > baseHeightNormalized + 0.001
         )
+
+        log(
+            """
+            startEditing id=\(selectedWatermarkID.uuidString)
+            text="\(item.text)"
+            pageSize=\(describe(size: currentPageSize))
+            frame=\(describe(item: item))
+            measuredBase=\(describe(size: measuredSize))
+            sessionInitialWidthPt=\(describe(points: item.width * currentPageSize.width))
+            """
+        )
     }
 
     func updateEditingDraft(_ text: String, pageSize: CGSize) {
         currentPageSize = pageSize
         editingTextDraft = text
+
+        if isCurrentPageTile {
+            guard let editingWatermarkID,
+                  let session = editingSession, session.watermarkID == editingWatermarkID,
+                  let index = tileItemsByPage[selectedIndex]?.firstIndex(where: { $0.id == editingWatermarkID }),
+                  let item = tileItemsByPage[selectedIndex]?[index] else { return }
+
+            tileItemsByPage[selectedIndex]?[index].text = text
+
+            let measured = TextMeasurer.measure(
+                text: text,
+                fontSize: item.style.fontSize,
+                maxWidth: pageSize.width
+            )
+
+            let widthPt = min(measured.width, pageSize.width)
+            let heightPt = measured.height
+
+            let widthNorm = widthPt / max(pageSize.width, 1)
+            let heightNorm = heightPt / max(pageSize.height, 1)
+            let newCenterX = min(
+                max(session.leftEdgeX + widthNorm / 2, widthNorm / 2),
+                1 - widthNorm / 2
+            )
+            let newCenterY = session.topEdgeY + heightNorm / 2
+
+            tileItemsByPage[selectedIndex]?[index].width = widthNorm
+            tileItemsByPage[selectedIndex]?[index].height = heightNorm
+            tileItemsByPage[selectedIndex]?[index].centerX = newCenterX
+            tileItemsByPage[selectedIndex]?[index].centerY = newCenterY
+
+            log(
+                """
+                updateTileDraft id=\(editingWatermarkID.uuidString)
+                rawText="\(text)"
+                measured=\(describe(size: measured))
+                newFrameNorm center=(\(describe(points: newCenterX)), \(describe(points: newCenterY))) size=(\(describe(points: widthNorm)), \(describe(points: heightNorm)))
+                """
+            )
+            return
+        }
 
         guard let editingWatermarkID,
               let session = editingSession, session.watermarkID == editingWatermarkID,
@@ -216,6 +280,17 @@ extension WatermarkViewModel {
                 || watermarkItems[index].centerX != newCenterX
                 || watermarkItems[index].centerY != newCenterY else { return }
 
+        log(
+            """
+            updateDraft id=\(editingWatermarkID.uuidString)
+            rawText="\(text)"
+            measured=\(describe(size: measured))
+            pageSize=\(describe(size: pageSize))
+            newFrame widthPt=\(describe(points: widthPt)) heightPt=\(describe(points: heightPt))
+            newFrameNorm center=(\(describe(points: newCenterX)), \(describe(points: newCenterY))) size=(\(describe(points: widthNorm)), \(describe(points: heightNorm)))
+            """
+        )
+
         watermarkItems[index].width = widthNorm
         watermarkItems[index].height = heightNorm
         watermarkItems[index].centerX = newCenterX
@@ -223,8 +298,41 @@ extension WatermarkViewModel {
     }
 
     func applyTextEditing() {
+        if isCurrentPageTile {
+            guard let editingWatermarkID else {
+                log("applyTileTextEditing skipped because editing item is missing")
+                resetEditingState()
+                return
+            }
+
+            let trimmed = editingTextDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            let finalText = trimmed.isEmpty ? "Watermark" : trimmed
+
+            if let selectedTileIndex = tileItemsByPage[selectedIndex]?.firstIndex(where: { $0.id == editingWatermarkID }) {
+                tileTemplatesByPage[selectedIndex]?.text = finalText
+                regenerateTileItemsForCurrentPage(preservingSelectedIndex: selectedTileIndex)
+            } else {
+                tileTemplatesByPage[selectedIndex]?.text = finalText
+                regenerateTileItemsForCurrentPage()
+            }
+
+            editingTextDraft = finalText
+            updateSaveState()
+
+            log(
+                """
+                applyTileTextEditing id=\(editingWatermarkID.uuidString)
+                finalText="\(finalText)"
+                """
+            )
+
+            resetEditingState()
+            return
+        }
+
         guard let editingWatermarkID,
               let index = watermarkItems.firstIndex(where: { $0.id == editingWatermarkID }) else {
+            log("applyTextEditing skipped because editing item is missing")
             resetEditingState()
             return
         }
@@ -232,12 +340,40 @@ extension WatermarkViewModel {
         let trimmed = editingTextDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalText = trimmed.isEmpty ? "Watermark" : trimmed
 
+        let draftBeforeTrim = watermarkItems[index].text
+        let currentWidthPt = watermarkItems[index].width * max(currentPageSize.width, 1)
+
         watermarkItems[index].text = finalText
         editingTextDraft = finalText
 
-        // Reflow: use the initial width from before editing started,
-        // so text wraps within the original frame width (growing height)
-        if currentPageSize != .zero, let session = editingSession {
+        // During live editing the frame already grows to the right size.
+        // On submit we should preserve that width instead of snapping back
+        // to the pre-edit width, otherwise the watermark visually "shrinks".
+        if currentPageSize != .zero {
+            if draftBeforeTrim != finalText {
+                let reflowWidthPt = max(currentWidthPt, 1)
+                let measured = TextMeasurer.measure(
+                    text: finalText,
+                    fontSize: watermarkItems[index].style.fontSize,
+                    maxWidth: reflowWidthPt
+                )
+
+                let widthNorm = measured.width / max(currentPageSize.width, 1)
+                let heightNorm = measured.height / max(currentPageSize.height, 1)
+
+                watermarkItems[index].width = widthNorm
+                watermarkItems[index].height = heightNorm
+            }
+
+            log(
+                """
+                applyTextEditing id=\(editingWatermarkID.uuidString)
+                finalText="\(finalText)"
+                preservedWidthPt=\(describe(points: currentWidthPt))
+                resultingFrame=\(describe(item: watermarkItems[index]))
+                """
+            )
+        } else if let session = editingSession {
             let initialWidthPt = session.initialWidth * currentPageSize.width
             let measured = TextMeasurer.measure(
                 text: finalText,
@@ -252,6 +388,24 @@ extension WatermarkViewModel {
             watermarkItems[index].height = heightNorm
             watermarkItems[index].centerX = session.leftEdgeX + widthNorm / 2
             watermarkItems[index].centerY = session.topEdgeY + heightNorm / 2
+
+            log(
+                """
+                applyTextEditing id=\(editingWatermarkID.uuidString)
+                finalText="\(finalText)"
+                initialWidthPt=\(describe(points: initialWidthPt))
+                measuredAfterDone=\(describe(size: measured))
+                resultingFrame=\(describe(item: watermarkItems[index]))
+                """
+            )
+        } else {
+            log(
+                """
+                applyTextEditing id=\(editingWatermarkID.uuidString)
+                finalText="\(finalText)"
+                skippedReflow currentPageSize=\(describe(size: currentPageSize)) hasSession=\(editingSession != nil)
+                """
+            )
         }
 
         resetEditingState()
@@ -391,6 +545,10 @@ extension WatermarkViewModel {
     func switchPlacementMode(_ mode: WatermarkPlacementMode) {
         guard mode != placementMode else { return }
 
+        let selectedSingleItem = selectedWatermarkID.flatMap { selectedID in
+            watermarkItems.first { $0.id == selectedID && $0.pageIndex == selectedIndex }
+        }
+
         clearSelection()
         editingWatermarkID = nil
         editingTextDraft = ""
@@ -402,7 +560,9 @@ extension WatermarkViewModel {
             // Create tile template for this page, take text from existing single item if available
             var template = TileTemplate.default
 
-            if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
+            if let selectedSingleItem {
+                template.text = selectedSingleItem.text
+            } else if let firstItem = watermarkItems.first(where: { $0.pageIndex == selectedIndex }) {
                 template.text = firstItem.text
             }
 
@@ -459,6 +619,7 @@ extension WatermarkViewModel: WatermarkPageDelegate {
     }
 
     func didSubmitEditing() {
+        log("didSubmitEditing editingWatermarkID=\(editingWatermarkID?.uuidString ?? "nil") draft=\"\(editingTextDraft)\"")
         applyTextEditing()
     }
 
@@ -469,6 +630,8 @@ extension WatermarkViewModel: WatermarkPageDelegate {
     func didChangeSelectedWatermarkFrame(id: UUID, rect: CGRect?) {
         guard selectedWatermarkID == id, let rect else { return }
         guard !isBubbleFrozen else { return }
+
+        log("didChangeSelectedWatermarkFrame id=\(id.uuidString) rect=\(describe(rect: rect))")
 
         let newAnchor = WatermarkBubbleAnchor(
             watermarkID: id,
@@ -551,6 +714,7 @@ private extension WatermarkViewModel {
     }
 
     func resetEditingState() {
+        log("resetEditingState editingWatermarkID=\(editingWatermarkID?.uuidString ?? "nil")")
         editingWatermarkID = nil
         editingTextDraft = ""
         editingSession = nil
@@ -691,9 +855,60 @@ private extension WatermarkViewModel {
         return items
     }
 
-    func regenerateTileItemsForCurrentPage() {
+    func regenerateTileItemsForCurrentPage(preservingSelectedIndex selectedTileIndex: Int? = nil) {
         guard let template = tileTemplatesByPage[selectedIndex] else { return }
-        tileItemsByPage[selectedIndex] = generateTileItemsForPage(selectedIndex, template: template)
+        let previousItems = tileItemsByPage[selectedIndex] ?? []
+        var regeneratedItems = generateTileItemsForPage(selectedIndex, template: template)
+
+        for index in regeneratedItems.indices {
+            guard previousItems.indices.contains(index) else { continue }
+            let previousID = previousItems[index].id
+            let item = regeneratedItems[index]
+            regeneratedItems[index] = DocumentWatermarkItem(
+                id: previousID,
+                pageIndex: item.pageIndex,
+                text: item.text,
+                centerX: item.centerX,
+                centerY: item.centerY,
+                width: item.width,
+                height: item.height,
+                rotation: item.rotation,
+                opacity: item.opacity,
+                style: item.style,
+                isTile: item.isTile
+            )
+        }
+
+        tileItemsByPage[selectedIndex] = regeneratedItems
+
+        if let selectedTileIndex,
+           regeneratedItems.indices.contains(selectedTileIndex) {
+            let preservedID = regeneratedItems[selectedTileIndex].id
+            selectedWatermarkID = preservedID
+            if editingWatermarkID != nil {
+                editingWatermarkID = preservedID
+            }
+        }
+    }
+
+    func log(_ message: String) {
+        print("💧 WatermarkVM | \(message)")
+    }
+
+    func describe(points value: CGFloat) -> String {
+        String(format: "%.2f", value)
+    }
+
+    func describe(size: CGSize) -> String {
+        "(\(describe(points: size.width)), \(describe(points: size.height)))"
+    }
+
+    func describe(rect: CGRect) -> String {
+        "origin=(\(describe(points: rect.origin.x)), \(describe(points: rect.origin.y))) size=\(describe(size: rect.size))"
+    }
+
+    func describe(item: DocumentWatermarkItem) -> String {
+        "center=(\(describe(points: item.centerX)), \(describe(points: item.centerY))) size=(\(describe(points: item.width)), \(describe(points: item.height)))"
     }
 }
 
