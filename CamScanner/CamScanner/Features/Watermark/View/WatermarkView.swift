@@ -128,6 +128,7 @@ private extension WatermarkView {
             editingWatermarkID: viewModel.editingWatermarkID,
             editingTextDraft: viewModel.editingTextDraft,
             isScrollDisabled: viewModel.shouldShowStyleSheet,
+            isInteractionDisabled: viewModel.shouldShowStyleSheet,
             delegate: viewModel
         )
     }

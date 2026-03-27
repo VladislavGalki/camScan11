@@ -190,6 +190,8 @@ extension OpenDocumentViewModel {
                 documentType: models.first?.documentType ?? .documents,
                 pages: models
             )
+        result.textItems = textItems
+        result.watermarkItems = watermarkItems
         result.cellHeight = currentCellHeight
         return result
     }

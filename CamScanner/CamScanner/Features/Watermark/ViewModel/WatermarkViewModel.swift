@@ -104,7 +104,6 @@ private struct TileTemplate: Equatable {
 extension WatermarkViewModel {
     func updateCurrentPageSize(_ size: CGSize) {
         guard size != .zero else { return }
-        log("didChangePageSize page=\(selectedIndex) size=\(describe(size: size))")
         currentPageSize = size
 
         if isCurrentPageTile {
@@ -191,17 +190,6 @@ extension WatermarkViewModel {
             topEdgeY: topEdgeY,
             shouldLockWidth: item.height > baseHeightNormalized + 0.001
         )
-
-        log(
-            """
-            startEditing id=\(selectedWatermarkID.uuidString)
-            text="\(item.text)"
-            pageSize=\(describe(size: currentPageSize))
-            frame=\(describe(item: item))
-            measuredBase=\(describe(size: measuredSize))
-            sessionInitialWidthPt=\(describe(points: item.width * currentPageSize.width))
-            """
-        )
     }
 
     func updateEditingDraft(_ text: String, pageSize: CGSize) {
@@ -237,15 +225,6 @@ extension WatermarkViewModel {
             tileItemsByPage[selectedIndex]?[index].height = heightNorm
             tileItemsByPage[selectedIndex]?[index].centerX = newCenterX
             tileItemsByPage[selectedIndex]?[index].centerY = newCenterY
-
-            log(
-                """
-                updateTileDraft id=\(editingWatermarkID.uuidString)
-                rawText="\(text)"
-                measured=\(describe(size: measured))
-                newFrameNorm center=(\(describe(points: newCenterX)), \(describe(points: newCenterY))) size=(\(describe(points: widthNorm)), \(describe(points: heightNorm)))
-                """
-            )
             return
         }
 
@@ -280,17 +259,6 @@ extension WatermarkViewModel {
                 || watermarkItems[index].centerX != newCenterX
                 || watermarkItems[index].centerY != newCenterY else { return }
 
-        log(
-            """
-            updateDraft id=\(editingWatermarkID.uuidString)
-            rawText="\(text)"
-            measured=\(describe(size: measured))
-            pageSize=\(describe(size: pageSize))
-            newFrame widthPt=\(describe(points: widthPt)) heightPt=\(describe(points: heightPt))
-            newFrameNorm center=(\(describe(points: newCenterX)), \(describe(points: newCenterY))) size=(\(describe(points: widthNorm)), \(describe(points: heightNorm)))
-            """
-        )
-
         watermarkItems[index].width = widthNorm
         watermarkItems[index].height = heightNorm
         watermarkItems[index].centerX = newCenterX
@@ -300,7 +268,6 @@ extension WatermarkViewModel {
     func applyTextEditing() {
         if isCurrentPageTile {
             guard let editingWatermarkID else {
-                log("applyTileTextEditing skipped because editing item is missing")
                 resetEditingState()
                 return
             }
@@ -319,20 +286,12 @@ extension WatermarkViewModel {
             editingTextDraft = finalText
             updateSaveState()
 
-            log(
-                """
-                applyTileTextEditing id=\(editingWatermarkID.uuidString)
-                finalText="\(finalText)"
-                """
-            )
-
             resetEditingState()
             return
         }
 
         guard let editingWatermarkID,
               let index = watermarkItems.firstIndex(where: { $0.id == editingWatermarkID }) else {
-            log("applyTextEditing skipped because editing item is missing")
             resetEditingState()
             return
         }
@@ -364,15 +323,6 @@ extension WatermarkViewModel {
                 watermarkItems[index].width = widthNorm
                 watermarkItems[index].height = heightNorm
             }
-
-            log(
-                """
-                applyTextEditing id=\(editingWatermarkID.uuidString)
-                finalText="\(finalText)"
-                preservedWidthPt=\(describe(points: currentWidthPt))
-                resultingFrame=\(describe(item: watermarkItems[index]))
-                """
-            )
         } else if let session = editingSession {
             let initialWidthPt = session.initialWidth * currentPageSize.width
             let measured = TextMeasurer.measure(
@@ -388,24 +338,6 @@ extension WatermarkViewModel {
             watermarkItems[index].height = heightNorm
             watermarkItems[index].centerX = session.leftEdgeX + widthNorm / 2
             watermarkItems[index].centerY = session.topEdgeY + heightNorm / 2
-
-            log(
-                """
-                applyTextEditing id=\(editingWatermarkID.uuidString)
-                finalText="\(finalText)"
-                initialWidthPt=\(describe(points: initialWidthPt))
-                measuredAfterDone=\(describe(size: measured))
-                resultingFrame=\(describe(item: watermarkItems[index]))
-                """
-            )
-        } else {
-            log(
-                """
-                applyTextEditing id=\(editingWatermarkID.uuidString)
-                finalText="\(finalText)"
-                skippedReflow currentPageSize=\(describe(size: currentPageSize)) hasSession=\(editingSession != nil)
-                """
-            )
         }
 
         resetEditingState()
@@ -619,7 +551,6 @@ extension WatermarkViewModel: WatermarkPageDelegate {
     }
 
     func didSubmitEditing() {
-        log("didSubmitEditing editingWatermarkID=\(editingWatermarkID?.uuidString ?? "nil") draft=\"\(editingTextDraft)\"")
         applyTextEditing()
     }
 
@@ -630,8 +561,6 @@ extension WatermarkViewModel: WatermarkPageDelegate {
     func didChangeSelectedWatermarkFrame(id: UUID, rect: CGRect?) {
         guard selectedWatermarkID == id, let rect else { return }
         guard !isBubbleFrozen else { return }
-
-        log("didChangeSelectedWatermarkFrame id=\(id.uuidString) rect=\(describe(rect: rect))")
 
         let newAnchor = WatermarkBubbleAnchor(
             watermarkID: id,
@@ -714,7 +643,6 @@ private extension WatermarkViewModel {
     }
 
     func resetEditingState() {
-        log("resetEditingState editingWatermarkID=\(editingWatermarkID?.uuidString ?? "nil")")
         editingWatermarkID = nil
         editingTextDraft = ""
         editingSession = nil
@@ -891,25 +819,6 @@ private extension WatermarkViewModel {
         }
     }
 
-    func log(_ message: String) {
-        print("💧 WatermarkVM | \(message)")
-    }
-
-    func describe(points value: CGFloat) -> String {
-        String(format: "%.2f", value)
-    }
-
-    func describe(size: CGSize) -> String {
-        "(\(describe(points: size.width)), \(describe(points: size.height)))"
-    }
-
-    func describe(rect: CGRect) -> String {
-        "origin=(\(describe(points: rect.origin.x)), \(describe(points: rect.origin.y))) size=\(describe(size: rect.size))"
-    }
-
-    func describe(item: DocumentWatermarkItem) -> String {
-        "center=(\(describe(points: item.centerX)), \(describe(points: item.centerY))) size=(\(describe(points: item.width)), \(describe(points: item.height)))"
-    }
 }
 
 // MARK: - String Helper

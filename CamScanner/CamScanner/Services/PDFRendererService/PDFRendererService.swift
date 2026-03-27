@@ -100,6 +100,13 @@ final class PDFRendererService {
             cellHeight: document.cellHeight
         )
 
+        UserWatermarkItemRenderer.drawForDocuments(
+            items: document.watermarkItems,
+            in: ctx,
+            fittedRect: fittedRect,
+            cellHeight: document.cellHeight
+        )
+
         if watermark {
             WatermarkRenderer.draw(
                 in: ctx,
@@ -157,6 +164,13 @@ final class PDFRendererService {
             cellHeight: document.cellHeight
         )
 
+        UserWatermarkItemRenderer.drawForIDCard(
+            items: document.watermarkItems,
+            in: ctx,
+            imageRects: imageRects,
+            cellHeight: document.cellHeight
+        )
+
         if watermark {
             WatermarkRenderer.draw(
                 in: ctx,
@@ -195,6 +209,13 @@ final class PDFRendererService {
 
         TextItemRenderer.drawForPassport(
             items: document.textItems,
+            in: ctx,
+            imageRect: rect,
+            cellHeight: document.cellHeight
+        )
+
+        UserWatermarkItemRenderer.drawForPassport(
+            items: document.watermarkItems,
             in: ctx,
             imageRect: rect,
             cellHeight: document.cellHeight
@@ -621,6 +642,282 @@ extension PDFRendererService {
             )
 
             return max(ceil(wrappedRect.height) + verticalInset * 2, minHeight)
+        }
+    }
+}
+
+extension PDFRendererService {
+    enum UserWatermarkItemRenderer {
+        private static let cellWidth: CGFloat = 322
+        private static let idCardImageViewSize = CGSize(width: 171, height: 108)
+        private static let idCardSpacing: CGFloat = 8
+        private static let passportImageViewSize = CGSize(width: 360, height: 250)
+
+        static func drawForDocuments(
+            items: [DocumentWatermarkItem],
+            in ctx: CGContext,
+            fittedRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
+            let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
+
+            let screenContent = CGRect(
+                x: 0,
+                y: (cellHeight - imageHeightInCell) / 2,
+                width: cellWidth,
+                height: imageHeightInCell
+            )
+
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: fittedRect)
+        }
+
+        static func drawForIDCard(
+            items: [DocumentWatermarkItem],
+            in ctx: CGContext,
+            imageRects: [CGRect],
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty, !imageRects.isEmpty else { return }
+
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
+            let imgSize = idCardImageViewSize
+            let imageCount = imageRects.count
+            let totalH = CGFloat(imageCount) * imgSize.height + CGFloat(imageCount - 1) * idCardSpacing
+            let originX = (cellWidth - imgSize.width) / 2
+            var y = (cellHeight - totalH) / 2
+            var screenRects: [CGRect] = []
+
+            for _ in 0..<imageCount {
+                screenRects.append(CGRect(x: originX, y: y, width: imgSize.width, height: imgSize.height))
+                y += imgSize.height + idCardSpacing
+            }
+
+            drawPerImage(items, in: ctx, cellHeight: cellHeight,
+                         screenRects: screenRects, renderRects: imageRects)
+        }
+
+        static func drawForPassport(
+            items: [DocumentWatermarkItem],
+            in ctx: CGContext,
+            imageRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
+            let ivSize = passportImageViewSize
+            let imageAspect = imageRect.width / imageRect.height
+
+            let visibleSize: CGSize
+            if imageAspect > ivSize.width / ivSize.height {
+                visibleSize = CGSize(width: ivSize.width, height: ivSize.width / imageAspect)
+            } else {
+                visibleSize = CGSize(width: ivSize.height * imageAspect, height: ivSize.height)
+            }
+
+            let ivOriginX = (cellWidth - ivSize.width) / 2
+            let ivOriginY = (cellHeight - ivSize.height) / 2
+            let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
+            let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
+            let screenContent = CGRect(origin: CGPoint(x: visOriginX, y: visOriginY), size: visibleSize)
+
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: imageRect)
+        }
+
+        private static func drawMapped(
+            _ items: [DocumentWatermarkItem],
+            in ctx: CGContext,
+            cellHeight: CGFloat,
+            screenContent: CGRect,
+            renderRect: CGRect
+        ) {
+            UIGraphicsPushContext(ctx)
+
+            let scaleX = renderRect.width / screenContent.width
+            let scaleY = renderRect.height / screenContent.height
+
+            for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+                let pdfX = renderRect.midX + (cellX - screenContent.midX) * scaleX
+                let pdfY = renderRect.midY + (cellY - screenContent.midY) * scaleY
+
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        private static func drawPerImage(
+            _ items: [DocumentWatermarkItem],
+            in ctx: CGContext,
+            cellHeight: CGFloat,
+            screenRects: [CGRect],
+            renderRects: [CGRect]
+        ) {
+            UIGraphicsPushContext(ctx)
+
+            for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+
+                var bestIdx = 0
+                var bestDist = CGFloat.greatestFiniteMagnitude
+                for (i, sr) in screenRects.enumerated() {
+                    let d = abs(cellY - sr.midY)
+                    if d < bestDist {
+                        bestDist = d
+                        bestIdx = i
+                    }
+                }
+
+                let sr = screenRects[bestIdx]
+                let rr = renderRects[bestIdx]
+                let scaleX = rr.width / sr.width
+                let scaleY = rr.height / sr.height
+                let pdfX = rr.midX + (cellX - sr.midX) * scaleX
+                let pdfY = rr.midY + (cellY - sr.midY) * scaleY
+
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        private static func drawItemAt(
+            _ item: DocumentWatermarkItem,
+            centerX: CGFloat,
+            centerY: CGFloat,
+            cellHeight: CGFloat,
+            scaleX: CGFloat,
+            scaleY: CGFloat
+        ) {
+            let screenBlockW = item.width * cellWidth
+            let screenBlockH = item.height * cellHeight
+            let screenPadding: CGFloat = 8
+            let screenContentW = max(screenBlockW - screenPadding * 2, 0)
+            let screenContentH = max(screenBlockH - screenPadding * 2, 0)
+
+            let font = UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular)
+            let color = (UIColor(rgbaHex: item.style.textColorHex) ?? .black).withAlphaComponent(item.opacity)
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineBreakMode = .byWordWrapping
+            paragraphStyle.lineSpacing = 0
+
+            switch item.style.alignment {
+            case .left: paragraphStyle.alignment = .left
+            case .center: paragraphStyle.alignment = .center
+            case .right: paragraphStyle.alignment = .right
+            }
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: color,
+                .kern: item.style.letterSpacing,
+                .paragraphStyle: paragraphStyle
+            ]
+
+            let textBounds = (item.text as NSString).boundingRect(
+                with: CGSize(width: screenContentW, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let vCenterOffset = max((screenContentH - ceil(textBounds.height)) / 2, 0)
+
+            let screenContentRect = CGRect(
+                x: -screenBlockW / 2 + screenPadding,
+                y: -screenBlockH / 2 + screenPadding + vCenterOffset,
+                width: screenContentW,
+                height: screenContentH
+            )
+
+            let screenClipRect = CGRect(
+                x: -screenBlockW / 2,
+                y: -screenBlockH / 2,
+                width: screenBlockW,
+                height: screenBlockH
+            )
+
+            guard let context = UIGraphicsGetCurrentContext() else { return }
+            context.saveGState()
+            context.translateBy(x: centerX, y: centerY)
+            context.scaleBy(x: scaleX, y: scaleY)
+
+            if item.rotation != 0 {
+                context.rotate(by: item.rotation * .pi / 180)
+            }
+
+            context.clip(to: screenClipRect)
+
+            (item.text as NSString).draw(
+                with: screenContentRect,
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+
+            context.restoreGState()
+        }
+
+        private static func resolveCellHeight(from items: [DocumentWatermarkItem], provided: CGFloat) -> CGFloat {
+            if provided > 0 { return provided }
+            let derived = deriveCellHeight(from: items)
+            if derived > 0 { return derived }
+            return 456
+        }
+
+        private static func deriveCellHeight(from items: [DocumentWatermarkItem]) -> CGFloat {
+            guard let item = items.first, item.height > 0.001 else { return 0 }
+
+            let widthPoints = item.width * cellWidth
+            let heightPoints = measureTextBlockHeight(item: item, widthPoints: widthPoints)
+            let derived = heightPoints / item.height
+            guard derived > 100, derived < 2000 else { return 0 }
+            return derived
+        }
+
+        private static func measureTextBlockHeight(item: DocumentWatermarkItem, widthPoints: CGFloat) -> CGFloat {
+            let horizontalInset: CGFloat = 8
+            let verticalInset: CGFloat = 8
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byWordWrapping
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular),
+                .kern: item.style.letterSpacing,
+                .paragraphStyle: paragraph
+            ]
+
+            let sourceText = item.text.isEmpty ? " " : item.text
+            let attributed = NSAttributedString(string: sourceText, attributes: attributes)
+
+            let singleLineRect = attributed.boundingRect(
+                with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+
+            let idealWidth = ceil(singleLineRect.width)
+            let availableWidth = max(widthPoints - horizontalInset * 2, 1)
+            let targetWidth = min(idealWidth, availableWidth)
+
+            let wrappedRect = attributed.boundingRect(
+                with: CGSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+
+            return ceil(wrappedRect.height) + verticalInset * 2
         }
     }
 }

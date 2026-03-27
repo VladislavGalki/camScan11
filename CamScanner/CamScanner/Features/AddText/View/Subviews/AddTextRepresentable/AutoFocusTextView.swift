@@ -98,10 +98,6 @@ struct AutoFocusTextView: UIViewRepresentable {
     private func performFullReflow(on textView: UITextView) {
         let availableTextWidth = max(textView.bounds.width - horizontalInset * 2, 1)
 
-        print(
-            "⌨️ AutoFocusTextView | reflow textLength=\(textView.text.count) bounds=\(textView.bounds) availableTextWidth=\(availableTextWidth)"
-        )
-
         textView.textContainer.size = CGSize(
             width: availableTextWidth,
             height: .greatestFiniteMagnitude
@@ -128,7 +124,6 @@ struct AutoFocusTextView: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            print("⌨️ AutoFocusTextView | didChange text=\"\(textView.text)\"")
             if parent.text != textView.text {
                 parent.text = textView.text
             }
@@ -140,18 +135,13 @@ struct AutoFocusTextView: UIViewRepresentable {
             shouldChangeTextIn range: NSRange,
             replacementText replacement: String
         ) -> Bool {
-            print(
-                "⌨️ AutoFocusTextView | shouldChange range=\(NSStringFromRange(range)) replacement=\"\(replacement)\" current=\"\(textView.text)\""
-            )
             if replacement == "\n" {
-                print("⌨️ AutoFocusTextView | submit triggered by return key")
                 parent.onSubmit()
                 return false
             }
 
             if let stringRange = Range(range, in: textView.text) {
                 let predictedText = textView.text.replacingCharacters(in: stringRange, with: replacement)
-                print("⌨️ AutoFocusTextView | predictedText=\"\(predictedText)\"")
                 parent.onPredictedTextChange?(predictedText)
             }
 

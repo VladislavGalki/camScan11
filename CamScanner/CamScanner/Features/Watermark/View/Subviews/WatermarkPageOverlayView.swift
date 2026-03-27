@@ -26,6 +26,7 @@ struct WatermarkPageOverlayView: View {
     let selectedWatermarkID: UUID?
     let editingWatermarkID: UUID?
     let editingTextDraft: String
+    let isInteractionDisabled: Bool
     weak var delegate: WatermarkPageDelegate?
 
     // MARK: - Body
@@ -47,6 +48,7 @@ struct WatermarkPageOverlayView: View {
             .onChange(of: geo.size) { _, newSize in
                 delegate?.didChangePageSize(newSize)
             }
+            .allowsHitTesting(!isInteractionDisabled)
         }
     }
 }

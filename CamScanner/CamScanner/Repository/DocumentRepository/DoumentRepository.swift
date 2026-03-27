@@ -993,17 +993,21 @@ extension DocumentRepository {
         ) ?? .documents
 
         var allTextItems: [DocumentTextItem] = []
+        var allWatermarkItems: [DocumentWatermarkItem] = []
         for document in documents {
             guard let docID = document.id else { continue }
-            let items = try fetchTextOverlays(documentID: docID)
-            allTextItems.append(contentsOf: items)
+            let textItems = try fetchTextOverlays(documentID: docID)
+            let watermarkItems = try fetchWatermarkOverlays(documentID: docID)
+            allTextItems.append(contentsOf: textItems)
+            allWatermarkItems.append(contentsOf: watermarkItems)
         }
 
         return ShareInputModel(
             documentName: first.title,
             documentType: firstType,
             pages: pages,
-            textItems: allTextItems
+            textItems: allTextItems,
+            watermarkItems: allWatermarkItems
         )
     }
     

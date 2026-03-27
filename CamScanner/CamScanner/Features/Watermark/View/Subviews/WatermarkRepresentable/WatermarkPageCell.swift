@@ -127,6 +127,7 @@ extension WatermarkPageCell {
         selectedWatermarkID: UUID?,
         editingWatermarkID: UUID?,
         editingTextDraft: String,
+        isInteractionDisabled: Bool,
         delegate: WatermarkPageDelegate?,
         onSelectedWatermarkFrameChanged: ((UUID, CGRect?) -> Void)?
     ) {
@@ -187,6 +188,7 @@ extension WatermarkPageCell {
             selectedWatermarkID: selectedWatermarkID,
             editingWatermarkID: editingWatermarkID,
             editingTextDraft: editingTextDraft,
+            isInteractionDisabled: isInteractionDisabled,
             delegate: delegate
         )
     }
@@ -197,14 +199,11 @@ extension WatermarkPageCell {
         selectedWatermarkID: UUID?,
         editingWatermarkID: UUID?,
         editingTextDraft: String,
+        isInteractionDisabled: Bool,
         delegate: WatermarkPageDelegate?
     ) {
         currentWatermarkItems = watermarkItems
         currentSelectedWatermarkID = selectedWatermarkID
-
-        print(
-            "💧 WatermarkPageCell | updateOverlay page=\(pageIndex) items=\(watermarkItems.count) selected=\(selectedWatermarkID?.uuidString ?? "nil") editing=\(editingWatermarkID?.uuidString ?? "nil") zoomContainer=\(zoomContainerView.bounds)"
-        )
 
         let overlay = WatermarkPageOverlayView(
             pageIndex: pageIndex,
@@ -212,6 +211,7 @@ extension WatermarkPageCell {
             selectedWatermarkID: selectedWatermarkID,
             editingWatermarkID: editingWatermarkID,
             editingTextDraft: editingTextDraft,
+            isInteractionDisabled: isInteractionDisabled,
             delegate: delegate
         )
 
@@ -277,13 +277,6 @@ private extension WatermarkPageCell {
         )
 
         let rectInContentView = zoomContainerView.convert(rectInZoomContainer, to: contentView)
-        print(
-            """
-            💧 WatermarkPageCell | reportFrame id=\(selectedWatermarkID.uuidString)
-            itemCenter=(\(item.centerX), \(item.centerY)) itemSize=(\(item.width), \(item.height))
-            rectInContentView=\(rectInContentView)
-            """
-        )
         onSelectedWatermarkFrameChanged?(selectedWatermarkID, rectInContentView)
     }
 }

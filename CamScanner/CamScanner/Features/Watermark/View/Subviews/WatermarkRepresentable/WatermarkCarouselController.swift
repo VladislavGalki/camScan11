@@ -19,6 +19,7 @@ final class WatermarkCarouselController: UIViewController {
     private var selectedWatermarkID: UUID?
     private var editingWatermarkID: UUID?
     private var editingTextDraft: String
+    private var isInteractionDisabled: Bool
     private var currentIndex: Int = 0
 
     // MARK: - Delegate
@@ -33,6 +34,7 @@ final class WatermarkCarouselController: UIViewController {
         selectedWatermarkID: UUID?,
         editingWatermarkID: UUID?,
         editingTextDraft: String,
+        isInteractionDisabled: Bool,
         delegate: WatermarkPageDelegate?
     ) {
         self.models = models
@@ -40,6 +42,7 @@ final class WatermarkCarouselController: UIViewController {
         self.selectedWatermarkID = selectedWatermarkID
         self.editingWatermarkID = editingWatermarkID
         self.editingTextDraft = editingTextDraft
+        self.isInteractionDisabled = isInteractionDisabled
         self.delegate = delegate
         super.init(nibName: nil, bundle: nil)
     }
@@ -68,6 +71,7 @@ final class WatermarkCarouselController: UIViewController {
         selectedWatermarkID newSelectedWatermarkID: UUID?,
         editingWatermarkID newEditingWatermarkID: UUID?,
         editingTextDraft newEditingTextDraft: String,
+        isInteractionDisabled newIsInteractionDisabled: Bool,
         isScrollDisabled: Bool = false
     ) {
         let didModelsChange = models != newModels
@@ -75,12 +79,14 @@ final class WatermarkCarouselController: UIViewController {
         let didSelectionChange = selectedWatermarkID != newSelectedWatermarkID
         let didEditingIDChange = editingWatermarkID != newEditingWatermarkID
         let didEditingDraftChange = editingTextDraft != newEditingTextDraft
+        let didInteractionChange = isInteractionDisabled != newIsInteractionDisabled
 
         models = newModels
         watermarkItems = newWatermarkItems
         selectedWatermarkID = newSelectedWatermarkID
         editingWatermarkID = newEditingWatermarkID
         editingTextDraft = newEditingTextDraft
+        isInteractionDisabled = newIsInteractionDisabled
 
         collectionView.isScrollEnabled = (editingWatermarkID == nil) && !isScrollDisabled
 
@@ -90,7 +96,7 @@ final class WatermarkCarouselController: UIViewController {
             return
         }
 
-        if didItemsChange || didSelectionChange || didEditingIDChange || didEditingDraftChange {
+        if didItemsChange || didSelectionChange || didEditingIDChange || didEditingDraftChange || didInteractionChange {
             updateVisibleOverlays()
             updateIndicator(index: min(currentIndex, max(newModels.count - 1, 0)))
         }
@@ -181,6 +187,7 @@ private extension WatermarkCarouselController {
                 selectedWatermarkID: selectedWatermarkID,
                 editingWatermarkID: editingWatermarkID,
                 editingTextDraft: editingTextDraft,
+                isInteractionDisabled: isInteractionDisabled,
                 delegate: delegate
             )
         }
@@ -211,6 +218,7 @@ extension WatermarkCarouselController: UICollectionViewDataSource {
             selectedWatermarkID: selectedWatermarkID,
             editingWatermarkID: editingWatermarkID,
             editingTextDraft: editingTextDraft,
+            isInteractionDisabled: isInteractionDisabled,
             delegate: delegate,
             onSelectedWatermarkFrameChanged: { [weak self] id, rect in
                 guard let self else { return }

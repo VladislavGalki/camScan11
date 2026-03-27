@@ -6,6 +6,7 @@ struct SharePreviewModel: Identifiable, Equatable, Hashable {
     let documentType: DocumentTypeEnum
     var frames: [CapturedFrame]
     var textItems: [DocumentTextItem] = []
+    var watermarkItems: [DocumentWatermarkItem] = []
     var cellHeight: CGFloat = 0
     var isSelected: Bool = false
 }
