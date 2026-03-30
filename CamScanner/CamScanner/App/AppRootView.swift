@@ -59,6 +59,10 @@ struct AppRootView: View {
                 return AnyView(
                     WatermarkView(inputModel: inputModel)
                 )
+            case let .erase(inputModel):
+                return AnyView(
+                    EraseView(inputModel: inputModel)
+                )
             case let .share(inputModel):
                 return AnyView(
                     ShareView(inputModel: inputModel)

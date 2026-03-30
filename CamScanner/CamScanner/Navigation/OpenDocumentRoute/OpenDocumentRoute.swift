@@ -10,6 +10,8 @@ enum OpenDocumentRoute: Route {
 
     case watermark(WatermarkInputModel)
 
+    case erase(EraseInputModel)
+
     case share(ShareInputModel)
 
     case scanFlow(ScanInputModel, onDismiss: () -> Void)
@@ -23,6 +25,8 @@ extension OpenDocumentRoute: Equatable {
         case let (.addText(lModel), .addText(rModel)):
             return lModel == rModel
         case let (.watermark(lModel), .watermark(rModel)):
+            return lModel == rModel
+        case let (.erase(lModel), .erase(rModel)):
             return lModel == rModel
         case let (.share(lModel), .share(rModel)):
             return lModel == rModel
@@ -45,6 +49,9 @@ extension OpenDocumentRoute: Hashable {
             hasher.combine(model)
         case let .watermark(model):
             hasher.combine("watermark")
+            hasher.combine(model)
+        case let .erase(model):
+            hasher.combine("erase")
             hasher.combine(model)
         case let .share(model):
             hasher.combine("share")

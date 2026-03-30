@@ -315,7 +315,11 @@ private extension OpenDocumentView {
         case .signature:
             break
         case .erase:
-            break
+            router.push(
+                OpenDocumentRoute.erase(
+                    EraseInputModel(documentID: viewModel.documentId)
+                )
+            )
         case .watermark:
             router.push(
                 OpenDocumentRoute.watermark(

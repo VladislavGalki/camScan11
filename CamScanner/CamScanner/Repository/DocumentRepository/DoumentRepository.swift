@@ -816,6 +816,26 @@ extension DocumentRepository {
         try context.save()
     }
 
+    func saveErasedPageImage(
+        documentID: UUID,
+        pageImages: [(pageIndex: Int, image: UIImage)]
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else { return }
+        let pages = (document.pages as? Set<PageEntity>) ?? []
+
+        for page in pages {
+            guard let entry = pageImages.first(where: { $0.pageIndex == Int(page.index) }),
+                  let relativePath = page.imagePath else { continue }
+
+            let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+            if let data = entry.image.jpegData(compressionQuality: 0.92) {
+                try? data.write(to: fileURL, options: [.atomic])
+            }
+        }
+
+        try context.save()
+    }
+
     func deleteTextOverlay(
         documentID: UUID,
         overlayID: UUID
