@@ -39,6 +39,7 @@ final class ErasePageCell: UICollectionViewCell {
         super.prepareForReuse()
         imageView.image = nil
         canvasView.clearAll()
+        canvasView.colorProvider = nil
         delegate = nil
         previousStrokeCount = 0
         onDrawingBegan = nil
@@ -66,6 +67,7 @@ final class ErasePageCell: UICollectionViewCell {
         model: ScanPreviewModel,
         pageIndex: Int,
         strokes: [Stroke],
+        isAutoColor: Bool,
         eraseColor: UIColor,
         brushSize: CGFloat,
         delegate: ErasePageDelegate?
@@ -80,6 +82,11 @@ final class ErasePageCell: UICollectionViewCell {
         canvasView.penColor = eraseColor
         canvasView.penAlpha = 1.0
         canvasView.penWidth = brushSize
+        canvasView.colorProvider = isAutoColor
+            ? { [weak self] point in
+                self?.sampleEraseColor(at: point) ?? eraseColor
+            }
+            : nil
 
         canvasView.setStrokes(strokes)
         previousStrokeCount = strokes.count
@@ -104,9 +111,14 @@ final class ErasePageCell: UICollectionViewCell {
         setNeedsLayout()
     }
 
-    func updateEraseSettings(eraseColor: UIColor, brushSize: CGFloat) {
+    func updateEraseSettings(isAutoColor: Bool, eraseColor: UIColor, brushSize: CGFloat) {
         canvasView.penColor = eraseColor
         canvasView.penWidth = brushSize
+        canvasView.colorProvider = isAutoColor
+            ? { [weak self] point in
+                self?.sampleEraseColor(at: point) ?? eraseColor
+            }
+            : nil
     }
 
     func updateStrokes(_ strokes: [Stroke]) {
@@ -152,5 +164,77 @@ private extension ErasePageCell {
         let x = (container.width - w) / 2
         let y = (container.height - h) / 2
         return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    func sampleEraseColor(at normalizedPoint: CGPoint) -> UIColor? {
+        guard let image = imageView.image?.normalizedUp(),
+              let cgImage = image.cgImage else { return nil }
+
+        let width = cgImage.width
+        let height = cgImage.height
+
+        guard width > 0, height > 0 else { return nil }
+
+        let centerX = min(max(Int(round(normalizedPoint.x * CGFloat(width - 1))), 0), width - 1)
+        let centerY = min(max(Int(round(normalizedPoint.y * CGFloat(height - 1))), 0), height - 1)
+
+        let radius = max(2, min(width, height) / 120)
+        let sampleRect = CGRect(
+            x: max(0, centerX - radius),
+            y: max(0, centerY - radius),
+            width: min(width - max(0, centerX - radius), radius * 2 + 1),
+            height: min(height - max(0, centerY - radius), radius * 2 + 1)
+        ).integral
+
+        guard let cropped = cgImage.cropping(to: sampleRect) else { return nil }
+
+        let sampleWidth = Int(sampleRect.width)
+        let sampleHeight = Int(sampleRect.height)
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * sampleWidth
+        var pixelData = [UInt8](repeating: 0, count: bytesPerRow * sampleHeight)
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: &pixelData,
+                  width: sampleWidth,
+                  height: sampleHeight,
+                  bitsPerComponent: 8,
+                  bytesPerRow: bytesPerRow,
+                  space: colorSpace,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return nil }
+
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: sampleWidth, height: sampleHeight))
+
+        var rSum: Double = 0
+        var gSum: Double = 0
+        var bSum: Double = 0
+        var alphaSum: Double = 0
+        var count: Double = 0
+
+        for y in 0..<sampleHeight {
+            for x in 0..<sampleWidth {
+                let offset = (y * bytesPerRow) + (x * bytesPerPixel)
+                let alpha = Double(pixelData[offset + 3]) / 255
+
+                guard alpha > 0.01 else { continue }
+
+                rSum += Double(pixelData[offset]) * alpha
+                gSum += Double(pixelData[offset + 1]) * alpha
+                bSum += Double(pixelData[offset + 2]) * alpha
+                alphaSum += alpha
+                count += 1
+            }
+        }
+
+        guard count > 0, alphaSum > 0 else { return nil }
+
+        return UIColor(
+            red: rSum / (alphaSum * 255),
+            green: gSum / (alphaSum * 255),
+            blue: bSum / (alphaSum * 255),
+            alpha: 1
+        )
     }
 }

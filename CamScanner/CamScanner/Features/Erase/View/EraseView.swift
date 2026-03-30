@@ -7,6 +7,12 @@ struct EraseView: View {
     @State private var brushPreviewTask: Task<Void, Never>?
     @EnvironmentObject private var router: Router
 
+    private let presetColors: [String] = [
+        "#FFFFFFFF",
+        "#020202FF",
+        "#BFBFBFFF"
+    ]
+
     init(inputModel: EraseInputModel) {
         _viewModel = StateObject(wrappedValue: EraseViewModel(inputModel: inputModel))
     }
@@ -48,32 +54,6 @@ private extension EraseView {
                 ),
                 action: { handleBack() }
             )
-
-            Spacer(minLength: 0)
-
-            if viewModel.hasAnyChanges {
-                HStack(spacing: 8) {
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .iconOnly(.back),
-                            style: .secondary,
-                            size: .s
-                        ),
-                        action: { viewModel.undo() }
-                    )
-                    .appButtonEnabled(viewModel.canUndo)
-
-                    AppButton(
-                        config: AppButtonConfig(
-                            content: .iconOnly(.forward),
-                            style: .secondary,
-                            size: .s
-                        ),
-                        action: { viewModel.redo() }
-                    )
-                    .appButtonEnabled(viewModel.canRedo)
-                }
-            }
 
             Spacer(minLength: 0)
 
@@ -125,6 +105,7 @@ private extension EraseView {
             models: viewModel.models,
             strokesByPage: viewModel.strokesByPage,
             selectedIndex: viewModel.selectedIndex,
+            isAutoColor: viewModel.isAutoColor,
             eraseColor: viewModel.activeColor,
             brushSize: viewModel.brushSize,
             delegate: viewModel
@@ -132,30 +113,41 @@ private extension EraseView {
     }
 
     var bottomPanel: some View {
-        VStack(spacing: 16) {
-            // Auto color toggle
-            HStack {
-                Text("Auto color")
-                    .appTextStyle(.bodySecondary)
-                    .foregroundStyle(.text(.primary))
-                Spacer()
-                Toggle("", isOn: $viewModel.isAutoColor)
-                    .labelsHidden()
-                    .tint(.bg(.accent))
+        VStack(spacing: 20) {
+            HStack(spacing: 16) {
+                HStack(spacing: 0) {
+                    ForEach(presetColors, id: \.self) { hex in
+                        presetColorItem(hex: hex)
+
+                        Spacer(minLength: 0)
+                    }
+
+                    nativeColorPicker
+                        .padding(.trailing, 16)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 12) {
+                    Text("Auto color")
+                        .appTextStyle(.bodySecondary)
+                        .foregroundStyle(.text(.secondary))
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { viewModel.isAutoColor },
+                            set: { viewModel.setAutoColorEnabled($0) }
+                        )
+                    )
+                        .labelsHidden()
+                        .tint(.bg(.accent))
+                }
             }
 
-            // Manual color picker
-            if !viewModel.isAutoColor {
-                colorPickerRow
-            }
-
-            // Brush size slider
-            HStack(spacing: 12) {
-                Text("Size")
-                    .appTextStyle(.bodySecondary)
-                    .foregroundStyle(.text(.primary))
-                    .frame(width: 32, alignment: .leading)
-
+            sliderBlock(
+                title: "Size",
+                valueText: "\(Int(viewModel.brushSize.rounded()))"
+            ) {
                 AppSlider(
                     value: Binding(
                         get: { viewModel.brushSize },
@@ -169,20 +161,52 @@ private extension EraseView {
             }
             .overlay(alignment: .top) {
                 if showBrushPreview {
-                    Circle()
-                        .fill(Color(viewModel.activeColor))
-                        .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .frame(width: 96, height: 68)
+                        .foregroundStyle(.bg(.surface))
+                        .appBorderModifier(.border(.primary), radius: 8)
+                        .overlay {
                             Circle()
-                                .stroke(Color.border(.primary), lineWidth: 0.5)
-                        )
-                        .frame(
-                            width: viewModel.brushSize,
-                            height: viewModel.brushSize
-                        )
-                        .offset(y: -viewModel.brushSize / 2 - 12)
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
+                                .fill(Color.black)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.border(.primary), lineWidth: 0.5)
+                                )
+                                .frame(
+                                    width: viewModel.brushSize,
+                                    height: viewModel.brushSize
+                                )
+                                .transition(.opacity)
+                                .allowsHitTesting(false)
+                        }
+                        .offset(y: -48)
                 }
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if viewModel.hasAnyChanges {
+                HStack(spacing: 8) {
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.back),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: { viewModel.undo() }
+                    )
+                    .appButtonEnabled(viewModel.canUndo)
+
+                    AppButton(
+                        config: AppButtonConfig(
+                            content: .iconOnly(.forward),
+                            style: .secondary,
+                            size: .s
+                        ),
+                        action: { viewModel.redo() }
+                    )
+                    .appButtonEnabled(viewModel.canRedo)
+                }
+                .offset(y: -48)
             }
         }
         .padding(.horizontal, 16)
@@ -194,38 +218,94 @@ private extension EraseView {
         )
     }
 
-    var colorPickerRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(erasePresetColors, id: \.self) { color in
+    func presetColorItem(hex: String) -> some View {
+        let normalizedHex = normalized(hex)
+        let selectedHex = normalized(viewModel.manualColor.toRGBAHex() ?? "#FFFFFFFF")
+        let isSelected = !viewModel.isAutoColor && normalizedHex == selectedHex
+        let isWhite = normalizedHex == "#FFFFFFFF"
+        let swatchColor = Color(rgbaHex: hex) ?? .clear
+        let innerSize: CGFloat = isSelected && !isWhite ? 26 : 32
+
+        return Button {
+            guard let color = Color(rgbaHex: normalizedHex) else { return }
+            viewModel.selectManualColor(color)
+        } label: {
+            ZStack {
+                if isSelected && !isWhite {
                     Circle()
-                        .fill(color)
+                        .stroke(swatchColor, lineWidth: 3)
                         .frame(width: 32, height: 32)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    color == .white
-                                        ? Color.border(.primary)
-                                        : Color.clear,
-                                    lineWidth: 1
-                                )
+                }
+
+                Circle()
+                    .fill(swatchColor)
+                    .frame(width: innerSize, height: innerSize)
+
+                if isWhite {
+                    if isSelected {
+                        Circle()
+                            .fill(Color(hex: "#E5E5E5") ?? .clear)
+                            .frame(width: 22, height: 22)
+                    }
+
+                    Circle()
+                        .stroke(
+                            Color.black.opacity(0.08),
+                            lineWidth: 1
                         )
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    viewModel.manualColor == color
-                                        ? .bg(.accent)
-                                        : Color.clear,
-                                    lineWidth: 2.5
-                                )
-                                .padding(-3)
-                        )
-                        .onTapGesture {
-                            viewModel.manualColor = color
-                        }
+                        .frame(width: 32, height: 32)
                 }
             }
+            .frame(width: 32, height: 32)
         }
+        .buttonStyle(.plain)
+    }
+
+    var nativeColorPicker: some View {
+        ColorPicker(
+            "",
+            selection: Binding(
+                get: {
+                    viewModel.manualColor
+                },
+                set: { newValue in
+                    viewModel.selectManualColor(newValue)
+                }
+            ),
+            supportsOpacity: false
+        )
+        .labelsHidden()
+        .scaleEffect(1.35)
+        .frame(width: 34, height: 34)
+    }
+
+    func sliderBlock<Content: View>(
+        title: String,
+        valueText: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .appTextStyle(.bodySecondary)
+                    .foregroundStyle(.text(.secondary))
+
+                Spacer()
+
+                Text(valueText)
+                    .appTextStyle(.bodySecondary)
+                    .foregroundStyle(.text(.secondary))
+            }
+
+            content()
+        }
+    }
+
+    func normalized(_ hex: String) -> String {
+        hex
+            .replacingOccurrences(of: "#", with: "")
+            .uppercased()
+            .withHashPrefixRGBA
     }
 
     var discardConfirmationOverlay: some View {

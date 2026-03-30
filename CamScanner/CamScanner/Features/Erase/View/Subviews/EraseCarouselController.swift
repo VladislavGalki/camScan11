@@ -14,6 +14,7 @@ final class EraseCarouselController: UIViewController {
 
     private var models: [ScanPreviewModel]
     private var strokesByPage: [Int: [Stroke]]
+    private var isAutoColor: Bool
     private var eraseColor: UIColor
     private var brushSize: CGFloat
     private var currentIndex: Int = 0
@@ -28,12 +29,14 @@ final class EraseCarouselController: UIViewController {
         models: [ScanPreviewModel],
         strokesByPage: [Int: [Stroke]],
         selectedIndex: Int,
+        isAutoColor: Bool,
         eraseColor: UIColor,
         brushSize: CGFloat,
         delegate: ErasePageDelegate?
     ) {
         self.models = models
         self.strokesByPage = strokesByPage
+        self.isAutoColor = isAutoColor
         self.eraseColor = eraseColor
         self.brushSize = brushSize
         self.currentIndex = selectedIndex
@@ -62,18 +65,21 @@ final class EraseCarouselController: UIViewController {
         models newModels: [ScanPreviewModel],
         strokesByPage newStrokesByPage: [Int: [Stroke]],
         selectedIndex newSelectedIndex: Int,
+        isAutoColor newIsAutoColor: Bool,
         eraseColor newEraseColor: UIColor,
         brushSize newBrushSize: CGFloat,
         isScrollDisabled: Bool
     ) {
         let didModelsChange = models != newModels
         let didStrokesChange = strokesByPage != newStrokesByPage
+        let didAutoColorModeChange = isAutoColor != newIsAutoColor
         let didColorChange = eraseColor != newEraseColor
         let didBrushChange = brushSize != newBrushSize
         let didSelectedIndexChange = currentIndex != newSelectedIndex
 
         models = newModels
         strokesByPage = newStrokesByPage
+        isAutoColor = newIsAutoColor
         eraseColor = newEraseColor
         brushSize = newBrushSize
         currentIndex = newSelectedIndex
@@ -93,7 +99,7 @@ final class EraseCarouselController: UIViewController {
             scrollToPageIfNeeded(newSelectedIndex)
         }
 
-        if didColorChange || didBrushChange {
+        if didAutoColorModeChange || didColorChange || didBrushChange {
             updateVisibleSettings()
         }
     }
@@ -164,7 +170,11 @@ private extension EraseCarouselController {
     func updateVisibleSettings() {
         for cell in collectionView.visibleCells {
             guard let pageCell = cell as? ErasePageCell else { continue }
-            pageCell.updateEraseSettings(eraseColor: eraseColor, brushSize: brushSize)
+            pageCell.updateEraseSettings(
+                isAutoColor: isAutoColor,
+                eraseColor: eraseColor,
+                brushSize: brushSize
+            )
         }
     }
 
@@ -197,6 +207,7 @@ extension EraseCarouselController: UICollectionViewDataSource {
             model: models[indexPath.item],
             pageIndex: indexPath.item,
             strokes: strokesByPage[indexPath.item] ?? [],
+            isAutoColor: isAutoColor,
             eraseColor: eraseColor,
             brushSize: brushSize,
             delegate: delegate

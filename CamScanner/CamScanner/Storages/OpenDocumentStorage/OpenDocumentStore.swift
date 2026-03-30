@@ -3,6 +3,10 @@ import CoreData
 import Combine
 import UIKit
 
+extension Notification.Name {
+    static let openDocumentPreviewDidChange = Notification.Name("openDocumentPreviewDidChange")
+}
+
 final class OpenDocumentStore: NSObject {
     var previewModelsPublisher: AnyPublisher<[ScanPreviewModel], Never> {
         previewModelsSubject.eraseToAnyPublisher()
@@ -23,6 +27,7 @@ final class OpenDocumentStore: NSObject {
     private let context = PersistenceController.shared.container.viewContext
     private let documentID: UUID
     private let documentRepository = DocumentRepository.shared
+    private var cancellables = Set<AnyCancellable>()
 
     private var frc: NSFetchedResultsController<DocumentEntity>!
 
@@ -30,6 +35,7 @@ final class OpenDocumentStore: NSObject {
         self.documentID = documentID
         super.init()
         configureFRC()
+        subscribe()
         performFetch()
         rebuild()
     }
@@ -46,6 +52,18 @@ final class OpenDocumentStore: NSObject {
 }
 
 private extension OpenDocumentStore {
+    func subscribe() {
+        NotificationCenter.default.publisher(for: .openDocumentPreviewDidChange)
+            .compactMap { $0.userInfo?["documentID"] as? UUID }
+            .filter { [documentID] changedID in
+                changedID == documentID
+            }
+            .sink { [weak self] _ in
+                self?.rebuild()
+            }
+            .store(in: &cancellables)
+    }
+
     func configureFRC() {
         let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
         request.predicate = NSPredicate(format: "id == %@", documentID as CVarArg)

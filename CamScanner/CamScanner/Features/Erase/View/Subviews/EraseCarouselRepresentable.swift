@@ -4,6 +4,7 @@ struct EraseCarouselRepresentable: UIViewControllerRepresentable {
     var models: [ScanPreviewModel]
     var strokesByPage: [Int: [Stroke]]
     var selectedIndex: Int
+    var isAutoColor: Bool
     var eraseColor: UIColor
     var brushSize: CGFloat
     var isScrollDisabled: Bool = false
@@ -14,6 +15,7 @@ struct EraseCarouselRepresentable: UIViewControllerRepresentable {
             models: models,
             strokesByPage: strokesByPage,
             selectedIndex: selectedIndex,
+            isAutoColor: isAutoColor,
             eraseColor: eraseColor,
             brushSize: brushSize,
             delegate: delegate
@@ -25,6 +27,7 @@ struct EraseCarouselRepresentable: UIViewControllerRepresentable {
             models: models,
             strokesByPage: strokesByPage,
             selectedIndex: selectedIndex,
+            isAutoColor: isAutoColor,
             eraseColor: eraseColor,
             brushSize: brushSize,
             isScrollDisabled: isScrollDisabled

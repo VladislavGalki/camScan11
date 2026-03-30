@@ -52,6 +52,7 @@ final class EraseViewModel: ObservableObject {
     private let store: EraseStore
     private let documentID: UUID
     private var cancellables = Set<AnyCancellable>()
+    private var hasSelectedManualColor = false
 
     // MARK: - Init
 
@@ -114,6 +115,20 @@ final class EraseViewModel: ObservableObject {
 
         guard !pageImages.isEmpty else { return }
         try? store.saveErasedPages(pageImages)
+    }
+
+    func setAutoColorEnabled(_ isEnabled: Bool) {
+        if !isEnabled && !hasSelectedManualColor {
+            manualColor = .white
+        }
+
+        isAutoColor = isEnabled
+    }
+
+    func selectManualColor(_ color: Color) {
+        manualColor = color
+        hasSelectedManualColor = true
+        isAutoColor = false
     }
 
     // MARK: - Auto Color Detection

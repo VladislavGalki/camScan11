@@ -15,6 +15,7 @@ final class DrawingCanvasUIView: UIView {
     var onStrokesChanged: (([Stroke]) -> Void)?
     var onTouchBegan: (() -> Void)?
     var onTouchEnded: (() -> Void)?
+    var colorProvider: ((CGPoint) -> UIColor?)?
 
     private var suppressStrokesChangedCallback = false
 
@@ -93,6 +94,10 @@ final class DrawingCanvasUIView: UIView {
         onTouchBegan?()
 
         let pN = toNormalized(pView)
+
+        if let sampledColor = colorProvider?(pN) {
+            penColor = sampledColor
+        }
 
         // ✅ widthN фиксируем относительно imageRect (на экране)
         let minSide = max(1, min(imageRectInView.width, imageRectInView.height))

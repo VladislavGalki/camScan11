@@ -21,5 +21,11 @@ final class EraseStore {
             documentID: documentID,
             pageImages: pageImages
         )
+
+        NotificationCenter.default.post(
+            name: .openDocumentPreviewDidChange,
+            object: nil,
+            userInfo: ["documentID": documentID]
+        )
     }
 }
