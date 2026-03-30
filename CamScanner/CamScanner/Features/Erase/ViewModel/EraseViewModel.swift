@@ -19,6 +19,10 @@ final class EraseViewModel: ObservableObject {
 
     // MARK: - Computed
 
+    var strokesByPage: [Int: [Stroke]] {
+        histories.mapValues(\.current)
+    }
+
     var currentStrokes: [Stroke] {
         histories[selectedIndex]?.current ?? []
     }

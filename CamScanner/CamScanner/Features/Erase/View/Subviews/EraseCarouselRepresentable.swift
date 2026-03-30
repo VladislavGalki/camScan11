@@ -2,7 +2,8 @@ import SwiftUI
 
 struct EraseCarouselRepresentable: UIViewControllerRepresentable {
     var models: [ScanPreviewModel]
-    var strokes: [Stroke]
+    var strokesByPage: [Int: [Stroke]]
+    var selectedIndex: Int
     var eraseColor: UIColor
     var brushSize: CGFloat
     var isScrollDisabled: Bool = false
@@ -11,7 +12,8 @@ struct EraseCarouselRepresentable: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> EraseCarouselController {
         EraseCarouselController(
             models: models,
-            strokes: strokes,
+            strokesByPage: strokesByPage,
+            selectedIndex: selectedIndex,
             eraseColor: eraseColor,
             brushSize: brushSize,
             delegate: delegate
@@ -21,7 +23,8 @@ struct EraseCarouselRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: EraseCarouselController, context: Context) {
         vc.update(
             models: models,
-            strokes: strokes,
+            strokesByPage: strokesByPage,
+            selectedIndex: selectedIndex,
             eraseColor: eraseColor,
             brushSize: brushSize,
             isScrollDisabled: isScrollDisabled

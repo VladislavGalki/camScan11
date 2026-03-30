@@ -16,8 +16,13 @@ final class DrawingCanvasUIView: UIView {
     var onTouchBegan: (() -> Void)?
     var onTouchEnded: (() -> Void)?
 
+    private var suppressStrokesChangedCallback = false
+
     private(set) var strokes: [Stroke] = [] {
-        didSet { onStrokesChanged?(strokes) }
+        didSet {
+            guard !suppressStrokesChangedCallback else { return }
+            onStrokesChanged?(strokes)
+        }
     }
 
     // MARK: - Private
@@ -48,17 +53,22 @@ final class DrawingCanvasUIView: UIView {
     /// ✅ Вызывай при каждом layout/обновлении (из SwiftUI wrapper),
     /// передавай реальный rect картинки в этом canvas (aspectFit)
     func setImageRectInView(_ rect: CGRect) {
+        guard imageRectInView.integral != rect.integral else { return }
         imageRectInView = rect
         // если rect изменился — надо перерисовать слои
         redrawAllLayers()
     }
 
     func setStrokes(_ new: [Stroke]) {
+        guard strokes != new else { return }
+
         // очистка
         strokeLayers.values.forEach { $0.removeFromSuperlayer() }
         strokeLayers.removeAll()
 
+        suppressStrokesChangedCallback = true
         strokes = new
+        suppressStrokesChangedCallback = false
 
         // перерисовка
         for s in strokes {

@@ -13,7 +13,7 @@ final class EraseCarouselController: UIViewController {
     // MARK: - State
 
     private var models: [ScanPreviewModel]
-    private var strokes: [Stroke]
+    private var strokesByPage: [Int: [Stroke]]
     private var eraseColor: UIColor
     private var brushSize: CGFloat
     private var currentIndex: Int = 0
@@ -26,15 +26,17 @@ final class EraseCarouselController: UIViewController {
 
     init(
         models: [ScanPreviewModel],
-        strokes: [Stroke],
+        strokesByPage: [Int: [Stroke]],
+        selectedIndex: Int,
         eraseColor: UIColor,
         brushSize: CGFloat,
         delegate: ErasePageDelegate?
     ) {
         self.models = models
-        self.strokes = strokes
+        self.strokesByPage = strokesByPage
         self.eraseColor = eraseColor
         self.brushSize = brushSize
+        self.currentIndex = selectedIndex
         self.delegate = delegate
         super.init(nibName: nil, bundle: nil)
     }
@@ -58,20 +60,23 @@ final class EraseCarouselController: UIViewController {
 
     func update(
         models newModels: [ScanPreviewModel],
-        strokes newStrokes: [Stroke],
+        strokesByPage newStrokesByPage: [Int: [Stroke]],
+        selectedIndex newSelectedIndex: Int,
         eraseColor newEraseColor: UIColor,
         brushSize newBrushSize: CGFloat,
         isScrollDisabled: Bool
     ) {
         let didModelsChange = models != newModels
-        let didStrokesChange = strokes != newStrokes
+        let didStrokesChange = strokesByPage != newStrokesByPage
         let didColorChange = eraseColor != newEraseColor
         let didBrushChange = brushSize != newBrushSize
+        let didSelectedIndexChange = currentIndex != newSelectedIndex
 
         models = newModels
-        strokes = newStrokes
+        strokesByPage = newStrokesByPage
         eraseColor = newEraseColor
         brushSize = newBrushSize
+        currentIndex = newSelectedIndex
 
         collectionView.isScrollEnabled = !isScrollDisabled
 
@@ -82,6 +87,10 @@ final class EraseCarouselController: UIViewController {
 
         if didStrokesChange {
             updateVisibleStrokes()
+        }
+
+        if didSelectedIndexChange {
+            scrollToPageIfNeeded(newSelectedIndex)
         }
 
         if didColorChange || didBrushChange {
@@ -147,9 +156,8 @@ private extension EraseCarouselController {
     func updateVisibleStrokes() {
         for cell in collectionView.visibleCells {
             guard let pageCell = cell as? ErasePageCell,
-                  let indexPath = collectionView.indexPath(for: pageCell),
-                  indexPath.item == currentIndex else { continue }
-            pageCell.updateStrokes(strokes)
+                  let indexPath = collectionView.indexPath(for: pageCell) else { continue }
+            pageCell.updateStrokes(strokesByPage[indexPath.item] ?? [])
         }
     }
 
@@ -158,6 +166,15 @@ private extension EraseCarouselController {
             guard let pageCell = cell as? ErasePageCell else { continue }
             pageCell.updateEraseSettings(eraseColor: eraseColor, brushSize: brushSize)
         }
+    }
+
+    func scrollToPageIfNeeded(_ index: Int) {
+        guard models.indices.contains(index) else { return }
+
+        let indexPath = IndexPath(item: index, section: 0)
+        guard collectionView.indexPathsForVisibleItems.contains(indexPath) == false else { return }
+
+        collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
     }
 }
 
@@ -179,7 +196,7 @@ extension EraseCarouselController: UICollectionViewDataSource {
         cell.configure(
             model: models[indexPath.item],
             pageIndex: indexPath.item,
-            strokes: indexPath.item == currentIndex ? strokes : [],
+            strokes: strokesByPage[indexPath.item] ?? [],
             eraseColor: eraseColor,
             brushSize: brushSize,
             delegate: delegate

@@ -123,7 +123,8 @@ private extension EraseView {
     var carouselView: some View {
         EraseCarouselRepresentable(
             models: viewModel.models,
-            strokes: viewModel.currentStrokes,
+            strokesByPage: viewModel.strokesByPage,
+            selectedIndex: viewModel.selectedIndex,
             eraseColor: viewModel.activeColor,
             brushSize: viewModel.brushSize,
             delegate: viewModel
