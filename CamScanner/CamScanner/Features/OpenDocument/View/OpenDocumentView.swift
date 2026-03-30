@@ -3,6 +3,9 @@ import SwiftUI
 struct OpenDocumentView: View {
     @StateObject private var viewModel: OpenDocumentViewModel
     @State private var bottomBarAction: ScanPreviewBottomBarAction?
+    @State private var shouldShowDotsOverlay = false
+    @State private var isRenameSheetPresented = false
+    @State private var overlayState: OpenDocumentOverlayState = .none
 
     @EnvironmentObject private var router: Router
     
@@ -46,6 +49,28 @@ struct OpenDocumentView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.isExtractingText)
+        .overlayPreferenceValue(OpenDocumentDotsAnchorKey.self) { anchor in
+            GeometryReader { proxy in
+                if shouldShowDotsOverlay, let anchor {
+                    OpenDocumentDotsOverlay(
+                        isVisible: $shouldShowDotsOverlay,
+                        isLocked: viewModel.isLocked,
+                        frame: proxy[anchor],
+                        onSelect: handleDotsSelection
+                    )
+                }
+            }
+        }
+        .overlay { modalOverlay }
+        .sheet(isPresented: $isRenameSheetPresented) {
+            RenameFileView(
+                documentFileName: Binding(
+                    get: { viewModel.title },
+                    set: { viewModel.renameDocument(to: $0) }
+                )
+            )
+            .presentationCornerRadius(38)
+        }
         .sheet(isPresented: Binding(
             get: { viewModel.extractedText != nil },
             set: { if !$0 { viewModel.extractedText = nil } }
@@ -85,10 +110,10 @@ private extension OpenDocumentView {
             Text(viewModel.title)
                 .appTextStyle(.topBarTitle)
                 .foregroundStyle(.text(.primary))
-                .underline(true, color: .text(.secondary))
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .onTapGesture { }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
 
             AppButton(
                 config: AppButtonConfig(
@@ -96,8 +121,13 @@ private extension OpenDocumentView {
                     style: .secondary,
                     size: .m
                 ),
-                action: { }
+                action: {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        shouldShowDotsOverlay = true
+                    }
+                }
             )
+            .anchorPreference(key: OpenDocumentDotsAnchorKey.self, value: .bounds) { $0 }
 
             AppButton(
                 config: AppButtonConfig(
@@ -233,6 +263,77 @@ private extension OpenDocumentView {
                 .ignoresSafeArea(edges: .bottom)
         )
     }
+
+    @ViewBuilder
+    var modalOverlay: some View {
+        if overlayState != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+
+                switch overlayState {
+                case .deleteConfirmation:
+                    DeleteDocumentView(
+                        onDelete: {
+                            if viewModel.deleteDocument() {
+                                overlayState = .none
+                                dismiss()
+                            }
+                        },
+                        onCancel: {
+                            overlayState = .none
+                        }
+                    )
+                case .lock:
+                    LockDocumentView(
+                        faceIdRequest: {
+                            await viewModel.handleFaceIdRequest()
+                        },
+                        onSuccess: { pin, viaFaceId in
+                            viewModel.createDocumentPin(pin, viaFaceId: viaFaceId)
+                            overlayState = .none
+                        },
+                        onClose: {
+                            overlayState = .none
+                        }
+                    )
+                case let .enterPin(menuItem):
+                    EnterPinView(
+                        documentTitle: viewModel.title,
+                        validatePin: { pin in
+                            viewModel.validateCurrentDocumentPin(pin)
+                        },
+                        onSuccess: {
+                            switch menuItem {
+                            case .delete:
+                                overlayState = .deleteConfirmation
+                            case .unlock:
+                                overlayState = .unlockConfirmation
+                            case .rename, .lock:
+                                overlayState = .none
+                            }
+                        },
+                        onClose: {
+                            overlayState = .none
+                        }
+                    )
+                case .unlockConfirmation:
+                    UnlockDocumentView(
+                        documentTitle: viewModel.title,
+                        onRemove: {
+                            viewModel.removeDocumentPin()
+                            overlayState = .none
+                        },
+                        onCancel: {
+                            overlayState = .none
+                        }
+                    )
+                case .none:
+                    EmptyView()
+                }
+            }
+        }
+    }
     
     func bottomItem(_ item: OpenDocumentBottomBarActionType) -> some View {
         VStack(spacing: 4) {
@@ -333,5 +434,34 @@ private extension OpenDocumentView {
         case .delete:
             break
         }
+    }
+
+    private func handleDotsSelection(_ item: OpenDocumentMenuItem) {
+        switch item {
+        case .rename:
+            isRenameSheetPresented = true
+        case .delete:
+            viewModel.performLockedMenuAction {
+                overlayState = .deleteConfirmation
+            } onRequiresPin: {
+                overlayState = .enterPin(.delete)
+            }
+        case .lock:
+            overlayState = .lock
+        case .unlock:
+            viewModel.performLockedMenuAction {
+                overlayState = .unlockConfirmation
+            } onRequiresPin: {
+                overlayState = .enterPin(.unlock)
+            }
+        }
+    }
+}
+
+private struct OpenDocumentDotsAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>?
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
     }
 }

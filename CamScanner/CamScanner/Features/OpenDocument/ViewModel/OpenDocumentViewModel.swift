@@ -7,6 +7,8 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var models: [ScanPreviewModel] = []
     @Published var selectedIndex: Int = 0
     @Published var title: String = ""
+    @Published var isLocked: Bool = false
+    @Published var lockViaFaceId: Bool = false
     @Published var textItems: [DocumentTextItem] = []
     @Published var watermarkItems: [DocumentWatermarkItem] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
@@ -28,6 +30,9 @@ final class OpenDocumentViewModel: ObservableObject {
     private let documentRepository = DocumentRepository.shared
     private let filterRenderer = FilterRenderer.shared
     private let ocrService = OCRService.shared
+    private let passwordCryptoService = PasswordCryptoService.shared
+    private let faceIdService = FaceIDService.shared
+    private let lockedActionExecutor = LockedActionExecutor.shared
 
     private var currentCellHeight: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
@@ -48,6 +53,8 @@ final class OpenDocumentViewModel: ObservableObject {
 
     private func bootstrap() {
         title = (try? documentRepository.fetchDocumentTitle(id: inputModel.documentID)) ?? ""
+        isLocked = (try? documentRepository.fetchDocumentIsLocked(id: inputModel.documentID)) ?? false
+        lockViaFaceId = (try? documentRepository.fetchDocumentLockViaFaceId(id: inputModel.documentID)) ?? false
     }
 
     private func subscribe() {
@@ -210,6 +217,87 @@ extension OpenDocumentViewModel {
         result.watermarkItems = watermarkItems
         result.cellHeight = currentCellHeight
         return result
+    }
+
+    func renameDocument(to newTitle: String) {
+        let trimmedTitle = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, trimmedTitle != title else { return }
+
+        do {
+            try documentRepository.renameDocument(id: inputModel.documentID, newTitle: trimmedTitle)
+            title = (try? documentRepository.fetchDocumentTitle(id: inputModel.documentID)) ?? trimmedTitle
+        } catch {}
+    }
+
+    func deleteDocument() -> Bool {
+        do {
+            try documentRepository.deleteDocument(id: inputModel.documentID)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func handleFaceIdRequest() async -> Bool {
+        await faceIdService.requestAuthorizationIfNeeded()
+    }
+
+    func validateCurrentDocumentPin(_ pin: String) -> Bool {
+        guard let documentData = try? documentRepository.getPasswordData(for: inputModel.documentID) else {
+            return false
+        }
+
+        return passwordCryptoService.verify(
+            pin: pin,
+            salt: documentData.salt,
+            hash: documentData.hash
+        )
+    }
+
+    func createDocumentPin(_ pin: String, viaFaceId: Bool) {
+        do {
+            let id = try documentRepository.setPassword(
+                id: inputModel.documentID,
+                pin: pin,
+                viaFaceId: viaFaceId
+            )
+
+            if id == inputModel.documentID {
+                isLocked = true
+                lockViaFaceId = viaFaceId
+            }
+        } catch {}
+    }
+
+    func removeDocumentPin() {
+        do {
+            let id = try documentRepository.removePassword(id: inputModel.documentID)
+
+            if id == inputModel.documentID {
+                isLocked = false
+                lockViaFaceId = false
+            }
+        } catch {}
+    }
+
+    func performLockedMenuAction(
+        onSuccess: @escaping @MainActor () -> Void,
+        onRequiresPin: @escaping @MainActor () -> Void
+    ) {
+        Task {
+            let result = await lockedActionExecutor.execute(
+                isLocked: isLocked,
+                isFaceIdEnabled: lockViaFaceId
+            )
+
+            await MainActor.run {
+                if result.success {
+                    onSuccess()
+                } else if result.requiresPin {
+                    onRequiresPin()
+                }
+            }
+        }
     }
 
     func rotatePage(at index: Int) {

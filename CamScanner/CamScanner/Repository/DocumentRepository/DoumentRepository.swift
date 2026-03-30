@@ -1157,6 +1157,38 @@ extension DocumentRepository {
 
         return document.title
     }
+
+    func fetchDocumentIsLocked(id: UUID) throws -> Bool {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+
+        guard let document = try context.fetch(request).first else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9002,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        return document.isLocked
+    }
+
+    func fetchDocumentLockViaFaceId(id: UUID) throws -> Bool {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+
+        guard let document = try context.fetch(request).first else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9003,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        return document.lockViaFaceId
+    }
     
     private func containerType(for document: DocumentEntity) -> DocumentContainerType {
         DocumentContainerType(
