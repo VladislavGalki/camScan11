@@ -21,7 +21,7 @@ struct EraseView: View {
 
             carouselView
                 .frame(maxHeight: .infinity)
-                .padding(.bottom, 16)
+                .padding(.bottom, 49)
 
             bottomPanel
         }

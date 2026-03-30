@@ -79,7 +79,10 @@ final class EraseViewModel: ObservableObject {
 
         var current = histories[pageIndex]!.current
         current.append(stroke)
-        histories[pageIndex]!.push(current)
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.histories[pageIndex]!.push(current)
+        }
     }
 
     func undo() {
