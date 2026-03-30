@@ -34,6 +34,11 @@ struct FilesView: View {
                 presentFolderView(newValue)
                 viewModel.folderToOpen = nil
             }
+            .onChange(of: viewModel.documentToOpen) { _, newValue in
+                guard let newValue else { return }
+                router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: newValue)))
+                viewModel.documentToOpen = nil
+            }
             .onChange(of: viewModel.isSelectable) { _, newValue in
                 tabBar.isTabBarVisible = !newValue
             }
@@ -104,8 +109,8 @@ private extension FilesView {
                         viewModel.handleDocumentSelected(id: id)
                         return
                     }
-                    
-                    router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: id)))
+
+                    viewModel.openDocumentTapped(id: id)
                 },
                 onFavourite: { id, isFavourite in
                     viewModel.handleDocumentFavourite(
@@ -269,7 +274,7 @@ private extension FilesView {
                         viewModel.clearSearch()
                     },
                     onDocumentClick: { id in
-                        router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: id)))
+                        viewModel.openDocumentTapped(id: id)
                     },
                     onFavourite: { id, isFavourite in
                         viewModel.handleDocumentFavourite(

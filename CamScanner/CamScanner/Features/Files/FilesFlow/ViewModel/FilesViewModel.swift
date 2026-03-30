@@ -5,6 +5,7 @@ import UIKit
 @MainActor
 final class FilesViewModel: ObservableObject {
     @Published var folderToOpen: UUID?
+    @Published var documentToOpen: UUID?
     @Published var viewState: FileViewState = .empty
     @Published var sortType: FilesSortType = .recent
     @Published var viewMode: FilesViewMode = .grid
@@ -286,6 +287,14 @@ extension FilesViewModel {
             self?.pendingAction = .openFolder(id)
         }
     }
+
+    func openDocumentTapped(id: UUID) {
+        performLockedAction(id: id) { [weak self] in
+            self?.documentToOpen = id
+        } onFailure: { [weak self] in
+            self?.pendingAction = .openDocument(id)
+        }
+    }
     
     func executePendingAction() {
         guard let action = pendingAction else { return }
@@ -294,6 +303,8 @@ extension FilesViewModel {
         switch action {
         case .openFolder(let id):
             folderToOpen = id
+        case .openDocument(let id):
+            documentToOpen = id
         }
     }
     
