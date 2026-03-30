@@ -104,18 +104,6 @@ final class CapturePostProcessor {
             bottomLeft: CGPoint(x: imageRect.minX, y: imageRect.maxY)
         )
 
-        print(
-            """
-            [PassportFlow] processIdByFrame
-            inputImageOrientation=\(image.imageOrientation.rawValue)
-            previewSize=\(previewSize)
-            fullSize=\(full.size)
-            frameRectInPreview=\(frameRectInPreview)
-            mappedImageRect=\(imageRect)
-            quad tl=\(quad.topLeft) tr=\(quad.topRight) br=\(quad.bottomRight) bl=\(quad.bottomLeft)
-            """
-        )
-
         // preview = cropped кусок (как CamScanner)
         let croppedForPreview = full.cropped(to: imageRect) ?? full
         let preview = croppedForPreview.downscaled(maxDimension: quality.maxDimension)

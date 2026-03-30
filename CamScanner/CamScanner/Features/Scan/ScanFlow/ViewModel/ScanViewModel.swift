@@ -262,15 +262,6 @@ final class ScanViewModel: ObservableObject {
             return
         }
 
-        print(
-            """
-            [PassportFlow] startQuickCropForPassport
-            imageSize=\(image.size)
-            previewSize=\(frame.preview?.size ?? .zero)
-            quad tl=\(quad.topLeft) tr=\(quad.topRight) br=\(quad.bottomRight) bl=\(quad.bottomLeft)
-            """
-        )
-
         idDocumentCropperModel = DocumentCropperModel(
             image: image,
             autoQuad: quad
@@ -383,17 +374,6 @@ final class ScanViewModel: ObservableObject {
             if let previewSize = camera.previewBoundsSize() {
                 let previewRect = CGRect(origin: .zero, size: previewSize)
                 let clipped = raw.intersection(previewRect)
-                
-                print(
-                    """
-                    [PassportFlow] capture overlay
-                    documentType=\(ui.selectedDocumentType.rawValue)
-                    rawRect=\(raw)
-                    previewSize=\(previewSize)
-                    previewRect=\(previewRect)
-                    clippedRect=\(clipped)
-                    """
-                )
                 
                 if !clipped.isNull, clipped.width > 10, clipped.height > 10 {
                     latestIdFrameRectInPreview = clipped
