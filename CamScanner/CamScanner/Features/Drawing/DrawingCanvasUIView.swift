@@ -13,6 +13,8 @@ final class DrawingCanvasUIView: UIView {
     private(set) var imageRectInView: CGRect = .zero
 
     var onStrokesChanged: (([Stroke]) -> Void)?
+    var onTouchBegan: (() -> Void)?
+    var onTouchEnded: (() -> Void)?
 
     private(set) var strokes: [Stroke] = [] {
         didSet { onStrokesChanged?(strokes) }
@@ -78,6 +80,8 @@ final class DrawingCanvasUIView: UIView {
         guard imageRectInView.width > 1, imageRectInView.height > 1 else { return }
         guard imageRectInView.contains(pView) else { return } // ✅ вне картинки не рисуем
 
+        onTouchBegan?()
+
         let pN = toNormalized(pView)
 
         // ✅ widthN фиксируем относительно imageRect (на экране)
@@ -113,11 +117,13 @@ final class DrawingCanvasUIView: UIView {
         strokes.append(s)
         currentStroke = nil
         currentLayer = nil
+        onTouchEnded?()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         currentStroke = nil
         currentLayer = nil
+        onTouchEnded?()
     }
 
     // MARK: - Eraser (tap delete whole stroke)

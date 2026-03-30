@@ -93,6 +93,14 @@ final class ErasePageCell: UICollectionViewCell {
             self.previousStrokeCount = newStrokes.count
         }
 
+        canvasView.onTouchBegan = { [weak self] in
+            self?.onDrawingBegan?()
+        }
+
+        canvasView.onTouchEnded = { [weak self] in
+            self?.onDrawingEnded?()
+        }
+
         setNeedsLayout()
     }
 
