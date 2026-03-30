@@ -74,7 +74,9 @@ final class EraseViewModel: ObservableObject {
 
     func commitStroke(_ stroke: Stroke, onPage pageIndex: Int) {
         if histories[pageIndex] == nil {
-            histories[pageIndex] = EraseStrokeHistory()
+            DispatchQueue.main.async { [weak self] in
+                self?.histories[pageIndex] = EraseStrokeHistory()
+            }
         }
 
         var current = histories[pageIndex]!.current
