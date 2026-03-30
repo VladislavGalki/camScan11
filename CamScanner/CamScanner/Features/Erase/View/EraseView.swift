@@ -32,11 +32,6 @@ struct EraseView: View {
                 discardConfirmationOverlay
             }
         }
-        .overlay {
-            if showBrushPreview {
-                brushSizeOverlay
-            }
-        }
     }
 }
 
@@ -154,22 +149,29 @@ private extension EraseView {
             }
 
             // Brush size slider
-            HStack(spacing: 12) {
-                Text("Size")
-                    .appTextStyle(.bodySecondary)
-                    .foregroundStyle(.text(.primary))
-                    .frame(width: 32, alignment: .leading)
+            VStack(spacing: 12) {
+                if showBrushPreview {
+                    brushStrokePreview
+                        .transition(.opacity)
+                }
 
-                AppSlider(
-                    value: Binding(
-                        get: { viewModel.brushSize },
-                        set: { newValue in
-                            viewModel.brushSize = newValue
-                            showBrushSizePreview()
-                        }
-                    ),
-                    range: 4...40
-                )
+                HStack(spacing: 12) {
+                    Text("Size")
+                        .appTextStyle(.bodySecondary)
+                        .foregroundStyle(.text(.primary))
+                        .frame(width: 32, alignment: .leading)
+
+                    AppSlider(
+                        value: Binding(
+                            get: { viewModel.brushSize },
+                            set: { newValue in
+                                viewModel.brushSize = newValue
+                                showBrushSizePreview()
+                            }
+                        ),
+                        range: 4...40
+                    )
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -215,24 +217,18 @@ private extension EraseView {
         }
     }
 
-    var brushSizeOverlay: some View {
-        VStack {
-            Spacer()
-            Circle()
-                .fill(Color(viewModel.activeColor))
-                .overlay(
-                    Circle()
-                        .stroke(Color.border(.primary), lineWidth: 0.5)
+    var brushStrokePreview: some View {
+        BrushStrokeShape()
+            .stroke(
+                Color(UIColor(red: 0x20/255, green: 0x20/255, blue: 0x20/255, alpha: 1)),
+                style: StrokeStyle(
+                    lineWidth: viewModel.brushSize,
+                    lineCap: .round,
+                    lineJoin: .round
                 )
-                .frame(
-                    width: viewModel.brushSize,
-                    height: viewModel.brushSize
-                )
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .allowsHitTesting(false)
-        .transition(.opacity)
+            )
+            .frame(width: 65, height: 36)
+            .frame(maxWidth: .infinity)
     }
 
     var discardConfirmationOverlay: some View {
@@ -315,5 +311,43 @@ private extension EraseView {
 
     var erasePresetColors: [Color] {
         [.white, Color(white: 0.9), Color(white: 0.7), Color(white: 0.5), Color(white: 0.3), .black]
+    }
+}
+
+// MARK: - Brush Stroke Shape
+
+private struct BrushStrokeShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: h * 0.65))
+        path.addCurve(
+            to: CGPoint(x: w * 0.35, y: h * 0.1),
+            control1: CGPoint(x: w * 0.08, y: h * 0.35),
+            control2: CGPoint(x: w * 0.2, y: h * 0.05)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.15, y: h * 0.7),
+            control1: CGPoint(x: w * 0.5, y: h * 0.15),
+            control2: CGPoint(x: w * 0.1, y: h * 0.55)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.75, y: h * 0.15),
+            control1: CGPoint(x: w * 0.25, y: h * 0.9),
+            control2: CGPoint(x: w * 0.6, y: h * 0.1)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.55, y: h * 0.85),
+            control1: CGPoint(x: w * 0.9, y: h * 0.2),
+            control2: CGPoint(x: w * 0.5, y: h * 0.7)
+        )
+        path.addCurve(
+            to: CGPoint(x: w, y: h * 0.95),
+            control1: CGPoint(x: w * 0.6, y: h * 1.0),
+            control2: CGPoint(x: w * 0.85, y: h * 0.95)
+        )
+        return path
     }
 }
