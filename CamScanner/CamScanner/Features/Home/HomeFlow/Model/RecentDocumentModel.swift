@@ -23,6 +23,7 @@ struct RecentDocumentModel: Identifiable, Equatable {
     let pageCountText: String
     let isFavorite: Bool
     let isLocked: Bool
+    let lockViaFaceId: Bool
     let createdAt: Date
     let lastViewedAt: Date
 }

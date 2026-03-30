@@ -8,6 +8,7 @@ struct HomeView: View {
     
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
+    @State private var pinDocumentID: UUID?
     
     @State var showAddCandidate: Bool = false
     
@@ -24,9 +25,7 @@ struct HomeView: View {
                             RecentView(model: vm.recentModel) {
                                 router.present(ScanFlowRoute.scan)
                             } onDocumentTapped: { item in
-                                if !item.isLocked {
-                                    router.push(HomeRoute.openDocument(id: item.id))
-                                }
+                                vm.openDocumentTapped(id: item.id)
                             } onFavoriteTapped: { documentId, isFavorite in
                                 vm.handleDocumentFavourite(documentId: documentId, isFavourite: isFavorite)
                             }
@@ -50,8 +49,20 @@ struct HomeView: View {
             Color.bg(.main)
         )
         .ignoresSafeArea(edges: .top)
+        .overlay { pinOverlay }
         .fullScreenCover(isPresented: $showAddCandidate) {
             OpenCVFilterDebugView()
+        }
+        .onChange(of: vm.documentToOpen) { _, newValue in
+            guard let newValue else { return }
+            router.push(HomeRoute.openDocument(id: newValue))
+            if vm.isSearchActive {
+                vm.clearSearch()
+            }
+            vm.documentToOpen = nil
+        }
+        .onChange(of: vm.pinDocumentIDToOpen) { _, newValue in
+            pinDocumentID = newValue
         }
     }
     
@@ -111,8 +122,7 @@ struct HomeView: View {
                 HomeSearchResultsView(
                     items: vm.searchItems,
                     onDocumentClick: { id in
-                        router.push(HomeRoute.openDocument(id: id))
-                        vm.clearSearch()
+                        vm.openDocumentTapped(id: id)
                     },
                     onFavourite: { id, isFavourite in
                         vm.handleDocumentFavourite(documentId: id, isFavourite: isFavourite)
@@ -132,6 +142,38 @@ struct HomeView: View {
                 onClear: vm.clearSearch
             )
             .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private var pinOverlay: some View {
+        if let pinDocumentID {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+
+                EnterPinView(
+                    documentTitle: vm.recentModel.first(where: { $0.id == pinDocumentID })?.title
+                        ?? vm.searchItems.first(where: { $0.id == pinDocumentID })?.title
+                        ?? "",
+                    validatePin: { pin in
+                        vm.validateDocumentPin(documentId: pinDocumentID, pin: pin)
+                    },
+                    onSuccess: {
+                        vm.finishLockedDocumentOpen(documentId: pinDocumentID)
+
+                        if vm.isSearchActive {
+                            vm.clearSearch()
+                        }
+
+                        self.pinDocumentID = nil
+                    },
+                    onClose: {
+                        vm.clearPendingPinRequest()
+                        self.pinDocumentID = nil
+                    }
+                )
+            }
         }
     }
 }

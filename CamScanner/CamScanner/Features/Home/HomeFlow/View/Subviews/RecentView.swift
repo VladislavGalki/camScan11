@@ -6,7 +6,7 @@ struct RecentView: View {
     let onDocumentTapped: (RecentDocumentModel) -> Void
     let onFavoriteTapped: (UUID, Bool) -> Void
     
-    private let itemSize = CGSize(width: 140, height: 182)
+    private let itemSize = CGSize(width: 106, height: 150)
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -71,24 +71,14 @@ struct RecentView: View {
                 .allowsHitTesting(false)
             }
             .frame(width: itemSize.width, height: itemSize.height)
-            .cornerRadius(16, corners: .allCorners)
-            .appBorderModifier(.border(.primary), radius: 16)
+            .cornerRadius(8, corners: .allCorners)
+            .appBorderModifier(.border(.primary), radius: 8)
             .padding(.bottom, 34)
     }
     
     private func recentItemView(_ item: RecentDocumentModel) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Rectangle()
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.12),
-                            Color.black.opacity(0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            recentItemBackground(item)
                 .frame(width: itemSize.width, height: itemSize.height)
                 .overlay {
                     itemImageView(for: item)
@@ -120,57 +110,93 @@ struct RecentView: View {
                     }
                     .padding([.top, .horizontal], 8)
                 }
-                .cornerRadius(16, corners: .allCorners)
-                .appBorderModifier(.border(.primary), radius: 16)
+                .cornerRadius(8, corners: .allCorners)
+                .appBorderModifier(.border(.primary), radius: 8)
                 .clipped()
             
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.title)
                     .appTextStyle(.meta)
                     .foregroundStyle(.text(.primary))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: itemSize.width, alignment: .leading)
                 
                 Text(item.pageCountText)
                     .appTextStyle(.helperText)
                     .foregroundStyle(.text(.secondary))
+                    .frame(width: itemSize.width, alignment: .leading)
             }
-            .padding(.leading, 4)
         }
     }
     
     @ViewBuilder
     private func itemImageView(for item: RecentDocumentModel) -> some View {
-        switch item.previewDocumentType {
-        case .documents:
-            if let image = item.thumbnail {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            }
-        case .idCard, .driverLicense:
-            VStack(spacing: 8) {
+        if item.isLocked {
+            GridDocumentLockSkeleton()
+                .padding(.bottom, 14)
+        } else {
+            switch item.previewDocumentType {
+            case .documents:
                 if let image = item.thumbnail {
                     Image(uiImage: image)
                         .resizable()
-                        .frame(width: 85.5, height: 55)
                         .scaledToFit()
                 }
-                
-                if let secondImage = item.secondThumbnail {
-                    Image(uiImage: secondImage)
+            case .idCard, .driverLicense:
+                VStack(spacing: 6) {
+                    if let image = item.thumbnail {
+                        Image(uiImage: image)
+                            .resizable()
+                            .frame(width: 54, height: 34)
+                            .scaledToFit()
+                    }
+
+                    if let secondImage = item.secondThumbnail {
+                        Image(uiImage: secondImage)
+                            .resizable()
+                            .frame(width: 54, height: 34)
+                            .scaledToFit()
+                    }
+                }
+            case .passport:
+                if let image = item.thumbnail {
+                    Image(uiImage: image)
                         .resizable()
-                        .frame(width: 85.5, height: 55)
+                        .frame(width: 64, height: 87)
                         .scaledToFit()
                 }
+            default:
+                EmptyView()
             }
-        case .passport:
-            if let image = item.thumbnail {
-                Image(uiImage: image)
-                    .resizable()
-                    .frame(width: 88, height: 125)
-                    .scaledToFit()
+        }
+    }
+
+    @ViewBuilder
+    private func recentItemBackground(_ item: RecentDocumentModel) -> some View {
+        if item.isLocked {
+            Rectangle()
+                .foregroundStyle(.bg(.surface))
+        } else {
+            switch item.previewDocumentType {
+            case .documents:
+                Rectangle()
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.12),
+                                Color.black.opacity(0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            case .idCard, .passport, .driverLicense:
+                Rectangle()
+                    .foregroundStyle(.bg(.surface))
+            default:
+                EmptyView()
             }
-        default:
-            EmptyView()
         }
     }
 }

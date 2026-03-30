@@ -10,10 +10,14 @@ final class HomeViewModel: ObservableObject {
     @Published var isSearchLoading = false
     @Published var isSearchActive = false
     @Published private(set) var searchItems: [FilesGridItem] = []
+    @Published var documentToOpen: UUID?
+    @Published var pinDocumentIDToOpen: UUID?
 
     private let documentRepository: DocumentRepository = DocumentRepository.shared
     private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
     private let fileDocumentStore: FileDocumentStore = FileDocumentStore()
+    private let passwordCryptoService = PasswordCryptoService.shared
+    private let lockedActionExecutor = LockedActionExecutor.shared
 
     private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
@@ -42,6 +46,44 @@ final class HomeViewModel: ObservableObject {
         searchText = ""
         isSearchLoading = false
         fileDocumentStore.clearSearch()
+    }
+
+    func openDocumentTapped(id: UUID) {
+        Task {
+            let result = await lockedActionExecutor.execute(
+                isLocked: isDocumentLocked(id: id),
+                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
+            )
+
+            await MainActor.run {
+                if result.success {
+                    documentToOpen = id
+                } else if result.requiresPin {
+                    pinDocumentIDToOpen = id
+                }
+            }
+        }
+    }
+
+    func validateDocumentPin(documentId: UUID, pin: String) -> Bool {
+        guard let documentData = try? documentRepository.getPasswordData(for: documentId) else {
+            return false
+        }
+
+        return passwordCryptoService.verify(
+            pin: pin,
+            salt: documentData.salt,
+            hash: documentData.hash
+        )
+    }
+
+    func finishLockedDocumentOpen(documentId: UUID) {
+        pinDocumentIDToOpen = nil
+        documentToOpen = documentId
+    }
+
+    func clearPendingPinRequest() {
+        pinDocumentIDToOpen = nil
     }
     
     private func subscribeToRecentDocuments() {
@@ -140,6 +182,7 @@ final class HomeViewModel: ObservableObject {
                 pageCountText: pageText,
                 isFavorite: document.isFavourite,
                 isLocked: document.isLocked,
+                lockViaFaceId: document.lockViaFaceId,
                 createdAt: document.createdAt,
                 lastViewedAt: document.lastViewed
             )
@@ -164,6 +207,30 @@ final class HomeViewModel: ObservableObject {
 
 //MARK: - Helpers
 extension HomeViewModel {
+    func isDocumentLocked(id: UUID) -> Bool {
+        if let recent = recentModel.first(where: { $0.id == id }) {
+            return recent.isLocked
+        }
+
+        if let item = searchItems.first(where: { $0.id == id })?.document {
+            return item.isLocked
+        }
+
+        return (try? documentRepository.fetchDocumentIsLocked(id: id)) ?? false
+    }
+
+    func isDocumentLockViaFaceId(id: UUID) -> Bool {
+        if let recent = recentModel.first(where: { $0.id == id }) {
+            return recent.lockViaFaceId
+        }
+
+        if let item = searchItems.first(where: { $0.id == id })?.document {
+            return item.lockViaFaceId
+        }
+
+        return (try? documentRepository.fetchDocumentLockViaFaceId(id: id)) ?? false
+    }
+
     private func previewDocumentType(for document: DocumentEntity) -> DocumentTypeEnum {
         let defaultType = DocumentTypeEnum(
             rawValue: document.documentTypeRaw ?? ""
