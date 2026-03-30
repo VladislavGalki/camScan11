@@ -6,14 +6,22 @@ import Combine
 final class HomeViewModel: ObservableObject {
     @Published private(set) var recentModel: [RecentDocumentModel] = []
     @Published private(set) var exploreToolModel: [ExploreToolModel] = []
+    @Published var searchText: String = ""
+    @Published var isSearchLoading = false
+    @Published var isSearchActive = false
+    @Published private(set) var searchItems: [FilesGridItem] = []
 
     private let documentRepository: DocumentRepository = DocumentRepository.shared
     private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
+    private let fileDocumentStore: FileDocumentStore = FileDocumentStore()
 
+    private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
     init() {
         subscribeToRecentDocuments()
+        subscribeToSearchDocuments()
+        subscribeSearch()
         bootstap()
     }
     
@@ -21,6 +29,19 @@ final class HomeViewModel: ObservableObject {
         do {
             try documentRepository.setDocumentFavourite(id: documentId, isFavourite: isFavourite)
         } catch {}
+    }
+
+    func startSearch() {
+        searchItems = []
+        searchText = ""
+        isSearchActive = true
+    }
+
+    func clearSearch() {
+        isSearchActive = false
+        searchText = ""
+        isSearchLoading = false
+        fileDocumentStore.clearSearch()
     }
     
     private func subscribeToRecentDocuments() {
@@ -44,6 +65,43 @@ final class HomeViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    private func subscribeToSearchDocuments() {
+        fileDocumentStore.bootstrap(with: .recent)
+
+        Publishers.CombineLatest(
+            fileDocumentStore.itemsPublisher,
+            fileDocumentStore.thumbnailsPublisher
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] items, thumbs in
+            guard let self else { return }
+
+            let documentItems = items.compactMap { item -> FilesGridItem? in
+                guard case .document(var doc) = item else { return nil }
+                doc.thumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 0)]
+                doc.secondThumbnail = thumbs[ThumbKey(docID: doc.id, pageIndex: 1)]
+                return .document(doc)
+            }
+
+            self.searchItems = documentItems
+            self.isSearchLoading = false
+        }
+        .store(in: &cancellables)
+    }
+
+    private func subscribeSearch() {
+        searchCancellable = $searchText
+            .dropFirst()
+            .handleEvents(receiveOutput: { [weak self] _ in
+                self?.isSearchLoading = true
+            })
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] text in
+                self?.fileDocumentStore.search(text)
+            }
     }
     
     private func bootstap() {
