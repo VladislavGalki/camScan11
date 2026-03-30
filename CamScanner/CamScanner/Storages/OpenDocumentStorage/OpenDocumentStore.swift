@@ -5,6 +5,7 @@ import UIKit
 
 extension Notification.Name {
     static let openDocumentPreviewDidChange = Notification.Name("openDocumentPreviewDidChange")
+    static let documentDidChange = Notification.Name("documentDidChange")
 }
 
 final class OpenDocumentStore: NSObject {

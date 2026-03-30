@@ -29,6 +29,7 @@ final class FileDocumentStore: NSObject {
     
     private var thumbInFlight = Set<ThumbKey>()
     private var rebuildWorkItem: DispatchWorkItem?
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Search State
     
@@ -49,6 +50,7 @@ final class FileDocumentStore: NSObject {
     func bootstrap(with sortType: FilesSortType) {
         currentSortType = sortType
         configureFRC()
+        subscribe()
         performFetch()
         rebuild()
     }
@@ -190,6 +192,18 @@ final class FileDocumentStore: NSObject {
     private func performFetch() {
         try? documentsFRC.performFetch()
         try? foldersFRC.performFetch()
+    }
+
+    private func subscribe() {
+        guard cancellables.isEmpty else { return }
+
+        NotificationCenter.default.publisher(for: .documentDidChange)
+            .compactMap { $0.userInfo?["documentID"] as? UUID }
+            .sink { [weak self] documentID in
+                self?.invalidateThumbnails(for: documentID)
+                self?.rebuild()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Sorting
@@ -526,6 +540,19 @@ extension FileDocumentStore {
         }
         
         thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
+    }
+
+    private func invalidateThumbnails(for documentID: UUID) {
+        var dict = thumbnailsSubject.value
+        dict.keys
+            .filter { $0.docID == documentID }
+            .forEach { dict[$0] = nil }
+
+        if dict != thumbnailsSubject.value {
+            thumbnailsSubject.send(dict)
+        }
+
+        thumbInFlight = thumbInFlight.filter { $0.docID != documentID }
     }
 }
 

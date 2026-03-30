@@ -284,6 +284,8 @@ private extension OpenDocumentView {
                             overlayState = .none
                         }
                     )
+                case .pageDeleteConfirmation:
+                    pageDeleteOverlay
                 case .lock:
                     LockDocumentView(
                         faceIdRequest: {
@@ -404,6 +406,7 @@ private extension OpenDocumentView {
                     ScanInputModel(existingDocumentID: viewModel.documentId),
                     onDismiss: {
                         viewModel.reloadTextItems()
+                        viewModel.reloadWatermarkItems()
                     }
                 )
             )
@@ -432,7 +435,7 @@ private extension OpenDocumentView {
         case .translate:
             break
         case .delete:
-            break
+            overlayState = .pageDeleteConfirmation
         }
     }
 
@@ -455,6 +458,87 @@ private extension OpenDocumentView {
                 overlayState = .enterPin(.unlock)
             }
         }
+    }
+
+    var pageDeleteOverlay: some View {
+        VStack(spacing: 0) {
+            Text("Delete the page?")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+
+            Text("You can retake it instead.")
+                .multilineTextAlignment(.center)
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .padding(.bottom, 24)
+
+            VStack(spacing: 10) {
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Delete"),
+                        style: .secondary,
+                        size: .l,
+                        extraTitleColor: .text(.destructive),
+                        isFullWidth: true
+                    ),
+                    action: {
+                        switch viewModel.deleteSelectedPage() {
+                        case .deleted(let pageIndex):
+                            overlayState = .none
+                            bottomBarAction = .deletePage(pageIndex)
+                        case .deletedLastPageDocument:
+                            overlayState = .none
+                            dismiss()
+                        case .failed:
+                            overlayState = .none
+                        }
+                    }
+                )
+
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Retake"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        overlayState = .none
+                        viewModel.preparePageRetake()
+                        router.present(
+                            OpenDocumentRoute.scanFlow(
+                                ScanInputModel(existingDocumentID: viewModel.documentId),
+                                onDismiss: {
+                                    viewModel.completePendingPageRetake()
+                                    viewModel.reloadTextItems()
+                                    viewModel.reloadWatermarkItems()
+                                }
+                            )
+                        )
+                    }
+                )
+
+                AppButton(
+                    config: AppButtonConfig(
+                        content: .title("Cancel"),
+                        style: .secondary,
+                        size: .l,
+                        isFullWidth: true
+                    ),
+                    action: {
+                        overlayState = .none
+                    }
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .foregroundStyle(.bg(.surface))
+        )
+        .frame(maxWidth: 300)
     }
 }
 

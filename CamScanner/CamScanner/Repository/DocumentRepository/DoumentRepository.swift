@@ -15,6 +15,14 @@ final class DocumentRepository {
     init(context: NSManagedObjectContext) {
         self.context = context
     }
+
+    private func notifyDocumentDidChange(_ documentID: UUID) {
+        NotificationCenter.default.post(
+            name: .documentDidChange,
+            object: nil,
+            userInfo: ["documentID": documentID]
+        )
+    }
     
     // MARK: - LOAD
     
@@ -278,6 +286,104 @@ extension DocumentRepository {
         document.cachedSize = totalSize
 
         try context.save()
+    }
+
+    func deletePage(
+        documentID: UUID,
+        at pageIndex: Int
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8004,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let pages = sortedPages(for: document)
+        guard pages.indices.contains(pageIndex) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8005,
+                userInfo: [NSLocalizedDescriptionKey: "Page not found"]
+            )
+        }
+
+        let pageToDelete = pages[pageIndex]
+        deleteAssets(for: pageToDelete)
+        context.delete(pageToDelete)
+
+        for page in pages[(pageIndex + 1)...] {
+            page.index -= 1
+        }
+
+        shiftOverlayPageIndices(
+            in: document,
+            deletingPageAt: pageIndex
+        )
+
+        document.pageCount = Int16(max(pages.count - 1, 0))
+        document.lastViewed = Date()
+        document.cachedSize = FileStore.shared.documentFolderSize(docID: documentID)
+
+        try context.save()
+    }
+
+    @discardableResult
+    func replacePageWithLastAdded(
+        documentID: UUID,
+        at pageIndex: Int,
+        previousPageCount: Int
+    ) throws -> Bool {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8006,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let pages = sortedPages(for: document)
+        guard previousPageCount >= 0,
+              pages.count > previousPageCount,
+              pageIndex >= 0,
+              pageIndex < previousPageCount,
+              pages.indices.contains(pageIndex)
+        else {
+            return false
+        }
+
+        guard let replacementPage = pages.last else {
+            return false
+        }
+
+        let targetPage = pages[pageIndex]
+        guard targetPage != replacementPage else {
+            return false
+        }
+
+        deleteAssets(for: targetPage)
+
+        targetPage.imagePath = replacementPage.imagePath
+        targetPage.originalPath = replacementPage.originalPath
+        targetPage.drawingBasePath = replacementPage.drawingBasePath
+        targetPage.drawingData = replacementPage.drawingData
+        targetPage.quadData = replacementPage.quadData
+        targetPage.sourceDocumentTypeRaw = replacementPage.sourceDocumentTypeRaw
+        targetPage.filterTypeRaw = replacementPage.filterTypeRaw
+        targetPage.filterAdjustment = replacementPage.filterAdjustment
+        targetPage.rotationAngle = replacementPage.rotationAngle
+
+        deleteOverlaysForPage(in: document, pageIndex: pageIndex)
+
+        context.delete(replacementPage)
+
+        document.pageCount = Int16(max(pages.count - 1, 0))
+        document.lastViewed = Date()
+        document.cachedSize = FileStore.shared.documentFolderSize(docID: documentID)
+
+        try context.save()
+        return true
     }
 
     @discardableResult
@@ -644,6 +750,7 @@ extension DocumentRepository {
             document.title = uniqueTitle
 
             try context.save()
+            notifyDocumentDidChange(id)
             return
         }
 
@@ -752,15 +859,21 @@ extension DocumentRepository {
         }
 
         try context.save()
+        notifyDocumentDidChange(documentID)
     }
     
     func updateTextOverlayCoordinates(_ items: [DocumentTextItem]) throws {
+        var documentIDToNotify: UUID?
+
         for item in items {
             let request: NSFetchRequest<TextOverlayEntity> = TextOverlayEntity.fetchRequest()
             request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
             request.fetchLimit = 1
 
             guard let entity = try context.fetch(request).first else { continue }
+            if documentIDToNotify == nil {
+                documentIDToNotify = entity.document?.id
+            }
             entity.centerX = item.centerX
             entity.centerY = item.centerY
             entity.width = item.width
@@ -768,6 +881,10 @@ extension DocumentRepository {
             entity.rotation = item.rotation
         }
         try context.save()
+
+        if let documentIDToNotify {
+            notifyDocumentDidChange(documentIDToNotify)
+        }
     }
 
     /// Saves rotated text coordinates, page rotation angles **and** the rotated
@@ -776,6 +893,7 @@ extension DocumentRepository {
     func saveRotationState(
         documentID: UUID,
         textItems: [DocumentTextItem],
+        watermarkItems: [DocumentWatermarkItem],
         pageIndices: [Int],
         rotationAngleDelta: Double,
         pageImages: [(pageIndex: Int, image: UIImage)]
@@ -794,7 +912,21 @@ extension DocumentRepository {
             entity.rotation = item.rotation
         }
 
-        // 2. Increment page rotation angles + save rotated images to disk
+        // 2. Update watermark overlay coordinates
+        for item in watermarkItems {
+            let request: NSFetchRequest<WatermarkOverlayEntity> = WatermarkOverlayEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else { continue }
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+        }
+
+        // 3. Increment page rotation angles + save rotated images to disk
         guard let document = try fetchDocument(id: documentID) else { return }
         let pages = (document.pages as? Set<PageEntity>) ?? []
 
@@ -814,6 +946,7 @@ extension DocumentRepository {
         }
 
         try context.save()
+        notifyDocumentDidChange(documentID)
     }
 
     func saveErasedPageImage(
@@ -834,6 +967,7 @@ extension DocumentRepository {
         }
 
         try context.save()
+        notifyDocumentDidChange(documentID)
     }
 
     func saveCropState(
@@ -860,6 +994,7 @@ extension DocumentRepository {
         }
 
         try context.save()
+        notifyDocumentDidChange(documentID)
     }
 
     func deleteTextOverlay(
@@ -876,6 +1011,7 @@ extension DocumentRepository {
         if let entity = try context.fetch(request).first {
             context.delete(entity)
             try context.save()
+            notifyDocumentDidChange(documentID)
         }
     }
 }
@@ -937,6 +1073,7 @@ extension DocumentRepository {
         }
 
         try context.save()
+        notifyDocumentDidChange(documentID)
     }
 
     func deleteWatermarkOverlay(
@@ -953,6 +1090,7 @@ extension DocumentRepository {
         if let entity = try context.fetch(request).first {
             context.delete(entity)
             try context.save()
+            notifyDocumentDidChange(documentID)
         }
     }
 }
@@ -1000,6 +1138,62 @@ extension DocumentRepository {
         let orderedDocuments = ids.compactMap { documentsByID[$0] }
 
         return try buildShareModel(from: orderedDocuments)
+    }
+
+    private func sortedPages(for document: DocumentEntity) -> [PageEntity] {
+        (document.pages as? Set<PageEntity>)?
+            .sorted { $0.index < $1.index } ?? []
+    }
+
+    private func deleteAssets(for page: PageEntity) {
+        let relativePaths = [
+            page.imagePath,
+            page.originalPath,
+            page.drawingBasePath
+        ]
+
+        for relativePath in relativePaths.compactMap({ $0 }) {
+            let url = FileStore.shared.url(forRelativePath: relativePath)
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private func shiftOverlayPageIndices(
+        in document: DocumentEntity,
+        deletingPageAt pageIndex: Int
+    ) {
+        let textOverlays = (document.textOverlays as? Set<TextOverlayEntity>) ?? []
+        for overlay in textOverlays {
+            if overlay.pageIndex == Int16(pageIndex) {
+                context.delete(overlay)
+            } else if overlay.pageIndex > Int16(pageIndex) {
+                overlay.pageIndex -= 1
+            }
+        }
+
+        let watermarkOverlays = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
+        for overlay in watermarkOverlays {
+            if overlay.pageIndex == Int16(pageIndex) {
+                context.delete(overlay)
+            } else if overlay.pageIndex > Int16(pageIndex) {
+                overlay.pageIndex -= 1
+            }
+        }
+    }
+
+    private func deleteOverlaysForPage(
+        in document: DocumentEntity,
+        pageIndex: Int
+    ) {
+        let textOverlays = (document.textOverlays as? Set<TextOverlayEntity>) ?? []
+        for overlay in textOverlays where overlay.pageIndex == Int16(pageIndex) {
+            context.delete(overlay)
+        }
+
+        let watermarkOverlays = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
+        for overlay in watermarkOverlays where overlay.pageIndex == Int16(pageIndex) {
+            context.delete(overlay)
+        }
     }
     
     private func fetchDocument(id: UUID) throws -> DocumentEntity? {

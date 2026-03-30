@@ -36,6 +36,7 @@ final class OpenDocumentViewModel: ObservableObject {
 
     private var currentCellHeight: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
+    private var pendingRetakeContext: PendingRetakeContext?
 
     init(inputModel: OpenDocumentInputModel) {
         self.inputModel = inputModel
@@ -92,6 +93,17 @@ final class OpenDocumentViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+}
+
+private struct PendingRetakeContext {
+    let pageIndex: Int
+    let previousPageCount: Int
+}
+
+enum OpenDocumentPageDeletionResult {
+    case deleted(pageIndex: Int)
+    case deletedLastPageDocument
+    case failed
 }
 
 // MARK: - Computed
@@ -238,6 +250,57 @@ extension OpenDocumentViewModel {
         }
     }
 
+    func deleteSelectedPage() -> OpenDocumentPageDeletionResult {
+        guard models.indices.contains(selectedIndex) else { return .failed }
+
+        if models.count == 1 {
+            return deleteDocument() ? .deletedLastPageDocument : .failed
+        }
+
+        let removedIndex = selectedIndex
+
+        do {
+            try documentRepository.deletePage(
+                documentID: inputModel.documentID,
+                at: removedIndex
+            )
+
+            let nextIndex = min(removedIndex, max(models.count - 2, 0))
+            selectedIndex = nextIndex
+            return .deleted(pageIndex: nextIndex)
+        } catch {
+            return .failed
+        }
+    }
+
+    func preparePageRetake() {
+        guard models.indices.contains(selectedIndex) else { return }
+        pendingRetakeContext = PendingRetakeContext(
+            pageIndex: selectedIndex,
+            previousPageCount: models.count
+        )
+    }
+
+    func completePendingPageRetake() {
+        guard let pendingRetakeContext else { return }
+        self.pendingRetakeContext = nil
+
+        do {
+            let didReplace = try documentRepository.replacePageWithLastAdded(
+                documentID: inputModel.documentID,
+                at: pendingRetakeContext.pageIndex,
+                previousPageCount: pendingRetakeContext.previousPageCount
+            )
+
+            if didReplace {
+                selectedIndex = min(
+                    pendingRetakeContext.pageIndex,
+                    max(models.count - 1, 0)
+                )
+            }
+        } catch { }
+    }
+
     func handleFaceIdRequest() async -> Bool {
         await faceIdService.requestAuthorizationIfNeeded()
     }
@@ -305,6 +368,7 @@ extension OpenDocumentViewModel {
 
         // 1. Compute rotated text positions (sync, uses current preview sizes)
         let updatedTextItems = computeRotatedTextItems(forPageIndex: index)
+        let updatedWatermarkItems = computeRotatedWatermarkItems(forPageIndex: index)
         let pageIndices = pageIndicesForModel(at: index)
 
         // Defer ALL @Published mutations to escape the current SwiftUI view update
@@ -314,6 +378,9 @@ extension OpenDocumentViewModel {
             // 2. Apply text changes in-memory
             if let items = updatedTextItems {
                 self.textItems = items
+            }
+            if let items = updatedWatermarkItems {
+                self.watermarkItems = items
             }
 
             // 3. Update in-memory model (re-render preview)
@@ -352,9 +419,12 @@ extension OpenDocumentViewModel {
             // 5. Save text coords + page rotation + images atomically
             let pageItems = (updatedTextItems ?? self.textItems)
                 .filter { $0.pageIndex == index }
+            let pageWatermarkItems = (updatedWatermarkItems ?? self.watermarkItems)
+                .filter { $0.pageIndex == index }
             try? self.documentRepository.saveRotationState(
                 documentID: self.inputModel.documentID,
                 textItems: pageItems,
+                watermarkItems: pageWatermarkItems,
                 pageIndices: pageIndices,
                 rotationAngleDelta: .pi / 2,
                 pageImages: pageImages
@@ -375,6 +445,47 @@ extension OpenDocumentViewModel {
         let cellSize = CGSize(width: cellW, height: cellH)
 
         var updatedItems = textItems
+        var changed = false
+
+        for i in updatedItems.indices where updatedItems[i].pageIndex == pageIndex {
+            let item = updatedItems[i]
+            let pos = CGPoint(x: item.centerX * cellW, y: item.centerY * cellH)
+
+            guard let (beforeRect, afterRect) = contentRectsForRotation(
+                model: model, position: pos, cellSize: cellSize
+            ) else {
+                continue
+            }
+
+            let nx = min(1, max(0, (pos.x - beforeRect.minX) / beforeRect.width))
+            let ny = min(1, max(0, (pos.y - beforeRect.minY) / beforeRect.height))
+
+            let rx = 1 - ny
+            let ry = nx
+
+            let newCX = (afterRect.minX + rx * afterRect.width) / cellW
+            let newCY = (afterRect.minY + ry * afterRect.height) / cellH
+
+            updatedItems[i].centerX = newCX
+            updatedItems[i].centerY = newCY
+            updatedItems[i].rotation = (item.rotation + 90).truncatingRemainder(dividingBy: 360)
+
+            changed = true
+        }
+
+        return changed ? updatedItems : nil
+    }
+
+    private func computeRotatedWatermarkItems(forPageIndex pageIndex: Int) -> [DocumentWatermarkItem]? {
+        guard let model = models[safe: pageIndex] else { return nil }
+
+        let cellW = Self.cardWidth
+        let cellH = currentCellHeight
+        guard cellW > 0, cellH > 0 else { return nil }
+
+        let cellSize = CGSize(width: cellW, height: cellH)
+
+        var updatedItems = watermarkItems
         var changed = false
 
         for i in updatedItems.indices where updatedItems[i].pageIndex == pageIndex {

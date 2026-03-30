@@ -37,6 +37,7 @@ final class HomeDocumentsStore: NSObject {
     override init() {
         super.init()
         bootstrap()
+        subscribe()
         performFetchDocuments()
     }
     
@@ -81,6 +82,26 @@ final class HomeDocumentsStore: NSObject {
 
         thumbnailsSubject.send(dict)
         thumbInFlight = thumbInFlight.filter { validIDs.contains($0.docID) }
+    }
+
+    private func subscribe() {
+        NotificationCenter.default.publisher(for: .documentDidChange)
+            .compactMap { $0.userInfo?["documentID"] as? UUID }
+            .sink { [weak self] documentID in
+                self?.invalidateThumbnails(for: documentID)
+                self?.rebuild()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func invalidateThumbnails(for documentID: UUID) {
+        var dict = thumbnailsSubject.value
+        dict.keys
+            .filter { $0.docID == documentID }
+            .forEach { dict[$0] = nil }
+
+        thumbnailsSubject.send(dict)
+        thumbInFlight = thumbInFlight.filter { $0.docID != documentID }
     }
 }
 
