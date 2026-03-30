@@ -246,7 +246,7 @@ final class AutoShootEngine {
 
     private func log(_ msg: String) {
         guard isLoggingEnabled else { return }
-        print("📸 AutoShoot | \(msg)")
+       // print("📸 AutoShoot | \(msg)")
     }
 
     private func fmt(_ v: CGFloat) -> String {

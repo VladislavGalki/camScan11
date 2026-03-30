@@ -145,12 +145,28 @@ extension OpenDocumentViewModel {
     }
 
     func applyCropOutput(_ output: ScanPreviewInputModel) {
-        models = output.pageGroups.map {
+        let preparedModels = output.pageGroups.map {
             ScanPreviewModel(
                 documentType: $0.documentType,
                 frames: OpenDocumentFramePreparer.preparedFrames($0.frames)
             )
         }
+
+        var pageUpdates: [(pageIndex: Int, frame: CapturedFrame)] = []
+        var pageIndex = 0
+        for group in preparedModels {
+            for frame in group.frames {
+                pageUpdates.append((pageIndex: pageIndex, frame: frame))
+                pageIndex += 1
+            }
+        }
+
+        try? documentRepository.saveCropState(
+            documentID: inputModel.documentID,
+            pageUpdates: pageUpdates
+        )
+
+        models = preparedModels
 
         selectedIndex = min(selectedIndex, max(models.count - 1, 0))
         updateSliderFromCurrentFrame()

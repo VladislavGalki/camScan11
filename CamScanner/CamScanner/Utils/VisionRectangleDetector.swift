@@ -12,29 +12,20 @@ enum VisionRectangleDetector {
     static func rectangle(forPixelBuffer pixelBuffer: CVPixelBuffer, completion: @escaping ((Quadrilateral?) -> Void)) {
         let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
-        print("[RectDetect] rectangle(forPixelBuffer:) called, size=\(width)x\(height)")
-
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let uiImage = ciImageToUIImage(ciImage) else {
-            print("[RectDetect] ❌ ciImageToUIImage returned nil")
             completion(nil)
             return
         }
 
         let mat = Mat(uiImage: uiImage)
-        print("[RectDetect] Mat created: \(mat.cols())x\(mat.rows()), channels=\(mat.channels()), type=\(mat.type())")
         let quad = detectLargestRectangle(in: mat, width: width, height: height)
-        print("[RectDetect] result: \(quad != nil ? "FOUND quad" : "nil")")
-        if let q = quad {
-            print("[RectDetect]   tl=\(q.topLeft) tr=\(q.topRight) br=\(q.bottomRight) bl=\(q.bottomLeft)")
-        }
         completion(quad)
     }
 
     /// Detects the largest rectangle from a CIImage.
     static func rectangle(forImage image: CIImage, completion: @escaping ((Quadrilateral?) -> Void)) {
         guard let uiImage = ciImageToUIImage(image) else {
-            print("[RectDetect] ❌ ciImageToUIImage returned nil (forImage)")
             completion(nil)
             return
         }
@@ -51,7 +42,6 @@ enum VisionRectangleDetector {
     ) {
         let orientedImage = image.oriented(orientation)
         guard let uiImage = ciImageToUIImage(orientedImage) else {
-            print("[RectDetect] ❌ ciImageToUIImage returned nil (forImage+orientation)")
             completion(nil)
             return
         }
@@ -84,7 +74,6 @@ enum VisionRectangleDetector {
                 height: Int32(Double(source.rows()) * scale)
             )
         )
-        print("[RectDetect] downscaled \(source.cols())x\(source.rows()) -> \(resized.cols())x\(resized.rows()), scale=\(scale)")
         return (resized, scale)
     }
 
@@ -99,7 +88,6 @@ enum VisionRectangleDetector {
         } else {
             small.copy(to: gray)
         }
-        print("[RectDetect] gray: \(gray.cols())x\(gray.rows()), channels=\(gray.channels()), empty=\(gray.empty())")
 
         let blurred = Mat()
         Imgproc.GaussianBlur(
@@ -114,20 +102,17 @@ enum VisionRectangleDetector {
         var bestArea: Double = 0
         let imageArea = Double(small.cols()) * Double(small.rows())
         let minArea = imageArea * 0.02
-        print("[RectDetect] imageArea=\(imageArea), minArea=\(minArea)")
 
         // Strategy 1: Canny with low thresholds
         let cannyLow = Mat()
         Imgproc.Canny(image: blurred, edges: cannyLow, threshold1: 30, threshold2: 100)
         let cannyLowNonZero = Core.countNonZero(src: cannyLow)
-        print("[RectDetect] Strategy 1 (Canny low): nonZero=\(cannyLowNonZero)")
         morphAndFind(cannyLow, minArea: minArea, strategyName: "CannyLow", best: &bestQuad, bestArea: &bestArea)
 
         // Strategy 2: Canny with medium thresholds
         let cannyMed = Mat()
         Imgproc.Canny(image: blurred, edges: cannyMed, threshold1: 50, threshold2: 150)
         let cannyMedNonZero = Core.countNonZero(src: cannyMed)
-        print("[RectDetect] Strategy 2 (Canny med): nonZero=\(cannyMedNonZero)")
         morphAndFind(cannyMed, minArea: minArea, strategyName: "CannyMed", best: &bestQuad, bestArea: &bestArea)
 
         // Strategy 3: Adaptive threshold + morphological close
@@ -142,11 +127,9 @@ enum VisionRectangleDetector {
             C: 2
         )
         let adaptiveNonZero = Core.countNonZero(src: adaptive)
-        print("[RectDetect] Strategy 3 (Adaptive): nonZero=\(adaptiveNonZero)")
         morphAndFind(adaptive, minArea: minArea, strategyName: "Adaptive", best: &bestQuad, bestArea: &bestArea)
 
         guard var quad = bestQuad else {
-            print("[RectDetect] ⚠️ No quad found across all strategies")
             return nil
         }
 
@@ -195,7 +178,6 @@ enum VisionRectangleDetector {
             mode: .RETR_LIST,
             method: .CHAIN_APPROX_SIMPLE
         )
-        print("[RectDetect]   [\(strategyName)] contours found: \(contours.count)")
 
         var candidateCount = 0
         var passedAreaCount = 0
@@ -224,26 +206,22 @@ enum VisionRectangleDetector {
             let convex = isConvex(approx)
             if convex { convexCount += 1 }
             guard convex else {
-                print("[RectDetect]   [\(strategyName)] 4-point contour FAILED convex check, area=\(area)")
                 continue
             }
 
             // Reject if contour covers >90% of the frame (it's the background, not a document)
             let imageArea = Double(dilated.cols()) * Double(dilated.rows())
             if area / imageArea > 0.90 {
-                print("[RectDetect]   [\(strategyName)] REJECTED: covers \(Int(area / imageArea * 100))% of frame")
                 continue
             }
 
             // Check angles are roughly rectangular (each corner within 30° of 90°)
             guard hasReasonableAngles(approx) else {
-                print("[RectDetect]   [\(strategyName)] REJECTED: angles not rectangular, area=\(area)")
                 continue
             }
 
             // Check aspect ratio is reasonable (not too extreme like 10:1)
             guard hasReasonableAspectRatio(approx) else {
-                print("[RectDetect]   [\(strategyName)] REJECTED: extreme aspect ratio, area=\(area)")
                 continue
             }
 
@@ -259,9 +237,7 @@ enum VisionRectangleDetector {
             )
             quad.reorganize()
             best = quad
-            print("[RectDetect]   [\(strategyName)] ✅ NEW best quad, area=\(area)")
         }
-        print("[RectDetect]   [\(strategyName)] summary: total=\(candidateCount), passedArea=\(passedAreaCount), 4pt=\(fourPointCount), convex=\(convexCount)")
     }
 
     /// Check that all interior angles are within 30° of 90° (i.e. 60°–120°).

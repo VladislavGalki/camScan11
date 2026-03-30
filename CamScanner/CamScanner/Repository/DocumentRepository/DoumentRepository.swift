@@ -836,6 +836,32 @@ extension DocumentRepository {
         try context.save()
     }
 
+    func saveCropState(
+        documentID: UUID,
+        pageUpdates: [(pageIndex: Int, frame: CapturedFrame)]
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else { return }
+        let pages = (document.pages as? Set<PageEntity>) ?? []
+
+        for page in pages {
+            guard let update = pageUpdates.first(where: { $0.pageIndex == Int(page.index) }) else { continue }
+
+            if let displayImage = update.frame.preview ?? update.frame.displayBase,
+               let relativePath = page.imagePath {
+                let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+                if let data = displayImage.jpegData(compressionQuality: 0.92) {
+                    try? data.write(to: fileURL, options: [.atomic])
+                }
+            }
+
+            page.quadData = update.frame.quad.flatMap { QuadCodec.encode($0) }
+            page.drawingData = nil
+            page.drawingBasePath = nil
+        }
+
+        try context.save()
+    }
+
     func deleteTextOverlay(
         documentID: UUID,
         overlayID: UUID
@@ -1045,7 +1071,7 @@ extension DocumentRepository {
 
         return pages.compactMap { page in
             guard
-                let originalPath = page.imagePath,
+                let originalPath = page.originalPath,
                 let originalImage = UIImage(
                     contentsOfFile: FileStore.shared
                         .url(forRelativePath: originalPath).path
@@ -1080,7 +1106,16 @@ extension DocumentRepository {
             )
 
             frame.applyFilter(state)
-            frame.previewBase = frame.preview ?? originalImage
+
+            if let displayPath = page.imagePath,
+               let displayImage = UIImage(
+                    contentsOfFile: FileStore.shared
+                        .url(forRelativePath: displayPath).path
+               ) {
+                frame.previewBase = displayImage
+            } else {
+                frame.previewBase = originalImage
+            }
 
             if let base = frame.previewBase {
                 frame.previewBase = ImageCompressionService.shared.compress(
