@@ -1,7 +1,20 @@
 import UIKit
 
+enum ShareExportError: LocalizedError {
+    case emptyOCRResult
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyOCRResult:
+            return "No text was recognized in the selected documents."
+        }
+    }
+}
+
 final class ShareExportService {
     static let shared = ShareExportService()
+
+    private let ocrService = OCRService.shared
 
     private init() {}
 
@@ -46,6 +59,38 @@ final class ShareExportService {
         return urls
     }
     
+    func exportTXT(documents: [SharePreviewModel], zip: Bool, fileName: String) async throws -> [URL] {
+        var allTexts: [String] = []
+
+        for document in documents {
+            for frame in document.frames {
+                guard let image = frame.preview else { continue }
+                let result = try await ocrService.recognizeText(in: image)
+                let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    allTexts.append(trimmed)
+                }
+            }
+        }
+
+        guard !allTexts.isEmpty else {
+            throw ShareExportError.emptyOCRResult
+        }
+
+        let combinedText = allTexts.joined(separator: "\n\n")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(fileName).txt")
+
+        try combinedText.write(to: url, atomically: true, encoding: .utf8)
+
+        if zip {
+            let zipURL = try ZipService.shared.zip(files: [url], fileName: fileName)
+            return [zipURL]
+        }
+
+        return [url]
+    }
+
     func exportJPG(documents: [SharePreviewModel], zip: Bool, fileName: String) throws -> [URL] {
         let renderer = JPGRendererService.shared
         

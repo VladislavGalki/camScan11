@@ -132,11 +132,17 @@ final class ShareViewModel: ObservableObject {
                             fileName: self.documentName
                         )
                     }.value
+                case .txt:
+                    urls = try await exportService.exportTXT(
+                        documents: selected,
+                        zip: isNeetCreateZipArchve,
+                        fileName: documentName
+                    )
                 default:
                     await MainActor.run {
                         self.isLoading = false
                     }
-                    
+
                     return
                 }
                 
