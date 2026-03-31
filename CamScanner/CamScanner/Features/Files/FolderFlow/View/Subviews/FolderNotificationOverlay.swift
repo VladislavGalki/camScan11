@@ -74,6 +74,7 @@ struct FolderNotificationOverlay: View {
                                 viewModel.folderActiveSheet = .share(id)
                                 onClear()
                             default:
+                                viewModel.executePendingDocumentOpen()
                                 onClear()
                             }
                         },

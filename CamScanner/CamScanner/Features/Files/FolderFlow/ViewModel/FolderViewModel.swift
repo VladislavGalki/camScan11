@@ -13,7 +13,9 @@ final class FolderViewModel: ObservableObject {
     
     @Published var shouldShowNotification = false
     @Published var notificationModel: NotificationModel?
-    
+    @Published var documentToOpen: UUID?
+    var pendingDocumentToOpen: UUID?
+
     let viewMode: FilesViewMode
     var folderItem: FileFolderItem
     
@@ -159,6 +161,39 @@ final class FolderViewModel: ObservableObject {
 
 // MARK: - Public
 extension FolderViewModel {
+    func openDocumentTapped(id: UUID) {
+        let isLocked = isDocumentLocked(id: id)
+        let isFaceId = isDocumentLockViaFaceId(id: id)
+
+        if isLocked {
+            pendingDocumentToOpen = id
+            Task {
+                if isFaceId {
+                    let authenticated = await faceIdService.authenticateForUnlock()
+                    await MainActor.run {
+                        if authenticated {
+                            executePendingDocumentOpen()
+                        } else {
+                            notificationOverlaystate = .unlock(id)
+                        }
+                    }
+                } else {
+                    await MainActor.run {
+                        notificationOverlaystate = .unlock(id)
+                    }
+                }
+            }
+        } else {
+            documentToOpen = id
+        }
+    }
+
+    func executePendingDocumentOpen() {
+        guard let id = pendingDocumentToOpen else { return }
+        pendingDocumentToOpen = nil
+        documentToOpen = id
+    }
+
     func handleMoveDocument(id: UUID?) {
         guard let id else { return }
         

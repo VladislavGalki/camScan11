@@ -12,12 +12,17 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var searchItems: [FilesGridItem] = []
     @Published var documentToOpen: UUID?
     @Published var pinDocumentIDToOpen: UUID?
+    @Published var homeActiveSheet: FileActiveSheet?
+    @Published var notificationOverlayState: FilesNotificationOverlayState = .none
+    @Published var shouldShowNotification = false
+    @Published var notificationModel: NotificationModel?
 
     private let documentRepository: DocumentRepository = DocumentRepository.shared
     private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
     private let fileDocumentStore: FileDocumentStore = FileDocumentStore()
     private let passwordCryptoService = PasswordCryptoService.shared
     private let lockedActionExecutor = LockedActionExecutor.shared
+    private let faceIdService = FaceIDService.shared
 
     private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
@@ -202,6 +207,124 @@ final class HomeViewModel: ObservableObject {
             ExploreToolModel(type: .watermart, icon: .watermarkImage, title: "Watermark"),
             ExploreToolModel(type: .cloudStorage, icon: .cloudImage, title: "Cloud Storage")
         ]
+    }
+}
+
+// MARK: - Menu Actions
+extension HomeViewModel {
+    func getTitleForItem(id: UUID?) -> String {
+        guard let id else { return "" }
+        return recentModel.first(where: { $0.id == id })?.title ?? ""
+    }
+
+    func makeShareModel(id: UUID?) -> ShareInputModel? {
+        guard let id else { return nil }
+        return try? documentRepository.loadShareModel(id: id)
+    }
+
+    func handleMoveDocument(id: UUID?) {
+        guard let id else { return }
+        homeActiveSheet = .move(
+            MoveDocumentInputModel(
+                viewMode: .list,
+                folderId: nil,
+                documentIDs: [id]
+            )
+        )
+    }
+
+    func handleFileDocumentRenamed(_ id: UUID?, fileName: String) {
+        guard let id else { return }
+        do {
+            try documentRepository.renameDocument(id: id, newTitle: fileName)
+        } catch {}
+    }
+
+    func handleApplyFileDocumentMenuItem(id: UUID?, menuItem: FilesMenuItem?) {
+        guard let id, let menuItem else { return }
+
+        switch menuItem {
+        case .share:
+            homeActiveSheet = .share(id)
+        case .unlockDocument:
+            do {
+                _ = try documentRepository.removePassword(id: id)
+                showNotification(type: .pinRemoved)
+            } catch {}
+        case .delete:
+            do {
+                try documentRepository.deleteDocument(id: id)
+                showNotification(type: .fileRemoved)
+            } catch {}
+        default:
+            return
+        }
+    }
+
+    func handleDocumentMoved(documentIds: [UUID], folderId: UUID?) {
+        do {
+            try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
+            homeActiveSheet = nil
+            showNotification(type: .multipleMoved(documentIds.isEmpty ? 1 : documentIds.count))
+        } catch {}
+    }
+
+    func handleFaceIdRequest() async -> Bool {
+        await faceIdService.requestAuthorizationIfNeeded()
+    }
+
+    func handleSetPassword(documentId: UUID?, pin: String, viaFaceId: Bool) {
+        guard let documentId else { return }
+        do {
+            _ = try documentRepository.setPassword(id: documentId, pin: pin, viaFaceId: viaFaceId)
+            showNotification(type: .pinCreated)
+        } catch {}
+    }
+
+    func handleFileDocumentMenuItemSelected(id: UUID?, menuItem: FilesMenuItem) {
+        guard let id else { return }
+
+        performLockedAction(id: id) { [weak self] in
+            self?.processSuccessMenuItemSelection(id: id, menuItem: menuItem)
+        }
+    }
+
+    func processSuccessMenuItemSelection(id: UUID, menuItem: FilesMenuItem) {
+        switch menuItem {
+        case .share:
+            homeActiveSheet = .share(id)
+        case .unlockDocument:
+            notificationOverlayState = .unlock(id)
+        case .delete:
+            notificationOverlayState = .deleteFile(id)
+        default:
+            break
+        }
+    }
+
+    private func performLockedAction(
+        id: UUID,
+        onSuccess: @escaping () -> Void
+    ) {
+        Task {
+            let result = await lockedActionExecutor.execute(
+                isLocked: isDocumentLocked(id: id),
+                isFaceIdEnabled: isDocumentLockViaFaceId(id: id)
+            )
+
+            await MainActor.run {
+                if result.success {
+                    onSuccess()
+                } else if result.requiresPin {
+                    notificationOverlayState = .unlock(id)
+                }
+            }
+        }
+    }
+
+    func showNotification(type: NotificationModel) {
+        notificationModel = type
+        shouldShowNotification = true
     }
 }
 

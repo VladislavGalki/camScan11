@@ -5,12 +5,18 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     
     @EnvironmentObject private var router: Router
-    
+    @EnvironmentObject private var tabBar: TabBarController
+
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
     @State private var pinDocumentID: UUID?
-    
+
     @State var showAddCandidate: Bool = false
+
+    @State private var selectedFileDocumentItemId: UUID?
+    @State private var selectedMenuItem: FilesMenuItem?
+    @State private var shouldShowMenuOverlay = false
+    @State private var menuFrame: CGRect = .zero
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -28,6 +34,11 @@ struct HomeView: View {
                                 vm.openDocumentTapped(id: item.id)
                             } onFavoriteTapped: { documentId, isFavorite in
                                 vm.handleDocumentFavourite(documentId: documentId, isFavourite: isFavorite)
+                            } onMenuClick: { id, frame in
+                                selectedFileDocumentItemId = id
+                                menuFrame = frame
+                                tabBar.isTabBarVisible = false
+                                shouldShowMenuOverlay = true
                             }
                             .padding(.bottom, 26)
                         }
@@ -49,7 +60,12 @@ struct HomeView: View {
             Color.bg(.main)
         )
         .ignoresSafeArea(edges: .top)
+        .coordinateSpace(name: "homeCoordinateSpace")
+        .overlay { menuOverlay }
+        .overlay { notificationOverlay }
+        .overlay(alignment: .top) { toastOverlay }
         .overlay { pinOverlay }
+        .sheet(item: $vm.homeActiveSheet) { sheetView($0) }
         .fullScreenCover(isPresented: $showAddCandidate) {
             OpenCVFilterDebugView()
         }
@@ -175,6 +191,202 @@ struct HomeView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Menu Overlays
+
+    private var menuOverlay: some View {
+        FilesMenuOverlay(
+            isVisible: $shouldShowMenuOverlay,
+            isLocked: {
+                guard let id = selectedFileDocumentItemId else { return false }
+                return vm.isDocumentLocked(id: id)
+            }(),
+            canMoved: false,
+            frame: menuFrame,
+            onSelect: handleMenuSelection,
+            onClose: { tabBar.isTabBarVisible = true }
+        )
+    }
+
+    @ViewBuilder
+    private var notificationOverlay: some View {
+        if vm.notificationOverlayState != .none {
+            ZStack {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+
+                switch vm.notificationOverlayState {
+                case .deleteFile:
+                    DeleteDocumentView(
+                        onDelete: {
+                            vm.handleApplyFileDocumentMenuItem(
+                                id: selectedFileDocumentItemId,
+                                menuItem: selectedMenuItem
+                            )
+                            clearMenuState()
+                        },
+                        onCancel: {
+                            clearMenuState()
+                        }
+                    )
+                    .onDisappear {
+                        tabBar.isTabBarVisible = true
+                    }
+                case .unlockDocument:
+                    UnlockDocumentView(
+                        documentTitle: vm.getTitleForItem(id: selectedFileDocumentItemId),
+                        onRemove: {
+                            vm.handleApplyFileDocumentMenuItem(
+                                id: selectedFileDocumentItemId,
+                                menuItem: selectedMenuItem
+                            )
+                            clearMenuState()
+                        },
+                        onCancel: {
+                            clearMenuState()
+                        }
+                    )
+                    .onDisappear {
+                        tabBar.isTabBarVisible = true
+                    }
+                case .lock:
+                    LockDocumentView {
+                        await vm.handleFaceIdRequest()
+                    } onSuccess: { pin, viaFaceId in
+                        vm.handleSetPassword(
+                            documentId: selectedFileDocumentItemId,
+                            pin: pin,
+                            viaFaceId: viaFaceId
+                        )
+                        clearMenuState()
+                    } onClose: {
+                        clearMenuState()
+                    }
+                case let .unlock(id):
+                    EnterPinView(
+                        documentTitle: vm.getTitleForItem(id: id),
+                        validatePin: { pin in
+                            vm.validateDocumentPin(documentId: id, pin: pin)
+                        },
+                        onSuccess: {
+                            if let selectedMenuItem {
+                                switch selectedMenuItem {
+                                case .unlockDocument:
+                                    vm.notificationOverlayState = .unlockDocument(id)
+                                case .delete:
+                                    vm.notificationOverlayState = .deleteFile(id)
+                                case .share:
+                                    clearMenuState()
+                                    tabBar.isTabBarVisible = true
+                                    vm.processSuccessMenuItemSelection(id: id, menuItem: selectedMenuItem)
+                                default:
+                                    clearMenuState()
+                                }
+                            } else {
+                                clearMenuState()
+                            }
+                        },
+                        onClose: {
+                            tabBar.isTabBarVisible = true
+                            clearMenuState()
+                        }
+                    )
+                default:
+                    EmptyView()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if vm.shouldShowNotification {
+            NotificationToast(
+                isPresented: $vm.shouldShowNotification,
+                title: vm.notificationModel?.title ?? ""
+            )
+        }
+    }
+
+    // MARK: - Menu Handling
+
+    private func handleMenuSelection(_ menuItem: FilesMenuItem) {
+        selectedMenuItem = menuItem
+
+        switch menuItem {
+        case .delete, .unlockDocument:
+            tabBar.isTabBarVisible = false
+
+            withAnimation(.easeInOut(duration: 0.15)) {
+                vm.handleFileDocumentMenuItemSelected(
+                    id: selectedFileDocumentItemId,
+                    menuItem: menuItem
+                )
+            }
+        case .rename:
+            vm.homeActiveSheet = .rename
+        case .lock:
+            tabBar.isTabBarVisible = false
+
+            withAnimation(.easeInOut(duration: 0.15)) {
+                vm.notificationOverlayState = .lock(UUID())
+            }
+        case .move:
+            vm.handleMoveDocument(id: selectedFileDocumentItemId)
+        case .share:
+            withAnimation(.easeInOut(duration: 0.15)) {
+                vm.handleFileDocumentMenuItemSelected(
+                    id: selectedFileDocumentItemId,
+                    menuItem: menuItem
+                )
+            }
+        }
+    }
+
+    // MARK: - Sheet
+
+    @ViewBuilder
+    private func sheetView(_ sheet: FileActiveSheet) -> some View {
+        switch sheet {
+        case let .share(id):
+            if let shareInputModel = vm.makeShareModel(id: id) {
+                ShareView(inputModel: shareInputModel) {
+                    vm.homeActiveSheet = nil
+                }
+                .presentationCornerRadius(38)
+            }
+        case .rename:
+            RenameFolderView(
+                folderTitle: vm.getTitleForItem(id: selectedFileDocumentItemId)
+            ) { fileName in
+                vm.handleFileDocumentRenamed(
+                    selectedFileDocumentItemId,
+                    fileName: fileName
+                )
+                clearMenuState()
+            }
+            .presentationCornerRadius(38)
+        case let .move(inputModel):
+            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
+                vm.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+            }
+            .presentationCornerRadius(38)
+        default:
+            EmptyView()
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func clearMenuState() {
+        if selectedMenuItem == .lock {
+            tabBar.isTabBarVisible = true
+        }
+
+        selectedFileDocumentItemId = nil
+        selectedMenuItem = nil
+        vm.notificationOverlayState = .none
     }
 }
 

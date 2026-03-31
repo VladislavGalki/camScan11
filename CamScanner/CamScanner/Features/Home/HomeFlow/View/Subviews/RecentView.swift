@@ -5,6 +5,7 @@ struct RecentView: View {
     let onPreviewTapped: () -> Void
     let onDocumentTapped: (RecentDocumentModel) -> Void
     let onFavoriteTapped: (UUID, Bool) -> Void
+    let onMenuClick: (UUID, CGRect) -> Void
     
     private let itemSize = CGSize(width: 106, height: 150)
     
@@ -99,14 +100,20 @@ struct RecentView: View {
                         
                         Spacer(minLength: 0)
                         
-                        AppButton(
-                            config: AppButtonConfig(
-                                content: .iconOnly(.dots),
-                                style: .secondary,
-                                size: .s
-                            ),
-                            action: {}
-                        )
+                        GeometryReader { geo in
+                            AppButton(
+                                config: AppButtonConfig(
+                                    content: .iconOnly(.dots),
+                                    style: .secondary,
+                                    size: .s
+                                ),
+                                action: {
+                                    let frame = geo.frame(in: .named("homeCoordinateSpace"))
+                                    onMenuClick(item.id, frame)
+                                }
+                            )
+                        }
+                        .frame(width: 28, height: 28)
                     }
                     .padding([.top, .horizontal], 8)
                 }

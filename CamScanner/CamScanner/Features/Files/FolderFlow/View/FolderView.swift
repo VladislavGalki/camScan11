@@ -35,6 +35,11 @@ struct FolderView: View {
             .overlay(alignment: .top) { toastOverlay }
             .sheet(item: $viewModel.folderActiveSheet) { sheetView($0) }
             .coordinateSpace(name: "filesCoordinateSpace")
+            .onChange(of: viewModel.documentToOpen) { _, newValue in
+                guard let newValue else { return }
+                router.push(FilesRoute.openDocument(OpenDocumentInputModel(documentID: newValue)))
+                viewModel.documentToOpen = nil
+            }
     }
     
     private var contentView: some View {
@@ -121,7 +126,7 @@ struct FolderView: View {
             highlightedID: viewModel.highlightedID,
             onFolderClick: { _ in },
             onDocumentClick: { id in
-                print("DELETED HANDLE NOTIFICATION")
+                viewModel.openDocumentTapped(id: id)
             },
             onFavourite: { id, isFavourite in
                 viewModel.handleDocumentFavourite(
