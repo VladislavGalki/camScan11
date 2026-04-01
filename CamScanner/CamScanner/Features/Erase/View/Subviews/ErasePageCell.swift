@@ -5,14 +5,24 @@ final class ErasePageCell: UICollectionViewCell {
 
     // MARK: - UI
 
-    private let imageView = UIImageView()
+    private let stackView = UIStackView()
+    private let imageView1 = UIImageView()
+    private let imageView2 = UIImageView()
     private let canvasView = DrawingCanvasUIView()
+
+    // MARK: - Constraints
+
+    private var image1WidthConstraint: NSLayoutConstraint?
+    private var image1HeightConstraint: NSLayoutConstraint?
+    private var image2WidthConstraint: NSLayoutConstraint?
+    private var image2HeightConstraint: NSLayoutConstraint?
 
     // MARK: - State
 
     private var pageIndex: Int = 0
     private weak var delegate: ErasePageDelegate?
     private var previousStrokeCount: Int = 0
+    private var compositePreviewImage: UIImage?
 
     // MARK: - Callbacks
 
@@ -37,26 +47,47 @@ final class ErasePageCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        imageView.image = nil
+        image1WidthConstraint?.isActive = false
+        image1HeightConstraint?.isActive = false
+        image2WidthConstraint?.isActive = false
+        image2HeightConstraint?.isActive = false
+        imageView1.image = nil
+        imageView2.image = nil
+        imageView1.isHidden = true
+        imageView2.isHidden = true
         canvasView.clearAll()
         canvasView.colorProvider = nil
         delegate = nil
         previousStrokeCount = 0
         onDrawingBegan = nil
         onDrawingEnded = nil
+        compositePreviewImage = nil
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        imageView.frame = contentView.bounds
         canvasView.frame = contentView.bounds
 
-        let imageRect = aspectFitRect(
-            imageSize: imageView.image?.size ?? .zero,
-            in: contentView.bounds.size
-        )
-        canvasView.setImageRectInView(imageRect)
+        if stackView.superview != nil, stackView.constraints.isEmpty {
+            NSLayoutConstraint.activate([
+                stackView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+                stackView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+            ])
+        }
+
+        contentView.layoutIfNeeded()
+        stackView.layoutIfNeeded()
+
+        let visibleRects = [imageView1, imageView2]
+            .filter { !$0.isHidden && $0.image != nil }
+            .map { $0.convert($0.bounds, to: contentView) }
+
+        let compositeRect = visibleRects.reduce(into: CGRect.null) { partialResult, rect in
+            partialResult = partialResult.union(rect)
+        }
+
+        canvasView.setImageRectInView(compositeRect.isNull ? .zero : compositeRect)
 
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 0).cgPath
     }
@@ -75,8 +106,9 @@ final class ErasePageCell: UICollectionViewCell {
         self.pageIndex = pageIndex
         self.delegate = delegate
 
-        let image = model.frames.first?.preview
-        imageView.image = image
+        scrollToDefaultState()
+        configureImages(for: model)
+        compositePreviewImage = makeCompositePreviewImage(for: model)
 
         canvasView.tool = .pen
         canvasView.penColor = eraseColor
@@ -131,23 +163,28 @@ final class ErasePageCell: UICollectionViewCell {
 
 private extension ErasePageCell {
     func setup() {
-        imageView.contentMode = .scaleAspectFit
-        imageView.clipsToBounds = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.spacing = 8
+        stackView.alignment = .center
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+
+        [imageView1, imageView2].forEach {
+            $0.contentMode = .scaleAspectFit
+            $0.clipsToBounds = true
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
 
         canvasView.backgroundColor = .clear
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         canvasView.tool = .pen
 
-        contentView.addSubview(imageView)
+        contentView.addSubview(stackView)
         contentView.addSubview(canvasView)
 
-        NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+        stackView.addArrangedSubview(imageView1)
+        stackView.addArrangedSubview(imageView2)
 
+        NSLayoutConstraint.activate([
             canvasView.topAnchor.constraint(equalTo: contentView.topAnchor),
             canvasView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             canvasView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -155,19 +192,84 @@ private extension ErasePageCell {
         ])
     }
 
-    func aspectFitRect(imageSize: CGSize, in container: CGSize) -> CGRect {
-        guard imageSize.width > 0, imageSize.height > 0,
-              container.width > 0, container.height > 0 else { return .zero }
-        let scale = min(container.width / imageSize.width, container.height / imageSize.height)
-        let w = imageSize.width * scale
-        let h = imageSize.height * scale
-        let x = (container.width - w) / 2
-        let y = (container.height - h) / 2
-        return CGRect(x: x, y: y, width: w, height: h)
+    func scrollToDefaultState() {
+        imageView1.isHidden = true
+        imageView2.isHidden = true
+
+        image1WidthConstraint?.isActive = false
+        image1HeightConstraint?.isActive = false
+        image2WidthConstraint?.isActive = false
+        image2HeightConstraint?.isActive = false
+    }
+
+    func configureImages(for model: ScanPreviewModel) {
+        let previews = model.frames.compactMap { $0.preview }
+
+        switch model.documentType {
+        case .documents:
+            guard let image = previews.first else { return }
+            imageView1.isHidden = false
+            imageView1.image = image
+            image1WidthConstraint = imageView1.widthAnchor.constraint(equalTo: contentView.widthAnchor)
+            image1WidthConstraint?.isActive = true
+
+        case .idCard, .driverLicense:
+            imageView1.isHidden = false
+            imageView2.isHidden = false
+            imageView1.image = previews.first
+            imageView2.image = previews.count > 1 ? previews[1] : nil
+
+            let size = CGSize(width: 171, height: 108)
+            image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
+            image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
+            image2WidthConstraint = imageView2.widthAnchor.constraint(equalToConstant: size.width)
+            image2HeightConstraint = imageView2.heightAnchor.constraint(equalToConstant: size.height)
+
+            [image1WidthConstraint, image1HeightConstraint,
+             image2WidthConstraint, image2HeightConstraint].forEach { $0?.isActive = true }
+
+        case .passport:
+            guard let image = previews.first else { return }
+            imageView1.isHidden = false
+            imageView1.image = image
+
+            let size = CGSize(width: 360, height: 250)
+            image1WidthConstraint = imageView1.widthAnchor.constraint(equalToConstant: size.width)
+            image1HeightConstraint = imageView1.heightAnchor.constraint(equalToConstant: size.height)
+            image1WidthConstraint?.isActive = true
+            image1HeightConstraint?.isActive = true
+
+        case .qrCode:
+            break
+        }
+    }
+
+    func makeCompositePreviewImage(for model: ScanPreviewModel) -> UIImage? {
+        let previews = model.frames.compactMap { $0.preview }
+        let visiblePreviews = previews.prefix(2)
+
+        guard !visiblePreviews.isEmpty else { return nil }
+
+        let referenceWidth: CGFloat?
+        switch model.documentType {
+        case .idCard, .driverLicense:
+            referenceWidth = 171
+        case .passport:
+            referenceWidth = 360
+        case .documents, .qrCode:
+            referenceWidth = nil
+        }
+
+        let layout = EraseCompositeLayout.make(
+            documentType: model.documentType,
+            images: Array(visiblePreviews),
+            referenceWidth: referenceWidth
+        )
+        return layout.compositeImage(with: Array(visiblePreviews))
     }
 
     func sampleEraseColor(at normalizedPoint: CGPoint) -> UIColor? {
-        guard let image = imageView.image?.normalizedUp(),
+        guard let image = compositePreviewImage?.normalizedUp(),
               let cgImage = image.cgImage else { return nil }
 
         let width = cgImage.width

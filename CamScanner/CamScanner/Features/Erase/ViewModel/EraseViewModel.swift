@@ -103,14 +103,37 @@ final class EraseViewModel: ObservableObject {
 
     func save() {
         var pageImages: [(pageIndex: Int, image: UIImage)] = []
+        var nextPhysicalPageIndex = 0
 
-        for (pageIndex, history) in histories where history.currentIndex > 0 {
-            guard models.indices.contains(pageIndex),
-                  let baseImage = models[pageIndex].frames.first?.preview else { continue }
+        for modelIndex in models.indices {
+            defer {
+                nextPhysicalPageIndex += max(models[modelIndex].frames.count, 1)
+            }
 
-            let strokes = history.current
-            let merged = Self.renderStrokes(strokes, over: baseImage)
-            pageImages.append((pageIndex: pageIndex, image: merged))
+            guard let history = histories[modelIndex],
+                  history.currentIndex > 0 else { continue }
+
+            let model = models[modelIndex]
+            let sourceImages = model.frames.compactMap(\.preview)
+            guard !sourceImages.isEmpty else { continue }
+
+            let layout = EraseCompositeLayout.make(
+                documentType: model.documentType,
+                images: sourceImages
+            )
+            guard let composite = layout.compositeImage(with: sourceImages) else { continue }
+
+            let renderedComposite = Self.renderStrokes(history.current, over: composite)
+
+            if sourceImages.count > 1,
+               model.documentType == .idCard || model.documentType == .driverLicense {
+                let splitImages = layout.split(renderedComposite, originalImages: sourceImages)
+                for (frameIndex, image) in splitImages.enumerated() {
+                    pageImages.append((pageIndex: nextPhysicalPageIndex + frameIndex, image: image))
+                }
+            } else {
+                pageImages.append((pageIndex: nextPhysicalPageIndex, image: renderedComposite))
+            }
         }
 
         guard !pageImages.isEmpty else { return }
@@ -135,8 +158,16 @@ final class EraseViewModel: ObservableObject {
 
     private func detectColorsForAllPages() {
         for (index, model) in models.enumerated() {
-            guard detectedColors[index] == nil,
-                  let image = model.frames.first?.preview else { continue }
+            guard detectedColors[index] == nil else { continue }
+            let images = model.frames.compactMap(\.preview)
+            guard !images.isEmpty else { continue }
+
+            let layout = EraseCompositeLayout.make(
+                documentType: model.documentType,
+                images: images,
+                referenceWidth: model.documentType == .idCard || model.documentType == .driverLicense ? 171 : nil
+            )
+            guard let image = layout.compositeImage(with: images) else { continue }
             detectedColors[index] = Self.detectDominantColor(from: image)
         }
     }
