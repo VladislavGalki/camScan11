@@ -16,6 +16,7 @@ final class OpenDocumentViewModel: ObservableObject {
 
     @Published var isExtractingText: Bool = false
     @Published var extractedText: String?
+    @Published var addPageStarted = false
 
     private var sliderRenderTask: Task<Void, Never>?
     private var scheduledFilterPreviewTask: Task<Void, Never>?
@@ -190,6 +191,20 @@ extension OpenDocumentViewModel {
         selectedIndex = min(selectedIndex, max(models.count - 1, 0))
         updateSliderFromCurrentFrame()
         rebuildFilterPreviewItems()
+    }
+
+    func addImportedPages(_ output: ScanPreviewInputModel) {
+        let pages = output.pageGroups.flatMap { group in
+            group.frames.map { DocumentPagePayload(frame: $0, sourceDocumentType: group.documentType) }
+        }
+        guard !pages.isEmpty else { return }
+        try? documentRepository.addPagesToDocument(documentID: documentId, pages: pages)
+
+        NotificationCenter.default.post(
+            name: .openDocumentPreviewDidChange,
+            object: nil,
+            userInfo: ["documentID": documentId]
+        )
     }
 
     func reloadTextItems() {

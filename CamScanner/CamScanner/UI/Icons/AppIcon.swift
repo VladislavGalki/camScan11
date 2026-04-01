@@ -55,6 +55,9 @@ public enum AppIcon: String, CaseIterable {
     case translate = "translate"
     case copy = "copy"
     case keyboard = "keyboard"
+    case scanner = "scanner"
+    case picture = "picture"
+    case folder2 = "folder2"
     
     // MARK: - Fill
     case homeFill = "home_fill"
