@@ -1,19 +1,26 @@
 import SwiftUI
+import PhotosUI
 
 struct AppEntryView: View {
 
     @State private var selectedTab: AppTab = .home
     @State private var cameraButtonFrame: CGRect = .zero
-    
+
+    @State private var showAddPageSheet = false
+    @State private var showPhotoPicker = false
+    @State private var showFilePicker = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var importedFileImages: [UIImage] = []
+
     @EnvironmentObject private var tabBar: TabBarController
     @EnvironmentObject private var router: Router
-    
+
     init() {
         let appearance = UITabBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = .clear
         appearance.shadowColor = .clear
-        
+
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
         UITabBar.appearance().isTranslucent = true
@@ -28,7 +35,7 @@ struct AppEntryView: View {
                         selectedTab: $selectedTab,
                         cameraButtonFrame: $cameraButtonFrame,
                         onScanTap: {
-                            router.present(ScanFlowRoute.scan)
+                            showAddPageSheet = true
                         }
                     )
                     .transition(.identity.combined(with: .move(edge: .bottom).combined(with: .opacity)))
@@ -36,5 +43,54 @@ struct AppEntryView: View {
             }
             .animation(.easeOut(duration: 0.15), value: tabBar.isTabBarVisible)
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            .sheet(isPresented: $showAddPageSheet) {
+                AddPageBottomSheetView(
+                    onTapScan: {
+                        router.present(ScanFlowRoute.scan)
+                    },
+                    onTapImportFromPhotos: {
+                        showPhotoPicker = true
+                    },
+                    onTapImportFromFiles: {
+                        showFilePicker = true
+                    }
+                )
+                .presentationDetents([.height(203)])
+                .presentationCornerRadius(24)
+                .presentationDragIndicator(.hidden)
+                .presentationBackground {
+                    Color.bg(.main)
+                }
+            }
+            .photosPicker(
+                isPresented: $showPhotoPicker,
+                selection: $selectedPhotoItems,
+                matching: .images
+            )
+            .onChange(of: selectedPhotoItems) { items in
+                guard !items.isEmpty else { return }
+                let pickedItems = items
+                selectedPhotoItems = []
+                Task {
+                    let images = await ImageImportHelper.loadImages(from: pickedItems)
+                    guard !images.isEmpty else { return }
+                    let inputModel = ImageImportHelper.makeCropperInputModel(from: images)
+                    router.present(ScanFlowRoute.importCropper(inputModel))
+                }
+            }
+            .sheet(isPresented: $showFilePicker) {
+                DocumentPickerRepresentable { urls in
+                    let images = ImageImportHelper.loadImages(from: urls)
+                    if !images.isEmpty {
+                        importedFileImages = images
+                    }
+                }
+            }
+            .onChange(of: importedFileImages) { images in
+                guard !images.isEmpty else { return }
+                importedFileImages = []
+                let inputModel = ImageImportHelper.makeCropperInputModel(from: images)
+                router.present(ScanFlowRoute.importCropper(inputModel))
+            }
     }
 }

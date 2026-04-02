@@ -41,6 +41,8 @@ struct AppRootView: View {
             switch r {
             case .scan:
                 return AnyView(ScanFlowContainerView())
+            case let .importCropper(inputModel):
+                return AnyView(ImportFlowContainerView(inputModel: inputModel))
             }
             
         // MARK: - OpenDocument

@@ -8,6 +8,8 @@ final class Router: ObservableObject {
     @Published var presentedRoute: AnyRoute?
     @Published var sheetRoute: AnyRoute?
 
+    var onPopEmptyHandler: (() -> Void)?
+
     // MARK: Push
 
     func push(_ route: any Route) {
@@ -15,7 +17,10 @@ final class Router: ObservableObject {
     }
 
     func pop() {
-        guard !path.isEmpty else { return }
+        guard !path.isEmpty else {
+            onPopEmptyHandler?()
+            return
+        }
         path.removeLast()
     }
 
