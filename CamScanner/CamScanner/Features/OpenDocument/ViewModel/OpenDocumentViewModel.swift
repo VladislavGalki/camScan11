@@ -9,6 +9,7 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var title: String = ""
     @Published var isLocked: Bool = false
     @Published var lockViaFaceId: Bool = false
+    @Published var isFavourite: Bool = false
     @Published var textItems: [DocumentTextItem] = []
     @Published var watermarkItems: [DocumentWatermarkItem] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
@@ -17,6 +18,8 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var isExtractingText: Bool = false
     @Published var extractedText: String?
     @Published var addPageStarted = false
+    @Published var shouldShowNotification = false
+    @Published var notificationModel: NotificationModel?
 
     private var sliderRenderTask: Task<Void, Never>?
     private var scheduledFilterPreviewTask: Task<Void, Never>?
@@ -57,6 +60,7 @@ final class OpenDocumentViewModel: ObservableObject {
         title = (try? documentRepository.fetchDocumentTitle(id: inputModel.documentID)) ?? ""
         isLocked = (try? documentRepository.fetchDocumentIsLocked(id: inputModel.documentID)) ?? false
         lockViaFaceId = (try? documentRepository.fetchDocumentLockViaFaceId(id: inputModel.documentID)) ?? false
+        isFavourite = (try? documentRepository.fetchDocumentIsFavourite(id: inputModel.documentID)) ?? false
     }
 
     private func subscribe() {
@@ -356,6 +360,37 @@ extension OpenDocumentViewModel {
                 lockViaFaceId = false
             }
         } catch {}
+    }
+
+    func handleDocumentFavourite(isFavourite: Bool) {
+        do {
+            try documentRepository.setDocumentFavourite(
+                id: inputModel.documentID,
+                isFavourite: isFavourite
+            )
+            self.isFavourite = isFavourite
+            showNotification(type: isFavourite ? .addedToFavorites : .removedFromFavourites)
+        } catch {}
+    }
+
+    func makeMoveInputModel() -> MoveDocumentInputModel {
+        MoveDocumentInputModel(
+            viewMode: .list,
+            folderId: nil,
+            documentIDs: [inputModel.documentID]
+        )
+    }
+
+    func handleDocumentMoved(documentIds: [UUID], folderId: UUID?) {
+        do {
+            try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)
+            showNotification(type: .fileMoved)
+        } catch {}
+    }
+
+    func showNotification(type: NotificationModel) {
+        notificationModel = type
+        shouldShowNotification = true
     }
 
     func performLockedMenuAction(

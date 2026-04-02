@@ -58,6 +58,7 @@ public enum AppIcon: String, CaseIterable {
     case scanner = "scanner"
     case picture = "picture"
     case folder2 = "folder2"
+    case reorder = "reorder"
     
     // MARK: - Fill
     case homeFill = "home_fill"

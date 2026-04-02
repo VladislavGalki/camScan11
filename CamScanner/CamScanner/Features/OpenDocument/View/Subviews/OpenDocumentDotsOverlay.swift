@@ -4,6 +4,7 @@ struct OpenDocumentDotsOverlay: View {
     @Binding var isVisible: Bool
 
     let isLocked: Bool
+    let isFavourite: Bool
     let frame: CGRect
     let onSelect: (OpenDocumentMenuItem) -> Void
 
@@ -41,12 +42,31 @@ struct OpenDocumentDotsOverlay: View {
 }
 
 private extension OpenDocumentDotsOverlay {
+    enum MenuEntry: Identifiable {
+        case item(OpenDocumentMenuItem)
+        case separator(String)
+
+        var id: String {
+            switch self {
+            case .item(let item):
+                return "item_\(item.id)"
+            case .separator(let value):
+                return "separator_\(value)"
+            }
+        }
+    }
+
     var menuView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(visibleMenuItems) { item in
-                menuRow(item) {
-                    isVisible = false
-                    onSelect(item)
+            ForEach(menuEntries) { entry in
+                switch entry {
+                case .item(let item):
+                    menuRow(item) {
+                        isVisible = false
+                        onSelect(item)
+                    }
+                case .separator:
+                    separator
                 }
             }
         }
@@ -66,12 +86,14 @@ private extension OpenDocumentDotsOverlay {
             Image(appIcon: icon(for: item))
                 .resizable()
                 .renderingMode(.template)
-                .foregroundStyle(.elements(isDestructive ? .destructive : .primary))
+                .foregroundStyle(iconColor(for: item))
                 .frame(width: 18, height: 18)
 
             Text(item.title)
                 .appTextStyle(.bodyPrimary)
                 .foregroundStyle(.text(isDestructive ? .destructive : .primary))
+                .lineLimit(1)
+                .truncationMode(.tail)
 
             Spacer()
         }
@@ -82,26 +104,59 @@ private extension OpenDocumentDotsOverlay {
 
     func icon(for item: OpenDocumentMenuItem) -> AppIcon {
         switch item {
+        case .addToFavorites:
+            return .star
+        case .removeFromFavorites:
+            return .starFill
         case .rename:
             return .edit
         case .lock, .unlock:
             return .lock
+        case .move:
+            return .move
+        case .selectPages:
+            return .check_circle
+        case .reorderPages:
+            return .reorder
         case .delete:
             return .trash
         }
     }
 
-    var visibleMenuItems: [OpenDocumentMenuItem] {
-        OpenDocumentMenuItem.allCases.filter {
-            switch $0 {
-            case .lock:
-                return !isLocked
-            case .unlock:
-                return isLocked
-            default:
-                return true
-            }
+    func iconColor(for item: OpenDocumentMenuItem) -> Color {
+        switch item {
+        case .delete:
+            return .elements(.destructive)
+        case .removeFromFavorites:
+            return .elements(.warning)
+        default:
+            return .elements(.primary)
         }
+    }
+
+    var menuEntries: [MenuEntry] {
+        let favoriteItem: OpenDocumentMenuItem = isFavourite ? .removeFromFavorites : .addToFavorites
+        let lockItem: OpenDocumentMenuItem = isLocked ? .unlock : .lock
+
+        return [
+            .item(favoriteItem),
+            .separator("favorites"),
+            .item(.rename),
+            .item(lockItem),
+            .item(.move),
+            .separator("move"),
+            .item(.selectPages),
+            .item(.reorderPages),
+            .separator("pages"),
+            .item(.delete)
+        ]
+    }
+
+    var separator: some View {
+        Rectangle()
+            .foregroundStyle(.divider(.default))
+            .frame(height: 1)
+            .padding(.vertical, 8)
     }
 
     var safeX: CGFloat {

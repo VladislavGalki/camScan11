@@ -7,6 +7,9 @@ enum NotificationModel {
     case pinCreated
     case pinRemoved
     case multipleMoved(Int)
+    case addedToFavorites
+    case removedFromFavourites
+    case fileMoved
     
     var title: String {
         switch self {
@@ -23,6 +26,12 @@ enum NotificationModel {
         case let .multipleMoved(count):
             let stringCount = count == 1 ? "1 item" : "\(count) items"
             return "\(stringCount) moved"
+        case .addedToFavorites:
+            return "Added to favorites"
+        case .removedFromFavourites:
+            return "Removed from favourites"
+        case .fileMoved:
+            return "File moved"
         }
     }
 }

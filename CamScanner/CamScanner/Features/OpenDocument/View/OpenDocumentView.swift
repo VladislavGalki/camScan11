@@ -12,6 +12,7 @@ struct OpenDocumentView: View {
     @State private var showFilePicker = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var importedFileImages: [UIImage] = []
+    @State private var activeSheet: OpenDocumentActiveSheet?
 
     @EnvironmentObject private var router: Router
 
@@ -54,6 +55,14 @@ struct OpenDocumentView: View {
                     .transition(.move(edge: .bottom))
             }
         }
+        .overlay(alignment: .top) {
+            if viewModel.shouldShowNotification {
+                NotificationToast(
+                    isPresented: $viewModel.shouldShowNotification,
+                    title: viewModel.notificationModel?.title ?? ""
+                )
+            }
+        }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.isExtractingText)
         .overlayPreferenceValue(OpenDocumentDotsAnchorKey.self) { anchor in
             GeometryReader { proxy in
@@ -61,6 +70,7 @@ struct OpenDocumentView: View {
                     OpenDocumentDotsOverlay(
                         isVisible: $shouldShowDotsOverlay,
                         isLocked: viewModel.isLocked,
+                        isFavourite: viewModel.isFavourite,
                         frame: proxy[anchor],
                         onSelect: handleDotsSelection
                     )
@@ -76,6 +86,16 @@ struct OpenDocumentView: View {
                 )
             )
             .presentationCornerRadius(38)
+        }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case let .move(inputModel):
+                MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
+                    viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+                    activeSheet = nil
+                }
+                .presentationCornerRadius(38)
+            }
         }
         .sheet(isPresented: Binding(
             get: { viewModel.extractedText != nil },
@@ -393,7 +413,13 @@ private extension OpenDocumentView {
                                 overlayState = .deleteConfirmation
                             case .unlock:
                                 overlayState = .unlockConfirmation
-                            case .rename, .lock:
+                            case .addToFavorites,
+                                 .removeFromFavorites,
+                                 .rename,
+                                 .lock,
+                                 .move,
+                                 .selectPages,
+                                 .reorderPages:
                                 overlayState = .none
                             }
                         },
@@ -515,6 +541,10 @@ private extension OpenDocumentView {
 
     private func handleDotsSelection(_ item: OpenDocumentMenuItem) {
         switch item {
+        case .addToFavorites:
+            viewModel.handleDocumentFavourite(isFavourite: true)
+        case .removeFromFavorites:
+            viewModel.handleDocumentFavourite(isFavourite: false)
         case .rename:
             isRenameSheetPresented = true
         case .delete:
@@ -531,6 +561,10 @@ private extension OpenDocumentView {
             } onRequiresPin: {
                 overlayState = .enterPin(.unlock)
             }
+        case .move:
+            activeSheet = .move(viewModel.makeMoveInputModel())
+        case .selectPages, .reorderPages:
+            break
         }
     }
 

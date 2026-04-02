@@ -627,6 +627,16 @@ extension DocumentRepository {
 
         try context.save()
     }
+
+    func fetchDocumentIsFavourite(id: UUID) throws -> Bool {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        request.fetchLimit = 1
+
+        guard let document = try context.fetch(request).first else { return false }
+
+        return document.isFavourite
+    }
     
     func getPasswordData(for id: UUID) throws -> (salt: Data, hash: Data)? {
         if let doc = try fetchDocument(id: id),
