@@ -11,6 +11,8 @@ struct AppEntryView: View {
     @State private var showFilePicker = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var importedFileImages: [UIImage] = []
+    @State private var shouldShowGlobalToast = false
+    @State private var globalToastTitle = ""
 
     @EnvironmentObject private var tabBar: TabBarController
     @EnvironmentObject private var router: Router
@@ -29,6 +31,14 @@ struct AppEntryView: View {
 
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
+            .overlay(alignment: .top) {
+                if shouldShowGlobalToast {
+                    NotificationToast(
+                        isPresented: $shouldShowGlobalToast,
+                        title: globalToastTitle
+                    )
+                }
+            }
             .overlay(alignment: .bottom) {
                 if tabBar.isTabBarVisible {
                     CustomTabBar(
@@ -91,6 +101,12 @@ struct AppEntryView: View {
                 importedFileImages = []
                 let inputModel = ImageImportHelper.makeCropperInputModel(from: images)
                 router.present(ScanFlowRoute.importCropper(inputModel))
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .appGlobalToastRequested)) { note in
+                guard let title = note.userInfo?["title"] as? String,
+                      !title.isEmpty else { return }
+                globalToastTitle = title
+                shouldShowGlobalToast = true
             }
     }
 }

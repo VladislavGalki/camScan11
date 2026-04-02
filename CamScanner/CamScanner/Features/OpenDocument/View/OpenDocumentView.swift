@@ -563,7 +563,9 @@ private extension OpenDocumentView {
             }
         case .move:
             activeSheet = .move(viewModel.makeMoveInputModel())
-        case .selectPages, .reorderPages:
+        case .selectPages:
+            router.push(OpenDocumentRoute.selectPages(viewModel.makeSelectPagesInputModel()))
+        case .reorderPages:
             break
         }
     }

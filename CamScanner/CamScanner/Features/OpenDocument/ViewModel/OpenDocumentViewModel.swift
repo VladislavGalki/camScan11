@@ -381,6 +381,10 @@ extension OpenDocumentViewModel {
         )
     }
 
+    func makeSelectPagesInputModel() -> OpenDocumentSelectPagesInputModel {
+        OpenDocumentSelectPagesInputModel(documentID: inputModel.documentID)
+    }
+
     func handleDocumentMoved(documentIds: [UUID], folderId: UUID?) {
         do {
             try documentRepository.moveDocumentsToFolder(ids: documentIds, toFolder: folderId)

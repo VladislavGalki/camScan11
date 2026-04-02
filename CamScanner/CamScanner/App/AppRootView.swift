@@ -73,6 +73,10 @@ struct AppRootView: View {
                 return AnyView(
                     ScanFlowContainerView(inputModel: inputModel, onDismiss: onDismiss)
                 )
+            case let .selectPages(inputModel):
+                return AnyView(
+                    OpenDocumentSelectPagesView(inputModel: inputModel)
+                )
             }
 
         // MARK: - Merge

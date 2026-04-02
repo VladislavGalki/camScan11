@@ -15,6 +15,8 @@ enum OpenDocumentRoute: Route {
     case share(ShareInputModel)
 
     case scanFlow(ScanInputModel, onDismiss: () -> Void)
+
+    case selectPages(OpenDocumentSelectPagesInputModel)
 }
 
 extension OpenDocumentRoute: Equatable {
@@ -32,6 +34,8 @@ extension OpenDocumentRoute: Equatable {
             return lModel == rModel
         case (.scanFlow, .scanFlow):
             return true
+        case let (.selectPages(lModel), .selectPages(rModel)):
+            return lModel == rModel
         default:
             return false
         }
@@ -58,6 +62,9 @@ extension OpenDocumentRoute: Hashable {
             hasher.combine(model)
         case .scanFlow:
             hasher.combine("scanFlow")
+        case let .selectPages(model):
+            hasher.combine("selectPages")
+            hasher.combine(model)
         }
     }
 }

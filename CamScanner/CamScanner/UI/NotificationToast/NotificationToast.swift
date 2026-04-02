@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let appGlobalToastRequested = Notification.Name("appGlobalToastRequested")
+}
+
 struct NotificationToast: View {
     @Binding var isPresented: Bool
 

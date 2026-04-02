@@ -58,6 +58,20 @@ final class DocumentRepository {
             return []
         }
     }
+
+    func fetchDocumentsInRoot() -> [DocumentEntity] {
+        let request: NSFetchRequest<DocumentEntity> = DocumentEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "folder == nil")
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "lastViewed", ascending: false)
+        ]
+
+        do {
+            return try context.fetch(request)
+        } catch {
+            return []
+        }
+    }
     
     func loadPreviewInputModel(id: UUID) throws -> ScanPreviewInputModel {
         guard let document = try fetchDocument(id: id) else {
