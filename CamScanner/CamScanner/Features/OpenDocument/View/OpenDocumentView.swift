@@ -43,7 +43,7 @@ struct OpenDocumentView: View {
         )
         .ignoresSafeArea(.keyboard, edges: .all)
         .overlay {
-            if viewModel.isExtractingText {
+            if viewModel.isExtractingText || viewModel.isTranslating {
                 Color.black.opacity(0.24)
                     .ignoresSafeArea()
                     .transaction { $0.animation = nil }
@@ -52,6 +52,12 @@ struct OpenDocumentView: View {
         .overlay(alignment: .bottom) {
             if viewModel.isExtractingText {
                 extractingOverlay
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if viewModel.isTranslating {
+                translatingOverlay
                     .transition(.move(edge: .bottom))
             }
         }
@@ -64,6 +70,7 @@ struct OpenDocumentView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.isExtractingText)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.isTranslating)
         .overlayPreferenceValue(OpenDocumentDotsAnchorKey.self) { anchor in
             GeometryReader { proxy in
                 if shouldShowDotsOverlay, let anchor {
@@ -144,6 +151,34 @@ struct OpenDocumentView: View {
             .presentationBackground {
                 Color.bg(.main)
             }
+        }
+        .sheet(isPresented: $viewModel.isTranslatePickerPresented) {
+            TranslateLanguagePickerView(
+                initialSelection: viewModel.selectedTranslateLanguage ?? viewModel.detectedLanguage
+            ) { language in
+                viewModel.translateText(to: language)
+            }
+            .presentationCornerRadius(38)
+            .presentationDragIndicator(.hidden)
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.translatedText != nil },
+            set: { if !$0 { viewModel.closeTranslator() } }
+        )) {
+            TranslatorView(
+                translatedText: viewModel.translatedText ?? "",
+                originalText: viewModel.originalTranslatedText ?? "",
+                selectedLanguage: viewModel.selectedTranslateLanguage ?? viewModel.detectedLanguage ?? .english,
+                documentName: viewModel.title,
+                onDismiss: { viewModel.closeTranslator() },
+                onTapLanguage: {
+                    viewModel.closeTranslator()
+                    reopenTranslatePickerFromTranslator()
+                }
+            )
+            .presentationDetents([.large])
+            .presentationCornerRadius(38)
+            .presentationDragIndicator(.hidden)
         }
         .photosPicker(
             isPresented: $showPhotoPicker,
@@ -495,6 +530,47 @@ private extension OpenDocumentView {
         )
     }
 
+    var translatingOverlay: some View {
+        VStack(spacing: 0) {
+            ExtractSpinnerView()
+                .padding(.top, 45)
+                .padding(.bottom, 24)
+
+            Text("Translating")
+                .appTextStyle(.itemTitle)
+                .foregroundStyle(.text(.primary))
+                .padding(.bottom, 8)
+
+            Text("Please keep this window open")
+                .appTextStyle(.bodyPrimary)
+                .foregroundStyle(.text(.secondary))
+                .multilineTextAlignment(.center)
+
+            Spacer(minLength: 0)
+
+            Button {
+                viewModel.cancelTranslation()
+            } label: {
+                Text("Cancel")
+                    .appTextStyle(.itemTitle)
+                    .foregroundStyle(.text(.onAccent))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Color.bg(.accent))
+                    .cornerRadius(16)
+            }
+            .padding(.bottom, 16)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .frame(height: 300)
+        .background(
+            Color.bg(.surface)
+                .cornerRadius(24, corners: [.topLeft, .topRight])
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
     private func handleBottomBarTap(_ action: OpenDocumentBottomBarActionType) {
         switch action {
         case .crop:
@@ -533,7 +609,7 @@ private extension OpenDocumentView {
         case .extract:
             viewModel.extractText()
         case .translate:
-            break
+            viewModel.startTranslateFlow()
         case .delete:
             overlayState = .pageDeleteConfirmation
         }
@@ -567,6 +643,12 @@ private extension OpenDocumentView {
             router.push(OpenDocumentRoute.selectPages(viewModel.makeSelectPagesInputModel()))
         case .reorderPages:
             break
+        }
+    }
+
+    private func reopenTranslatePickerFromTranslator() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            viewModel.isTranslatePickerPresented = true
         }
     }
 

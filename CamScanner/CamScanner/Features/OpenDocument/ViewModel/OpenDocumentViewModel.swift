@@ -21,9 +21,17 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var shouldShowNotification = false
     @Published var notificationModel: NotificationModel?
 
+    @Published var isTranslatePickerPresented = false
+    @Published var isTranslating = false
+    @Published var detectedLanguage: TranslateLanguage?
+    @Published var selectedTranslateLanguage: TranslateLanguage?
+    @Published var originalTranslatedText: String?
+    @Published var translatedText: String?
+
     private var sliderRenderTask: Task<Void, Never>?
     private var scheduledFilterPreviewTask: Task<Void, Never>?
     private var filterPreviewGenerationTask: Task<Void, Never>?
+    private var translationTask: Task<Void, Never>?
     private var didScheduleInitialFilterPreviewGeneration = false
 
     private let filterPreviewCacheService = FilterPreviewCacheService()
@@ -54,6 +62,7 @@ final class OpenDocumentViewModel: ObservableObject {
         sliderRenderTask?.cancel()
         scheduledFilterPreviewTask?.cancel()
         filterPreviewGenerationTask?.cancel()
+        translationTask?.cancel()
     }
 
     private func bootstrap() {
@@ -232,9 +241,64 @@ extension OpenDocumentViewModel {
             } catch {
                 extractedText = nil
             }
-            
+
             isExtractingText = false
         }
+    }
+
+    func startTranslateFlow() {
+        guard currentFrame?.preview != nil else { return }
+        isTranslatePickerPresented = false
+        selectedTranslateLanguage = nil
+        detectedLanguage = nil
+        isTranslatePickerPresented = true
+    }
+
+    func translateText(to language: TranslateLanguage) {
+        guard let image = currentFrame?.preview else { return }
+
+        isTranslatePickerPresented = false
+        selectedTranslateLanguage = language
+        isTranslating = true
+        translationTask?.cancel()
+        translationTask = Task {
+            do {
+                let result = try await ocrService.recognizeText(in: image)
+                let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    originalTranslatedText = nil
+                    translatedText = nil
+                    isTranslating = false
+                    return
+                }
+
+                originalTranslatedText = trimmed
+
+                if Task.isCancelled { return }
+
+                let translated = try await TranslationService.translate(
+                    text: trimmed,
+                    to: language.localeCode
+                )
+                translatedText = translated
+            } catch {
+                if !Task.isCancelled {
+                    originalTranslatedText = nil
+                    translatedText = nil
+                }
+            }
+            isTranslating = false
+        }
+    }
+
+    func cancelTranslation() {
+        translationTask?.cancel()
+        translationTask = nil
+        isTranslating = false
+    }
+
+    func closeTranslator() {
+        translatedText = nil
     }
 
     func makeShareInputModel() -> ShareInputModel {

@@ -102,6 +102,23 @@ public enum AppIcon: String, CaseIterable {
     case empty_folder_image = "empty_folder_image"
     case selectableCheck = "selectableCheck"
     case unselectableCheck = "unselectableCheck"
+    case emptyLanguage = "emptyLanguage"
+    
+    case arabic = "arabic"
+    case czech = "czech"
+    case china = "china"
+    case dutch = "dutch"
+    case english = "english"
+    case germany = "germany"
+    case greek = "greek"
+    case hebrew = "hebrew"
+    case hindi = "hindi"
+    case hungarian = "hungarian"
+    case inatian = "inatian"
+    case japanese = "japanese"
+    case korean = "korean"
+    case polish = "polish"
+    case portugal = "portugal"
 }
 
 public extension Image {

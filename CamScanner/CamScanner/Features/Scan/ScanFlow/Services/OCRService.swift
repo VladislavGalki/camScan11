@@ -1,5 +1,6 @@
 import UIKit
 import Vision
+import NaturalLanguage
 
 struct OCRResult {
     let text: String
@@ -78,6 +79,17 @@ final class OCRService {
     enum OCRError: Error {
         case noCGImage
         case failed
+    }
+
+    func detectLanguage(in image: UIImage) async throws -> String? {
+        let result = try await recognizeText(in: image)
+        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let language = recognizer.dominantLanguage else { return nil }
+        return language.rawValue
     }
 
     func recognizeText(in image: UIImage) async throws -> OCRResult {
