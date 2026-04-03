@@ -21,14 +21,10 @@ struct OpenDocumentSelectPagesMoveView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            navigationView
-                .padding([.bottom, .horizontal], 16)
-
-            navigationFolderItemView
-                .padding(.bottom, 9)
-                .padding(.horizontal, 16)
-
             listView
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            navigationView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bg(.main))
@@ -80,7 +76,23 @@ private extension OpenDocumentSelectPagesMoveView {
             .appButtonEnabled(viewModel.canConfirmMove)
         }
         .padding(.vertical, 12)
-        .background(Color.bg(.main))
+        .padding(.horizontal, 16)
+        .background(
+            ProgressiveBlurView()
+                .blur(radius: 20)
+                .background {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 1),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0.5),
+                            Color(red: 247/255, green: 247/255, blue: 247/255, opacity: 0),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .ignoresSafeArea()
+        )
     }
 
     @ViewBuilder

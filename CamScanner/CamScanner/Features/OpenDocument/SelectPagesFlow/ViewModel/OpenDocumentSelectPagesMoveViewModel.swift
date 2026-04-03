@@ -24,7 +24,7 @@ final class OpenDocumentSelectPagesMoveViewModel: ObservableObject {
     }
 
     var title: String {
-        "Move pages"
+        "Files"
     }
 
     var canConfirmMove: Bool {
