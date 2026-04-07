@@ -20,6 +20,17 @@ struct CustomTabBar: View {
         }
         .overlay {
             tabScanButton()
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear {
+                                cameraButtonFrame = proxy.frame(in: .global)
+                            }
+                            .onChange(of: proxy.frame(in: .global)) { _, newFrame in
+                                cameraButtonFrame = newFrame
+                            }
+                    }
+                )
                 .onTapGesture {
                     onScanTap()
                 }
