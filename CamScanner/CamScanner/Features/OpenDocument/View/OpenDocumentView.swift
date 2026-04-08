@@ -11,6 +11,7 @@ struct OpenDocumentView: View {
     @State private var showPhotoPicker = false
     @State private var showFilePicker = false
     @State private var showSignatureSheet = false
+    @State private var showSignaturePickerSheet = false
     @State private var signatureCropperModel: DocumentCropperModel?
     @State private var isSignatureProcessing = false
     @State private var extractedSignatureImage: UIImage?
@@ -195,6 +196,20 @@ struct OpenDocumentView: View {
                 }
             )
             .presentationDetents([.height(203)])
+            .presentationCornerRadius(24)
+            .presentationDragIndicator(.hidden)
+            .presentationBackground {
+                Color.bg(.main)
+            }
+        }
+        .sheet(isPresented: $showSignaturePickerSheet) {
+            SignaturePickerBottomSheetView(
+                onTapAddNew: {
+                    router.presentSheet(OpenDocumentRoute.createSignature)
+                },
+                onSelectSignature: { _ in }
+            )
+            .presentationDetents([.height(147)])
             .presentationCornerRadius(24)
             .presentationDragIndicator(.hidden)
             .presentationBackground {
@@ -671,7 +686,11 @@ private extension OpenDocumentView {
                 )
             )
         case .signature:
-            showSignatureSheet = true
+            if DocumentRepository.shared.fetchSignatures().isEmpty {
+                showSignatureSheet = true
+            } else {
+                showSignaturePickerSheet = true
+            }
         case .erase:
             router.push(
                 OpenDocumentRoute.erase(

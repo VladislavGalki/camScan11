@@ -104,6 +104,7 @@ public enum AppIcon: String, CaseIterable {
     case unselectableCheck = "unselectableCheck"
     case emptyLanguage = "emptyLanguage"
     case small_rect_separator_image = "small_rect_separator_image"
+    case plus_small = "plus_small"
     
     case arabic = "arabic"
     case czech = "czech"
