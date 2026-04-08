@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @MainActor
 final class CreateSignatureViewModel: ObservableObject {
@@ -41,5 +42,94 @@ final class CreateSignatureViewModel: ObservableObject {
 
     func eraseAll() {
         strokes = []
+    }
+
+    // MARK: - Save
+
+    func saveSignature(canvasSize: CGSize) throws {
+        guard let image = renderSignatureImage(canvasSize: canvasSize) else { return }
+        try DocumentRepository.shared.saveSignature(image: image)
+    }
+
+    // MARK: - Render
+
+    private func renderSignatureImage(canvasSize: CGSize) -> UIImage? {
+        guard !strokes.isEmpty else { return nil }
+
+        let minSide = max(1, min(canvasSize.width, canvasSize.height))
+
+        // Compute bounding box of all strokes in canvas coordinates
+        var minX = CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude
+        var maxX = -CGFloat.greatestFiniteMagnitude
+        var maxY = -CGFloat.greatestFiniteMagnitude
+
+        for stroke in strokes {
+            let widthPx = stroke.widthN * minSide
+            let halfW = widthPx / 2
+            for pN in stroke.points {
+                let x = pN.x * canvasSize.width
+                let y = pN.y * canvasSize.height
+                minX = min(minX, x - halfW)
+                minY = min(minY, y - halfW)
+                maxX = max(maxX, x + halfW)
+                maxY = max(maxY, y + halfW)
+            }
+        }
+
+        let padding: CGFloat = 8
+        minX = max(0, minX - padding)
+        minY = max(0, minY - padding)
+        maxX = min(canvasSize.width, maxX + padding)
+        maxY = min(canvasSize.height, maxY + padding)
+
+        let cropWidth = maxX - minX
+        let cropHeight = maxY - minY
+        guard cropWidth > 0, cropHeight > 0 else { return nil }
+
+        let renderSize = CGSize(width: cropWidth, height: cropHeight)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        format.scale = 2
+
+        let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
+        return renderer.image { ctx in
+            let cgCtx = ctx.cgContext
+
+            for stroke in strokes {
+                let widthPx = stroke.widthN * minSide
+                let color = stroke.color.withAlphaComponent(stroke.opacity)
+
+                cgCtx.setStrokeColor(color.cgColor)
+                cgCtx.setLineWidth(widthPx)
+                cgCtx.setLineCap(.round)
+                cgCtx.setLineJoin(.round)
+
+                guard !stroke.points.isEmpty else { continue }
+
+                let p0 = CGPoint(
+                    x: stroke.points[0].x * canvasSize.width - minX,
+                    y: stroke.points[0].y * canvasSize.height - minY
+                )
+
+                if stroke.points.count == 1 {
+                    let r = max(1, widthPx / 2)
+                    cgCtx.setFillColor(color.cgColor)
+                    cgCtx.fillEllipse(in: CGRect(x: p0.x - r, y: p0.y - r, width: 2 * r, height: 2 * r))
+                } else {
+                    cgCtx.beginPath()
+                    cgCtx.move(to: p0)
+                    for pN in stroke.points.dropFirst() {
+                        let p = CGPoint(
+                            x: pN.x * canvasSize.width - minX,
+                            y: pN.y * canvasSize.height - minY
+                        )
+                        cgCtx.addLine(to: p)
+                    }
+                    cgCtx.strokePath()
+                }
+            }
+        }
     }
 }

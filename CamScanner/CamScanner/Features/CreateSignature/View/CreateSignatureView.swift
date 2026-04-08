@@ -5,6 +5,8 @@ struct CreateSignatureView: View {
     @State private var showBrushPreview = false
     @State private var brushPreviewTask: Task<Void, Never>?
     @State private var strokesRevision: Int = 0
+    @State private var canvasSize: CGSize = .zero
+    @State private var isSaving = false
     @EnvironmentObject private var router: Router
 
     private let presetColors: [String] = [
@@ -55,9 +57,16 @@ private extension CreateSignatureView {
                     style: .primary,
                     size: .m
                 ),
-                action: { router.dismissSheet() }
+                action: {
+                    guard !isSaving else { return }
+                    isSaving = true
+                    Task {
+                        try? viewModel.saveSignature(canvasSize: canvasSize)
+                        router.dismissSheet()
+                    }
+                }
             )
-            .appButtonEnabled(!viewModel.isEmpty)
+            .appButtonEnabled(!viewModel.isEmpty && !isSaving)
         }
         .overlay {
             Text("Create a signature")
@@ -73,8 +82,6 @@ private extension CreateSignatureView {
 
     var canvasArea: some View {
         GeometryReader { geo in
-            let canvasSize = geo.size
-
             ZStack {
                 RoundedRectangle(cornerRadius: 32, style: .continuous)
                     .fill(Color.bg(.surface))
@@ -107,7 +114,7 @@ private extension CreateSignatureView {
                 .id("\(strokesRevision)_\(viewModel.selectedColorHex)_\(viewModel.brushSize)")
                 .appBorderModifier(.border(.primary), radius: 32)
                 .contentShape(Rectangle())
-                .gesture(drawingGesture(canvasSize: canvasSize))
+                .gesture(drawingGesture(canvasSize: geo.size))
 
                 VStack {
                     Spacer()
@@ -132,6 +139,12 @@ private extension CreateSignatureView {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onChange(of: geo.size) { newSize in
+                canvasSize = newSize
+            }
+            .onAppear {
+                canvasSize = geo.size
+            }
         }
     }
 

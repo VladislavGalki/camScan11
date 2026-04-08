@@ -72,6 +72,34 @@ final class FileStore {
         return fileURL
     }
 
+    @discardableResult
+    func savePNG(data: Data, folder: String, fileName: String) throws -> URL {
+        try ensureRootFolder()
+
+        let fm = FileManager.default
+        let folderURL = rootURL.appendingPathComponent(folder, isDirectory: true)
+        if !fm.fileExists(atPath: folderURL.path) {
+            try fm.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        }
+
+        let fileURL = folderURL.appendingPathComponent(fileName)
+
+        do {
+            try data.write(to: fileURL, options: [.atomic])
+        } catch {
+            throw FileStoreError.failedToWrite
+        }
+
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutableURL = fileURL
+        try? mutableURL.setResourceValues(values)
+
+        try? fm.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: fileURL.path)
+
+        return fileURL
+    }
+
     func loadImage(at url: URL) -> UIImage? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return UIImage(data: data)

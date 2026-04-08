@@ -63,6 +63,11 @@
         <attribute name="width" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <relationship name="document" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="DocumentEntity" inverseName="watermarkOverlays" inverseEntity="DocumentEntity"/>
     </entity>
+    <entity name="SignatureEntity" representedClassName="SignatureEntity" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="imagePath" attributeType="String"/>
+    </entity>
     <entity name="TextOverlayEntity" representedClassName="TextOverlayEntity" syncable="YES">
         <attribute name="alignmentRaw" attributeType="String"/>
         <attribute name="centerX" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>

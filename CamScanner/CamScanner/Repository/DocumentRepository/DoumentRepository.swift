@@ -1586,4 +1586,49 @@ extension DocumentRepository {
 
         return result
     }
+
+    // MARK: - Signatures
+
+    @discardableResult
+    func saveSignature(image: UIImage) throws -> UUID {
+        guard let pngData = image.pngData() else {
+            throw NSError(domain: "DocumentRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode signature as PNG"])
+        }
+
+        let signatureID = UUID()
+        let fileName = "\(signatureID.uuidString).png"
+
+        let fileURL = try FileStore.shared.savePNG(
+            data: pngData,
+            folder: "Signatures",
+            fileName: fileName
+        )
+
+        let entity = SignatureEntity(context: context)
+        entity.id = signatureID
+        entity.imagePath = FileStore.shared.relativePath(fromAbsolute: fileURL)
+        entity.createdAt = Date()
+
+        try context.save()
+        return signatureID
+    }
+
+    func fetchSignatures() -> [SignatureEntity] {
+        let request: NSFetchRequest<SignatureEntity> = SignatureEntity.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        return (try? context.fetch(request)) ?? []
+    }
+
+    func deleteSignature(id: UUID) throws {
+        let request: NSFetchRequest<SignatureEntity> = SignatureEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+
+        guard let entity = try context.fetch(request).first else { return }
+
+        let fileURL = FileStore.shared.url(forRelativePath: entity.imagePath)
+        FileStore.shared.deleteFileIfExists(atPath: fileURL.path)
+
+        context.delete(entity)
+        try context.save()
+    }
 }
