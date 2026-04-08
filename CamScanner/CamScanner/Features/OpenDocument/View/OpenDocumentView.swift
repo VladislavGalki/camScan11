@@ -207,7 +207,10 @@ struct OpenDocumentView: View {
                 onTapAddNew: {
                     router.presentSheet(OpenDocumentRoute.createSignature)
                 },
-                onSelectSignature: { _ in }
+                onSelectSignature: { _ in },
+                onDeleteSignature: { signature in
+                    overlayState = .signatureDeleteConfirmation(signature)
+                }
             )
             .presentationDetents([.height(147)])
             .presentationCornerRadius(24)
@@ -560,6 +563,16 @@ private extension OpenDocumentView {
                         documentTitle: viewModel.title,
                         onRemove: {
                             viewModel.removeDocumentPin()
+                            overlayState = .none
+                        },
+                        onCancel: {
+                            overlayState = .none
+                        }
+                    )
+                case .signatureDeleteConfirmation(let signature):
+                    DeleteSignatureView(
+                        onDelete: {
+                            try? DocumentRepository.shared.deleteSignature(id: signature.id)
                             overlayState = .none
                         },
                         onCancel: {

@@ -7,4 +7,5 @@ enum OpenDocumentOverlayState: Equatable {
     case lock
     case enterPin(OpenDocumentMenuItem)
     case unlockConfirmation
+    case signatureDeleteConfirmation(SignatureEntity)
 }

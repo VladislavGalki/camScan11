@@ -3,6 +3,7 @@ import SwiftUI
 struct SignaturePickerBottomSheetView: View {
     let onTapAddNew: () -> Void
     let onSelectSignature: (SignatureEntity) -> Void
+    let onDeleteSignature: (SignatureEntity) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var signatures: [SignatureEntity] = []
@@ -16,7 +17,7 @@ struct SignaturePickerBottomSheetView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     addNewCard
-                    
+
                     ForEach(signatures, id: \.id) { signature in
                         signatureCard(signature)
                     }
@@ -44,7 +45,7 @@ struct SignaturePickerBottomSheetView: View {
     private var addNewCard: some View {
         VStack(spacing: 8) {
             Image(appIcon: .plus_small)
-            
+
             Text("Add a new")
                 .appTextStyle(.bodySecondary)
                 .foregroundStyle(.text(.accent))
@@ -84,7 +85,8 @@ struct SignaturePickerBottomSheetView: View {
                     extraTitleColor: .elements(.destructive)
                 ),
                 action: {
-                    deleteSignature(signature)
+                    dismiss()
+                    onDeleteSignature(signature)
                 }
             )
             .padding(8)
@@ -106,15 +108,5 @@ struct SignaturePickerBottomSheetView: View {
     private func loadImage(for signature: SignatureEntity) -> UIImage? {
         let url = FileStore.shared.url(forRelativePath: signature.imagePath)
         return UIImage(contentsOfFile: url.path)
-    }
-
-    private func deleteSignature(_ signature: SignatureEntity) {
-        try? DocumentRepository.shared.deleteSignature(id: signature.id)
-        withAnimation {
-            loadSignatures()
-        }
-        if signatures.isEmpty {
-            dismiss()
-        }
     }
 }
