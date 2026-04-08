@@ -35,7 +35,9 @@ final class Router: ObservableObject {
     }
 
     func dismissPresented() {
-        presentedRoute = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.presentedRoute = nil
+        }
     }
 
     // MARK: Sheet
@@ -45,6 +47,8 @@ final class Router: ObservableObject {
     }
 
     func dismissSheet() {
-        sheetRoute = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.sheetRoute = nil
+        }
     }
 }

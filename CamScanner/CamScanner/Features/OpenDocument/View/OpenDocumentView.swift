@@ -10,6 +10,11 @@ struct OpenDocumentView: View {
     @State private var overlayState: OpenDocumentOverlayState = .none
     @State private var showPhotoPicker = false
     @State private var showFilePicker = false
+    @State private var showSignatureSheet = false
+    @State private var signatureCropperModel: DocumentCropperModel?
+    @State private var isSignatureProcessing = false
+    @State private var extractedSignatureImage: UIImage?
+    @State private var photoImportSource: PhotoImportSource = .addPage
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var importedFileImages: [UIImage] = []
     @State private var activeSheet: OpenDocumentActiveSheet?
@@ -47,6 +52,20 @@ struct OpenDocumentView: View {
                 Color.black.opacity(0.24)
                     .ignoresSafeArea()
                     .transaction { $0.animation = nil }
+            }
+        }
+        .overlay {
+            if isSignatureProcessing {
+                Color.black.opacity(0.24)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 8) {
+                    ExtractSpinnerView()
+
+                    Text("Processing signature")
+                        .appTextStyle(.itemTitle)
+                        .foregroundStyle(.text(.onImmersive))
+                }
             }
         }
         .overlay(alignment: .bottom) {
@@ -139,10 +158,40 @@ struct OpenDocumentView: View {
                     )
                 },
                 onTapImportFromPhotos: {
+                    photoImportSource = .addPage
                     showPhotoPicker = true
                 },
                 onTapImportFromFiles: {
                     showFilePicker = true
+                }
+            )
+            .presentationDetents([.height(203)])
+            .presentationCornerRadius(24)
+            .presentationDragIndicator(.hidden)
+            .presentationBackground {
+                Color.bg(.main)
+            }
+        }
+        .sheet(isPresented: $showSignatureSheet) {
+            SignatureBottomSheetView(
+                onTapCreateSignature: {
+                    router.presentSheet(OpenDocumentRoute.createSignature)
+                },
+                onTapScanSignature: {
+                    router.present(
+                        OpenDocumentRoute.scanFlow(
+                            ScanInputModel(
+                                mode: .signature { image in
+                                    processSignature(image)
+                                }
+                            ),
+                            onDismiss: {}
+                        )
+                    )
+                },
+                onTapImportFromPhotos: {
+                    photoImportSource = .signature
+                    showPhotoPicker = true
                 }
             )
             .presentationDetents([.height(203)])
@@ -187,20 +236,26 @@ struct OpenDocumentView: View {
         )
         .onChange(of: selectedPhotoItems) { _, items in
             guard !items.isEmpty else { return }
+            let source = photoImportSource
             let pickedItems = items
             selectedPhotoItems = []
             Task {
                 let images = await ImageImportHelper.loadImages(from: pickedItems)
                 guard !images.isEmpty else { return }
-                let inputModel = ImageImportHelper.makeCropperInputModel(from: images)
-                router.push(
-                    OpenDocumentRoute.scanCropper(
-                        inputModel,
-                        onFinish: { outputModel in
-                            viewModel.addImportedPages(outputModel)
-                        }
+                switch source {
+                case .addPage:
+                    let inputModel = ImageImportHelper.makeCropperInputModel(from: images)
+                    router.push(
+                        OpenDocumentRoute.scanCropper(
+                            inputModel,
+                            onFinish: { outputModel in
+                                viewModel.addImportedPages(outputModel)
+                            }
+                        )
                     )
-                )
+                case .signature:
+                    await openSignatureCropper(with: images[0])
+                }
             }
         }
         .sheet(isPresented: $showFilePicker) {
@@ -226,6 +281,29 @@ struct OpenDocumentView: View {
         }
         .onAppear {
             viewModel.reloadTextItems()
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { signatureCropperModel != nil },
+                set: { if !$0 { signatureCropperModel = nil } }
+            )
+        ) {
+            if let signatureCropperModel {
+                SignatureQuickCropperView(
+                    cropperModel: signatureCropperModel,
+                    onRetake: {
+                        self.signatureCropperModel = nil
+                        photoImportSource = .signature
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            showPhotoPicker = true
+                        }
+                    },
+                    onConfirm: { croppedModel in
+                        self.signatureCropperModel = nil
+                        processSignature(croppedModel.image)
+                    }
+                )
+            }
         }
     }
 }
@@ -593,7 +671,7 @@ private extension OpenDocumentView {
                 )
             )
         case .signature:
-            break
+            showSignatureSheet = true
         case .erase:
             router.push(
                 OpenDocumentRoute.erase(
@@ -649,6 +727,51 @@ private extension OpenDocumentView {
     private func reopenTranslatePickerFromTranslator() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             viewModel.isTranslatePickerPresented = true
+        }
+    }
+
+    private func openSignatureCropper(with image: UIImage) async {
+        let normalized = image.normalizedUp()
+        let autoQuad = await detectAutoQuad(for: normalized)
+        signatureCropperModel = DocumentCropperModel(image: normalized, autoQuad: autoQuad)
+    }
+
+    private func detectAutoQuad(for image: UIImage) async -> Quadrilateral? {
+        guard let ciImage = CIImage(image: image) else { return nil }
+        return await withCheckedContinuation { continuation in
+            VisionRectangleDetector.rectangle(forImage: ciImage) { quad in
+                continuation.resume(returning: quad)
+            }
+        }
+    }
+
+    private func processSignature(_ croppedImage: UIImage) {
+        isSignatureProcessing = true
+
+        Task.detached(priority: .userInitiated) {
+            let renderer = OpenCVFilterRenderer()
+            let processed = renderer.extractSignatureWithTransparentBackground(
+                image: croppedImage.normalizedUp()
+            )
+
+            await MainActor.run {
+                isSignatureProcessing = false
+
+                if let processed {
+                    extractedSignatureImage = processed
+                    NotificationCenter.default.post(
+                        name: .appGlobalToastRequested,
+                        object: nil,
+                        userInfo: ["title": "Signature ready"]
+                    )
+                } else {
+                    NotificationCenter.default.post(
+                        name: .appGlobalToastRequested,
+                        object: nil,
+                        userInfo: ["title": "Unable to process signature"]
+                    )
+                }
+            }
         }
     }
 
@@ -736,6 +859,10 @@ private extension OpenDocumentView {
 
 // MARK: - Import Helpers
 
+private enum PhotoImportSource {
+    case addPage
+    case signature
+}
 
 private struct OpenDocumentDotsAnchorKey: PreferenceKey {
     static var defaultValue: Anchor<CGRect>?

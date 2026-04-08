@@ -17,6 +17,8 @@ enum OpenDocumentRoute: Route {
     case scanFlow(ScanInputModel, onDismiss: () -> Void)
 
     case selectPages(OpenDocumentSelectPagesInputModel)
+
+    case createSignature
 }
 
 extension OpenDocumentRoute: Equatable {
@@ -36,6 +38,8 @@ extension OpenDocumentRoute: Equatable {
             return true
         case let (.selectPages(lModel), .selectPages(rModel)):
             return lModel == rModel
+        case (.createSignature, .createSignature):
+            return true
         default:
             return false
         }
@@ -65,6 +69,8 @@ extension OpenDocumentRoute: Hashable {
         case let .selectPages(model):
             hasher.combine("selectPages")
             hasher.combine(model)
+        case .createSignature:
+            hasher.combine("createSignature")
         }
     }
 }

@@ -13,6 +13,8 @@ struct ScanView: View {
 
     let oncloseClick: () -> Void
     private let existingDocumentID: UUID?
+    private let isSignatureScanMode: Bool
+    private let onSignatureCaptured: ((UIImage) -> Void)?
 
     init(
         inputModel: ScanInputModel = ScanInputModel(),
@@ -20,8 +22,19 @@ struct ScanView: View {
     ) {
         self.oncloseClick = oncloseClick
         self.existingDocumentID = inputModel.existingDocumentID
+        switch inputModel.mode {
+        case .regular:
+            self.isSignatureScanMode = false
+            self.onSignatureCaptured = nil
+        case let .signature(onCaptured):
+            self.isSignatureScanMode = true
+            self.onSignatureCaptured = onCaptured
+        }
 
         let store = ScanStore()
+        if case .signature = inputModel.mode {
+            store.ui.selectedDocumentType = .passport
+        }
         _store = StateObject(wrappedValue: store)
         _vm = StateObject(wrappedValue: ScanViewModel(settings: store.settings, ui: store.ui))
     }
@@ -44,17 +57,33 @@ struct ScanView: View {
         }
         .overlay {
             if vm.shouldShowQuickPreview, let cropperModel = vm.idDocumentCropperModel {
-                QuickDocumentCropperView(
-                    store: store,
-                    cropperModel: cropperModel,
-                    navigationHeight: navigationViewHeight,
-                    onRetake: {
-                        vm.retakeQuickCrop()
-                    },
-                    onConfirm: { cropperModel in
-                        vm.applyQuickCropForIdsType(cropperModel)
-                    }
-                )
+                if isSignatureScanMode {
+                    SignatureScanQuickCropperView(
+                        cropperModel: cropperModel,
+                        onRetake: {
+                            vm.retakeQuickCrop()
+                        },
+                        onConfirm: { cropperModel in
+                            DispatchQueue.main.async {
+                                vm.dismissQuickPreview()
+                                onSignatureCaptured?(cropperModel.image)
+                                oncloseClick()
+                            }
+                        }
+                    )
+                } else {
+                    QuickDocumentCropperView(
+                        store: store,
+                        cropperModel: cropperModel,
+                        navigationHeight: navigationViewHeight,
+                        onRetake: {
+                            vm.retakeQuickCrop()
+                        },
+                        onConfirm: { cropperModel in
+                            vm.applyQuickCropForIdsType(cropperModel)
+                        }
+                    )
+                }
             }
         }
         .overlay {
@@ -175,8 +204,26 @@ struct ScanView: View {
         }
     }
     
+    @ViewBuilder
     private var bottomContainerView: some View {
-        VStack(spacing: 0) {
+        if isSignatureScanMode {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    CaptureShutterButton(
+                        shouldStartAutoShootCountdown: vm.shouldStartAutoShootCountdown,
+                        buttonDisabled: vm.captureShutterButtonDisabled
+                    ) {
+                        vm.capture()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
+                .padding(.bottom, 12)
+            }
+            .padding(.top, 16)
+            .background(Color.bg(.immersive))
+        } else {
+            VStack(spacing: 0) {
             DocumentTypeCarouselView(
                 store: store,
                 shouldHideNonSelectedItems: vm.shouldShowBackBottomBarButton
@@ -234,11 +281,14 @@ struct ScanView: View {
         }
         .padding(.top, 16)
         .background(Color.bg(.immersive))
+        }
     }
     
     @ViewBuilder
     private var cameraTypeOverlayView: some View {
-        if store.ui.selectedDocumentType == .idCard
+        if isSignatureScanMode {
+            SignatureFrameOverlayView(ui: store.ui)
+        } else if store.ui.selectedDocumentType == .idCard
             || store.ui.selectedDocumentType == .driverLicense {
             IdCardDriverLicenseView(ui: store.ui, shouldShowGrid: store.settings.grid)
         } else if store.ui.selectedDocumentType == .qrCode {
@@ -329,7 +379,7 @@ struct ScanView: View {
     }
     
     private var navigationAutoModeOpacity: Double {
-        store.ui.selectedDocumentType == .documents ? 1.0 : 0.0
+        isSignatureScanMode ? 0.0 : (store.ui.selectedDocumentType == .documents ? 1.0 : 0.0)
     }
     
     private var shouldHideNavigationAndBottombBar: Double {

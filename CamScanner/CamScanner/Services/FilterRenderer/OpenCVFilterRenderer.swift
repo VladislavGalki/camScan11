@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import CoreImage
 import opencv2
 
 final class OpenCVFilterRenderer {
@@ -26,6 +27,82 @@ final class OpenCVFilterRenderer {
         default:
             return image
         }
+    }
+
+    func extractSignatureWithTransparentBackground(image: UIImage) -> UIImage? {
+        let normalizedImage = image.normalizedUp()
+        let source = Mat(uiImage: normalizedImage)
+
+        let gray = toGray(source)
+        let normalized = removeShadows(from: gray, sigmaX: 19)
+
+        let claheOutput = Mat()
+        let clahe = Imgproc.createCLAHE(
+            clipLimit: 2.8,
+            tileGridSize: Size2i(width: 8, height: 8)
+        )
+        clahe.apply(src: normalized, dst: claheOutput)
+
+        let contrasted = Mat()
+        claheOutput.convert(
+            to: contrasted,
+            rtype: CvType.CV_8U,
+            alpha: 1.24,
+            beta: -12.0
+        )
+
+        let denoised = Mat()
+        Imgproc.medianBlur(src: contrasted, dst: denoised, ksize: 3)
+
+        let binary = Mat()
+        let thresholdType = ThresholdTypes(
+            rawValue:
+                ThresholdTypes.THRESH_BINARY.rawValue |
+                ThresholdTypes.THRESH_OTSU.rawValue
+        )!
+        Imgproc.threshold(
+            src: denoised,
+            dst: binary,
+            thresh: 0,
+            maxval: 255,
+            type: thresholdType
+        )
+
+        let openKernel = Imgproc.getStructuringElement(
+            shape: .MORPH_RECT,
+            ksize: Size2i(width: 2, height: 2)
+        )
+        let opened = Mat()
+        Imgproc.morphologyEx(
+            src: binary,
+            dst: opened,
+            op: .MORPH_OPEN,
+            kernel: openKernel
+        )
+
+        let cleaned = cleanupBorders(from: opened, inset: 2)
+        let inkMask = Mat()
+        Core.bitwise_not(src: cleaned, dst: inkMask)
+
+        let maskImage = inkMask.toUIImage()
+
+        guard let inputCI = CIImage(image: normalizedImage),
+              let maskCI = CIImage(image: maskImage),
+              let filter = CIFilter(name: "CIBlendWithMask") else {
+            return nil
+        }
+
+        let transparentBackground = CIImage(color: .clear).cropped(to: inputCI.extent)
+        filter.setValue(inputCI, forKey: kCIInputImageKey)
+        filter.setValue(transparentBackground, forKey: kCIInputBackgroundImageKey)
+        filter.setValue(maskCI, forKey: kCIInputMaskImageKey)
+
+        guard let outputCI = filter.outputImage,
+              let cg = CIContext(options: nil).createCGImage(outputCI, from: inputCI.extent) else {
+            return nil
+        }
+
+        return UIImage(cgImage: cg, scale: 1, orientation: .up)
     }
 }
 

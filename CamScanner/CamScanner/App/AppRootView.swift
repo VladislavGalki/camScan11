@@ -77,6 +77,13 @@ struct AppRootView: View {
                 return AnyView(
                     OpenDocumentSelectPagesView(inputModel: inputModel)
                 )
+            case .createSignature:
+                return AnyView(
+                    CreateSignatureView()
+                        .presentationDetents([.large])
+                        .presentationCornerRadius(38)
+                        .interactiveDismissDisabled()
+                )
             }
 
         // MARK: - Merge

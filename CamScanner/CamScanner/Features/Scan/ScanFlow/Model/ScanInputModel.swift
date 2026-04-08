@@ -1,9 +1,20 @@
 import Foundation
+import UIKit
 
 struct ScanInputModel {
-    let existingDocumentID: UUID?
+    enum Mode {
+        case regular
+        case signature(onCaptured: (UIImage) -> Void)
+    }
 
-    init(existingDocumentID: UUID? = nil) {
+    var existingDocumentID: UUID?
+    let mode: Mode
+
+    init(
+        existingDocumentID: UUID? = nil,
+        mode: Mode = .regular
+    ) {
         self.existingDocumentID = existingDocumentID
+        self.mode = mode
     }
 }

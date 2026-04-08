@@ -9,6 +9,7 @@ final class IdFrameOverlayView: UIView {
         case padded(horizontalPadding: CGFloat, verticalPadding: CGFloat, height: CGFloat)
         case aspectFit(horizontalPadding: CGFloat, verticalPadding: CGFloat, aspect: CGFloat, maxHeight: CGFloat? = nil)
         case square(size: CGFloat, verticalOffset: CGFloat = 0)
+        case fixed(width: CGFloat, height: CGFloat, verticalOffset: CGFloat = 0)
     }
     
     private let gridLayer = CAShapeLayer()
@@ -260,6 +261,13 @@ final class IdFrameOverlayView: UIView {
             let x = (b.width - side) / 2
             let y = (b.height - side) / 2 + verticalOffset
             return CGRect(x: x, y: y, width: side, height: side).integral
+
+        case let .fixed(width, height, verticalOffset):
+            let safeWidth = min(width, b.width * 0.92)
+            let safeHeight = min(height, b.height * 0.92)
+            let x = (b.width - safeWidth) / 2
+            let y = (b.height - safeHeight) / 2 + verticalOffset
+            return CGRect(x: x, y: y, width: safeWidth, height: safeHeight).integral
         }
     }
 }

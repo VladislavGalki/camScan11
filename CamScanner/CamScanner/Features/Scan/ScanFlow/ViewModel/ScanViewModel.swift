@@ -362,6 +362,13 @@ final class ScanViewModel: ObservableObject {
         
         shouldShowQuickPreview = false
     }
+
+    func dismissQuickPreview() {
+        DispatchQueue.main.async { [weak self] in
+            self?.idDocumentCropperModel = nil
+            self?.shouldShowQuickPreview = false
+        }
+    }
     
     // MARK: - Capture
     func capture() {
