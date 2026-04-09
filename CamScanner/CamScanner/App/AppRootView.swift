@@ -77,12 +77,16 @@ struct AppRootView: View {
                 return AnyView(
                     OpenDocumentSelectPagesView(inputModel: inputModel)
                 )
-            case .createSignature:
+            case let .createSignature(onSaved):
                 return AnyView(
-                    CreateSignatureView()
+                    CreateSignatureView(onSaved: onSaved)
                         .presentationDetents([.large])
                         .presentationCornerRadius(38)
                         .interactiveDismissDisabled()
+                )
+            case let .placeSignature(inputModel):
+                return AnyView(
+                    PlaceSignatureView(inputModel: inputModel)
                 )
             }
 

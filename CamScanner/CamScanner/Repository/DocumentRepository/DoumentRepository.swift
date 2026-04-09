@@ -1590,7 +1590,12 @@ extension DocumentRepository {
     // MARK: - Signatures
 
     @discardableResult
-    func saveSignature(image: UIImage) throws -> UUID {
+    func saveSignature(
+        image: UIImage,
+        strokeData: Data? = nil,
+        colorHex: String? = nil,
+        brushSize: Double = 10
+    ) throws -> UUID {
         guard let pngData = image.pngData() else {
             throw NSError(domain: "DocumentRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode signature as PNG"])
         }
@@ -1608,6 +1613,9 @@ extension DocumentRepository {
         entity.id = signatureID
         entity.imagePath = FileStore.shared.relativePath(fromAbsolute: fileURL)
         entity.createdAt = Date()
+        entity.strokeData = strokeData
+        entity.colorHex = colorHex
+        entity.brushSize = brushSize
 
         try context.save()
         return signatureID

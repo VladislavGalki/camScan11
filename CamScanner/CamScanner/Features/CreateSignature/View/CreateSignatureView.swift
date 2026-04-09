@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CreateSignatureView: View {
+    let onSaved: ((UUID) -> Void)?
+
     @StateObject private var viewModel = CreateSignatureViewModel()
     @State private var showBrushPreview = false
     @State private var brushPreviewTask: Task<Void, Never>?
@@ -8,6 +10,10 @@ struct CreateSignatureView: View {
     @State private var canvasSize: CGSize = .zero
     @State private var isSaving = false
     @EnvironmentObject private var router: Router
+
+    init(onSaved: ((UUID) -> Void)? = nil) {
+        self.onSaved = onSaved
+    }
 
     private let presetColors: [String] = [
         "#020202FF",
@@ -61,8 +67,11 @@ private extension CreateSignatureView {
                     guard !isSaving else { return }
                     isSaving = true
                     Task {
-                        try? viewModel.saveSignature(canvasSize: canvasSize)
+                        let signatureID = try? viewModel.saveSignature(canvasSize: canvasSize)
                         router.dismissSheet()
+                        if let signatureID {
+                            onSaved?(signatureID)
+                        }
                     }
                 }
             )

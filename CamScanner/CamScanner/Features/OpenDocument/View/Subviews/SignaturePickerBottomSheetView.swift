@@ -97,6 +97,10 @@ struct SignaturePickerBottomSheetView: View {
                 .appBorderModifier(.border(.primary), radius: 16)
         )
         .clipShape(Rectangle())
+        .onTapGesture {
+            dismiss()
+            onSelectSignature(signature)
+        }
     }
 
     // MARK: - Data

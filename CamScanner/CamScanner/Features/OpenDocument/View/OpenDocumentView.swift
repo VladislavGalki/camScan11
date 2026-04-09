@@ -176,7 +176,11 @@ struct OpenDocumentView: View {
         .sheet(isPresented: $showSignatureSheet) {
             SignatureBottomSheetView(
                 onTapCreateSignature: {
-                    router.presentSheet(OpenDocumentRoute.createSignature)
+                    router.presentSheet(OpenDocumentRoute.createSignature(onSaved: { signatureID in
+                        router.push(OpenDocumentRoute.placeSignature(
+                            PlaceSignatureInputModel(documentID: viewModel.documentId, signatureEntityID: signatureID)
+                        ))
+                    }))
                 },
                 onTapScanSignature: {
                     router.present(
@@ -205,9 +209,17 @@ struct OpenDocumentView: View {
         .sheet(isPresented: $showSignaturePickerSheet) {
             SignaturePickerBottomSheetView(
                 onTapAddNew: {
-                    router.presentSheet(OpenDocumentRoute.createSignature)
+                    router.presentSheet(OpenDocumentRoute.createSignature(onSaved: { signatureID in
+                        router.push(OpenDocumentRoute.placeSignature(
+                            PlaceSignatureInputModel(documentID: viewModel.documentId, signatureEntityID: signatureID)
+                        ))
+                    }))
                 },
-                onSelectSignature: { _ in },
+                onSelectSignature: { signature in
+                    router.push(OpenDocumentRoute.placeSignature(
+                        PlaceSignatureInputModel(documentID: viewModel.documentId, signatureEntityID: signature.id)
+                    ))
+                },
                 onDeleteSignature: { signature in
                     overlayState = .signatureDeleteConfirmation(signature)
                 }

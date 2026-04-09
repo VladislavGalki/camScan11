@@ -18,7 +18,9 @@ enum OpenDocumentRoute: Route {
 
     case selectPages(OpenDocumentSelectPagesInputModel)
 
-    case createSignature
+    case createSignature(onSaved: ((UUID) -> Void)? = nil)
+
+    case placeSignature(PlaceSignatureInputModel)
 }
 
 extension OpenDocumentRoute: Equatable {
@@ -40,6 +42,8 @@ extension OpenDocumentRoute: Equatable {
             return lModel == rModel
         case (.createSignature, .createSignature):
             return true
+        case let (.placeSignature(lModel), .placeSignature(rModel)):
+            return lModel == rModel
         default:
             return false
         }
@@ -71,6 +75,9 @@ extension OpenDocumentRoute: Hashable {
             hasher.combine(model)
         case .createSignature:
             hasher.combine("createSignature")
+        case let .placeSignature(model):
+            hasher.combine("placeSignature")
+            hasher.combine(model)
         }
     }
 }

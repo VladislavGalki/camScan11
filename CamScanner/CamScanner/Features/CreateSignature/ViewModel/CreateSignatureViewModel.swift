@@ -46,9 +46,19 @@ final class CreateSignatureViewModel: ObservableObject {
 
     // MARK: - Save
 
-    func saveSignature(canvasSize: CGSize) throws {
-        guard let image = renderSignatureImage(canvasSize: canvasSize) else { return }
-        try DocumentRepository.shared.saveSignature(image: image)
+    @discardableResult
+    func saveSignature(canvasSize: CGSize) throws -> UUID? {
+        guard let image = renderSignatureImage(canvasSize: canvasSize) else { return nil }
+
+        let serializableStrokes = strokes.map { $0.toSerializable() }
+        let strokeData = try? JSONEncoder().encode(serializableStrokes)
+
+        return try DocumentRepository.shared.saveSignature(
+            image: image,
+            strokeData: strokeData,
+            colorHex: selectedColorHex,
+            brushSize: brushSize
+        )
     }
 
     // MARK: - Render
