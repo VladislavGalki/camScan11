@@ -1,14 +1,23 @@
 import SwiftUI
 
 struct SignatureStyleSheetView: View {
+    enum Mode {
+        case vector
+        case raster
+    }
+
+    let mode: Mode
     let initialColorHex: String
     let initialThickness: CGFloat
+    let initialOpacity: CGFloat
 
     let onColorChanged: (String) -> Void
     let onThicknessChanged: (CGFloat) -> Void
+    let onOpacityChanged: (CGFloat) -> Void
 
     @State private var colorHex: String
     @State private var thickness: CGFloat
+    @State private var opacity: CGFloat
 
     @State private var showBrushPreview = false
     @State private var brushPreviewTask: Task<Void, Never>?
@@ -23,17 +32,24 @@ struct SignatureStyleSheetView: View {
     ]
 
     init(
+        mode: Mode = .vector,
         initialColorHex: String,
         initialThickness: CGFloat,
+        initialOpacity: CGFloat = 1.0,
         onColorChanged: @escaping (String) -> Void,
-        onThicknessChanged: @escaping (CGFloat) -> Void
+        onThicknessChanged: @escaping (CGFloat) -> Void,
+        onOpacityChanged: @escaping (CGFloat) -> Void = { _ in }
     ) {
+        self.mode = mode
         self.initialColorHex = initialColorHex
         self.initialThickness = initialThickness
+        self.initialOpacity = initialOpacity
         self.onColorChanged = onColorChanged
         self.onThicknessChanged = onThicknessChanged
+        self.onOpacityChanged = onOpacityChanged
         _colorHex = State(initialValue: initialColorHex)
         _thickness = State(initialValue: initialThickness)
+        _opacity = State(initialValue: initialOpacity)
     }
 
     var body: some View {
@@ -48,51 +64,84 @@ struct SignatureStyleSheetView: View {
                 nativeColorPicker
             }
 
-            sliderBlock(
-                title: "Thickness",
-                valueText: "\(Int(thickness.rounded()))"
-            ) {
-                AppSlider(
-                    value: Binding(
-                        get: { thickness },
-                        set: { newValue in
-                            thickness = newValue
-                            onThicknessChanged(newValue)
-                            showBrushSizePreview()
-                        }
-                    ),
-                    range: 4...16
-                )
-            }
-            .overlay(alignment: .top) {
-                if showBrushPreview {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .frame(width: 96, height: 68)
-                        .foregroundStyle(.bg(.surface))
-                        .appBorderModifier(.border(.primary), radius: 8)
-                        .overlay {
-                            Circle()
-                                .fill(Color(rgbaHex: colorHex) ?? .black)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.border(.primary), lineWidth: 0.5)
-                                )
-                                .frame(width: thickness, height: thickness)
-                                .transition(.opacity)
-                                .allowsHitTesting(false)
-                        }
-                        .offset(y: -48)
-                }
+            switch mode {
+            case .vector:
+                thicknessSlider
+            case .raster:
+                opacitySlider
             }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
         .background(Color.bg(.surface))
     }
+}
 
-    // MARK: - Color Items
+// MARK: - Sliders
 
-    private func presetColorItem(hex: String) -> some View {
+private extension SignatureStyleSheetView {
+    var thicknessSlider: some View {
+        sliderBlock(
+            title: "Thickness",
+            valueText: "\(Int(thickness.rounded()))"
+        ) {
+            AppSlider(
+                value: Binding(
+                    get: { thickness },
+                    set: { newValue in
+                        thickness = newValue
+                        onThicknessChanged(newValue)
+                        showBrushSizePreview()
+                    }
+                ),
+                range: 4...16
+            )
+        }
+        .overlay(alignment: .top) {
+            if showBrushPreview {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .frame(width: 96, height: 68)
+                    .foregroundStyle(.bg(.surface))
+                    .appBorderModifier(.border(.primary), radius: 8)
+                    .overlay {
+                        Circle()
+                            .fill(Color(rgbaHex: colorHex) ?? .black)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.border(.primary), lineWidth: 0.5)
+                            )
+                            .frame(width: thickness, height: thickness)
+                            .transition(.opacity)
+                            .allowsHitTesting(false)
+                    }
+                    .offset(y: -48)
+            }
+        }
+    }
+
+    var opacitySlider: some View {
+        sliderBlock(
+            title: "Opacity",
+            valueText: "\(Int((opacity * 100).rounded()))%"
+        ) {
+            AppSlider(
+                value: Binding(
+                    get: { opacity },
+                    set: { newValue in
+                        opacity = newValue
+                        onOpacityChanged(newValue)
+                    }
+                ),
+                range: 0.1...1.0
+            )
+        }
+    }
+}
+
+// MARK: - Color Items
+
+private extension SignatureStyleSheetView {
+    func presetColorItem(hex: String) -> some View {
         let normalizedHex = normalized(hex)
         let selectedHex = normalized(colorHex)
         let isSelected = normalizedHex == selectedHex
@@ -119,7 +168,7 @@ struct SignatureStyleSheetView: View {
         .buttonStyle(.plain)
     }
 
-    private var nativeColorPicker: some View {
+    var nativeColorPicker: some View {
         ColorPicker(
             "",
             selection: Binding(
@@ -136,10 +185,12 @@ struct SignatureStyleSheetView: View {
         .scaleEffect(1.35)
         .frame(width: 34, height: 34)
     }
+}
 
-    // MARK: - Slider
+// MARK: - Slider Block
 
-    private func sliderBlock<Content: View>(
+private extension SignatureStyleSheetView {
+    func sliderBlock<Content: View>(
         title: String,
         valueText: String,
         @ViewBuilder content: () -> Content
@@ -160,17 +211,19 @@ struct SignatureStyleSheetView: View {
             content()
         }
     }
+}
 
-    // MARK: - Helpers
+// MARK: - Helpers
 
-    private func normalized(_ hex: String) -> String {
+private extension SignatureStyleSheetView {
+    func normalized(_ hex: String) -> String {
         hex
             .replacingOccurrences(of: "#", with: "")
             .uppercased()
             .withHashPrefixRGBA
     }
 
-    private func showBrushSizePreview() {
+    func showBrushSizePreview() {
         brushPreviewTask?.cancel()
         showBrushPreview = true
 

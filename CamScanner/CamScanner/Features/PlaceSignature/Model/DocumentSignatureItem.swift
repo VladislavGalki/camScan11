@@ -12,6 +12,7 @@ struct DocumentSignatureItem: Identifiable {
     var rotation: CGFloat
     var colorHex: String
     var thickness: CGFloat
+    var opacity: CGFloat
     var image: UIImage?
     let aspectRatio: CGFloat
     var strokes: [Stroke]?
@@ -31,6 +32,7 @@ extension DocumentSignatureItem: Equatable {
         lhs.rotation == rhs.rotation &&
         lhs.colorHex == rhs.colorHex &&
         lhs.thickness == rhs.thickness &&
+        lhs.opacity == rhs.opacity &&
         lhs.aspectRatio == rhs.aspectRatio
     }
 }

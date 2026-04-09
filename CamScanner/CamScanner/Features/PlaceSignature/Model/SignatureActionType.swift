@@ -1,9 +1,9 @@
 import Foundation
 
 enum SignatureActionType: String, CaseIterable, Identifiable {
-    case delete
-    case duplicate
     case edit
+    case duplicate
+    case delete
 
     var id: String { rawValue }
 

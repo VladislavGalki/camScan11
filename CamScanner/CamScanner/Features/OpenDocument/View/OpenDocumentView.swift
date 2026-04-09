@@ -14,7 +14,7 @@ struct OpenDocumentView: View {
     @State private var showSignaturePickerSheet = false
     @State private var signatureCropperModel: DocumentCropperModel?
     @State private var isSignatureProcessing = false
-    @State private var extractedSignatureImage: UIImage?
+
     @State private var photoImportSource: PhotoImportSource = .addPage
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var importedFileImages: [UIImage] = []
@@ -209,11 +209,7 @@ struct OpenDocumentView: View {
         .sheet(isPresented: $showSignaturePickerSheet) {
             SignaturePickerBottomSheetView(
                 onTapAddNew: {
-                    router.presentSheet(OpenDocumentRoute.createSignature(onSaved: { signatureID in
-                        router.push(OpenDocumentRoute.placeSignature(
-                            PlaceSignatureInputModel(documentID: viewModel.documentId, signatureEntityID: signatureID)
-                        ))
-                    }))
+                    showSignatureSheet = true
                 },
                 onSelectSignature: { signature in
                     router.push(OpenDocumentRoute.placeSignature(
@@ -791,30 +787,13 @@ private extension OpenDocumentView {
 
     private func processSignature(_ croppedImage: UIImage) {
         isSignatureProcessing = true
-
-        Task.detached(priority: .userInitiated) {
-            let renderer = OpenCVFilterRenderer()
-            let processed = renderer.extractSignatureWithTransparentBackground(
-                image: croppedImage.normalizedUp()
-            )
-
-            await MainActor.run {
-                isSignatureProcessing = false
-
-                if let processed {
-                    extractedSignatureImage = processed
-                    NotificationCenter.default.post(
-                        name: .appGlobalToastRequested,
-                        object: nil,
-                        userInfo: ["title": "Signature ready"]
-                    )
-                } else {
-                    NotificationCenter.default.post(
-                        name: .appGlobalToastRequested,
-                        object: nil,
-                        userInfo: ["title": "Unable to process signature"]
-                    )
-                }
+        Task {
+            let signatureID = await SignatureProcessingService.processAndSave(croppedImage: croppedImage)
+            isSignatureProcessing = false
+            if let signatureID {
+                router.push(OpenDocumentRoute.placeSignature(
+                    PlaceSignatureInputModel(documentID: viewModel.documentId, signatureEntityID: signatureID)
+                ))
             }
         }
     }

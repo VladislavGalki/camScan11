@@ -17,6 +17,7 @@ final class PlaceSignatureViewModel: ObservableObject {
     @Published var shouldShowStyleSheet = false
     @Published var styleDraftColorHex: String = "#020202FF"
     @Published var styleDraftThickness: CGFloat = 10
+    @Published var styleDraftOpacity: CGFloat = 1.0
 
     // MARK: - Internal
 
@@ -32,6 +33,7 @@ final class PlaceSignatureViewModel: ObservableObject {
 
     private var originalSignatureItems: [DocumentSignatureItem] = []
     private var currentPageSize: CGSize = .zero
+    private var rasterOriginals: [UUID: UIImage] = [:]
 
     private let openDocumentStore: OpenDocumentStore
     private let inputModel: PlaceSignatureInputModel
@@ -50,8 +52,12 @@ final class PlaceSignatureViewModel: ObservableObject {
 
 extension PlaceSignatureViewModel {
     func addInitialSignature() {
+        addSignature(entityID: inputModel.signatureEntityID)
+    }
+
+    func addSignature(entityID: UUID) {
         let entities = DocumentRepository.shared.fetchSignatures()
-        guard let entity = entities.first(where: { $0.id == inputModel.signatureEntityID }) else { return }
+        guard let entity = entities.first(where: { $0.id == entityID }) else { return }
 
         let url = FileStore.shared.url(forRelativePath: entity.imagePath)
         guard let image = UIImage(contentsOfFile: url.path) else { return }
@@ -79,6 +85,7 @@ extension PlaceSignatureViewModel {
             rotation: 0,
             colorHex: entity.colorHex ?? "#020202FF",
             thickness: entity.brushSize > 0 ? entity.brushSize : 10,
+            opacity: 1.0,
             image: image,
             aspectRatio: imageAspect,
             strokes: strokes
@@ -86,7 +93,6 @@ extension PlaceSignatureViewModel {
 
         signatureItems.append(item)
         selectedSignatureID = item.id
-        originalSignatureItems = signatureItems
     }
 
     func selectSignature(_ id: UUID?) {
@@ -157,6 +163,7 @@ extension PlaceSignatureViewModel {
             rotation: item.rotation,
             colorHex: item.colorHex,
             thickness: item.thickness,
+            opacity: item.opacity,
             image: item.image,
             aspectRatio: item.aspectRatio,
             strokes: item.strokes
@@ -173,10 +180,11 @@ extension PlaceSignatureViewModel {
 
         styleDraftColorHex = item.colorHex
         styleDraftThickness = item.thickness
+        styleDraftOpacity = item.opacity
         shouldShowStyleSheet = true
     }
 
-    func updateSignatureStyle(colorHex: String? = nil, thickness: CGFloat? = nil) {
+    func updateSignatureStyle(colorHex: String? = nil, thickness: CGFloat? = nil, opacity: CGFloat? = nil) {
         guard let selectedSignatureID,
               let index = signatureItems.firstIndex(where: { $0.id == selectedSignatureID }) else { return }
 
@@ -186,23 +194,37 @@ extension PlaceSignatureViewModel {
         if let thickness {
             signatureItems[index].thickness = thickness
         }
+        if let opacity {
+            signatureItems[index].opacity = opacity
+        }
 
-        // Re-render image from strokes if available
-        guard let strokes = signatureItems[index].strokes, !strokes.isEmpty,
-              let currentImage = signatureItems[index].image else { return }
+        guard let currentImage = signatureItems[index].image else { return }
 
-        let color = UIColor(rgbaHex: signatureItems[index].colorHex) ?? .black
-        let originalImageSize = CGSize(
-            width: currentImage.size.width * currentImage.scale,
-            height: currentImage.size.height * currentImage.scale
-        )
-        if let newImage = SignatureRenderer.render(
-            strokes: strokes,
-            colorOverride: color,
-            brushSizeOverride: signatureItems[index].thickness,
-            originalImageSize: originalImageSize
-        ) {
-            signatureItems[index].image = newImage
+        if let strokes = signatureItems[index].strokes, !strokes.isEmpty {
+            // Vector (Draw): re-render from strokes
+            let color = UIColor(rgbaHex: signatureItems[index].colorHex) ?? .black
+            let originalImageSize = CGSize(
+                width: currentImage.size.width * currentImage.scale,
+                height: currentImage.size.height * currentImage.scale
+            )
+            if let newImage = SignatureRenderer.render(
+                strokes: strokes,
+                colorOverride: color,
+                brushSizeOverride: signatureItems[index].thickness,
+                originalImageSize: originalImageSize
+            ) {
+                signatureItems[index].image = newImage
+            }
+        } else if colorHex != nil {
+            // Raster (Import/Scan): tint via alpha mask
+            let baseImage = rasterOriginals[signatureItems[index].id] ?? currentImage
+            if rasterOriginals[signatureItems[index].id] == nil {
+                rasterOriginals[signatureItems[index].id] = currentImage
+            }
+            let color = UIColor(rgbaHex: signatureItems[index].colorHex) ?? .black
+            if let tinted = tintImage(baseImage, with: color) {
+                signatureItems[index].image = tinted
+            }
         }
     }
 
@@ -305,5 +327,17 @@ private extension PlaceSignatureViewModel {
 
     func updateSaveState() {
         isSaveEnabled = signatureItems != originalSignatureItems
+    }
+
+    func tintImage(_ image: UIImage, with color: UIColor) -> UIImage? {
+        let size = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let rect = CGRect(origin: .zero, size: size)
+            image.draw(in: rect)
+            ctx.cgContext.setBlendMode(.sourceIn)
+            ctx.cgContext.setFillColor(color.cgColor)
+            ctx.cgContext.fill(rect)
+        }
     }
 }

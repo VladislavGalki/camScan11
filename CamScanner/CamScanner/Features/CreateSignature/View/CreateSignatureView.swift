@@ -9,7 +9,7 @@ struct CreateSignatureView: View {
     @State private var strokesRevision: Int = 0
     @State private var canvasSize: CGSize = .zero
     @State private var isSaving = false
-    @EnvironmentObject private var router: Router
+    @Environment(\.dismiss) private var dismiss
 
     init(onSaved: ((UUID) -> Void)? = nil) {
         self.onSaved = onSaved
@@ -52,7 +52,7 @@ private extension CreateSignatureView {
                     style: .secondary,
                     size: .m
                 ),
-                action: { router.dismissSheet() }
+                action: { dismiss() }
             )
 
             Spacer(minLength: 0)
@@ -68,7 +68,7 @@ private extension CreateSignatureView {
                     isSaving = true
                     Task {
                         let signatureID = try? viewModel.saveSignature(canvasSize: canvasSize)
-                        router.dismissSheet()
+                        dismiss()
                         if let signatureID {
                             onSaved?(signatureID)
                         }

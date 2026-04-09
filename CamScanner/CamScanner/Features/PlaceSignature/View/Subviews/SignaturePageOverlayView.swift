@@ -100,6 +100,7 @@ private extension SignaturePageOverlayView {
                         .resizable()
                         .scaledToFit()
                         .frame(width: width - 4, height: height - 4)
+                        .opacity(item.opacity)
                 } else {
                     Color.clear
                         .frame(width: width - 4, height: height - 4)
@@ -114,9 +115,14 @@ private extension SignaturePageOverlayView {
 
             // Resize/rotate handle — outside the contentShape so it gets its own hit area
             if isSelected {
-                Circle()
-                    .fill(Color.bg(.accent))
-                    .frame(width: Constants.handleSize, height: Constants.handleSize)
+                ZStack {
+                    Circle()
+                        .fill(Color.bg(.accent))
+                        .frame(width: Constants.handleSize, height: Constants.handleSize)
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 10, height: 10)
+                }
                     .padding(Constants.handleHitExtra)
                     .contentShape(Circle().size(
                         width: Constants.handleSize + Constants.handleHitExtra * 2,
