@@ -329,9 +329,8 @@ private extension PlaceSignatureViewModel {
                     if !existing.isEmpty {
                         self.signatureItems = existing
                         self.originalSignatureItems = existing
-                    } else {
-                        self.addInitialSignature()
                     }
+                    self.addInitialSignature()
                 }
             }
             .store(in: &cancellables)
