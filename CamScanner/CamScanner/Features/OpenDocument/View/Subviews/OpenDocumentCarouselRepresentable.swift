@@ -4,6 +4,7 @@ struct OpenDocumentCarouselRepresentable: UIViewControllerRepresentable {
     var models: [ScanPreviewModel]
     var textItems: [DocumentTextItem]
     var watermarkItems: [DocumentWatermarkItem]
+    var signatureItems: [DocumentSignatureItem]
 
     @Binding var actionBottomBarAction: ScanPreviewBottomBarAction?
 
@@ -16,6 +17,7 @@ struct OpenDocumentCarouselRepresentable: UIViewControllerRepresentable {
             models: models,
             textItems: textItems,
             watermarkItems: watermarkItems,
+            signatureItems: signatureItems,
             onPageChanged: onPageChanged,
             onRotatePage: onRotatePage,
             onCellHeightChanged: onCellHeightChanged
@@ -23,7 +25,7 @@ struct OpenDocumentCarouselRepresentable: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: OpenDocumentCarouselController, context: Context) {
-        vc.update(models, textItems: textItems, watermarkItems: watermarkItems)
+        vc.update(models, textItems: textItems, watermarkItems: watermarkItems, signatureItems: signatureItems)
 
         if let actionBottomBarAction {
             vc.handleBottomBarAction(actionBottomBarAction)

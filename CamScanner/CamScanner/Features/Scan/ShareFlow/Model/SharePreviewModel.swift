@@ -7,6 +7,7 @@ struct SharePreviewModel: Identifiable, Equatable, Hashable {
     var frames: [CapturedFrame]
     var textItems: [DocumentTextItem] = []
     var watermarkItems: [DocumentWatermarkItem] = []
+    var signatureItems: [DocumentSignatureItem] = []
     var cellHeight: CGFloat = 0
     var isSelected: Bool = false
 }

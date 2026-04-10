@@ -227,7 +227,7 @@ private extension PlaceSignatureView {
                     size: .m
                 ),
                 action: {
-                    // Stub: just close the screen
+                    viewModel.saveSignatureItems()
                     router.pop()
                 }
             )

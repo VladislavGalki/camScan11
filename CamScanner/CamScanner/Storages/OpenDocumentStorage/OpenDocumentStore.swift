@@ -21,9 +21,14 @@ final class OpenDocumentStore: NSObject {
         watermarkItemsSubject.eraseToAnyPublisher()
     }
 
+    var signatureItemsPublisher: AnyPublisher<[DocumentSignatureItem], Never> {
+        signatureItemsSubject.eraseToAnyPublisher()
+    }
+
     private let previewModelsSubject = CurrentValueSubject<[ScanPreviewModel], Never>([])
     private let textItemsSubject = CurrentValueSubject<[DocumentTextItem], Never>([])
     private let watermarkItemsSubject = CurrentValueSubject<[DocumentWatermarkItem], Never>([])
+    private let signatureItemsSubject = CurrentValueSubject<[DocumentSignatureItem], Never>([])
 
     private let context = PersistenceController.shared.container.viewContext
     private let documentID: UUID
@@ -49,6 +54,11 @@ final class OpenDocumentStore: NSObject {
     func reloadWatermarkItems() {
         let items = (try? documentRepository.fetchWatermarkOverlays(documentID: documentID)) ?? []
         watermarkItemsSubject.send(items)
+    }
+
+    func reloadSignatureItems() {
+        let items = (try? documentRepository.fetchSignatureOverlays(documentID: documentID)) ?? []
+        signatureItemsSubject.send(items)
     }
 }
 
@@ -106,6 +116,7 @@ private extension OpenDocumentStore {
         previewModelsSubject.send(models)
         reloadTextItems()
         reloadWatermarkItems()
+        reloadSignatureItems()
     }
 }
 

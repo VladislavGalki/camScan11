@@ -12,6 +12,7 @@ final class OpenDocumentViewModel: ObservableObject {
     @Published var isFavourite: Bool = false
     @Published var textItems: [DocumentTextItem] = []
     @Published var watermarkItems: [DocumentWatermarkItem] = []
+    @Published var signatureItems: [DocumentSignatureItem] = []
     @Published var filterPreviewItems: [ScanFilterPreviewModel] = []
     @Published var sliderValue: Double = 0.5
 
@@ -104,6 +105,12 @@ final class OpenDocumentViewModel: ObservableObject {
         store.watermarkItemsPublisher
             .sink { [weak self] items in
                 self?.watermarkItems = items
+            }
+            .store(in: &cancellables)
+
+        store.signatureItemsPublisher
+            .sink { [weak self] items in
+                self?.signatureItems = items
             }
             .store(in: &cancellables)
     }
@@ -310,6 +317,7 @@ extension OpenDocumentViewModel {
             )
         result.textItems = textItems
         result.watermarkItems = watermarkItems
+        result.signatureItems = signatureItems
         result.cellHeight = currentCellHeight
         return result
     }
@@ -487,6 +495,7 @@ extension OpenDocumentViewModel {
         // 1. Compute rotated text positions (sync, uses current preview sizes)
         let updatedTextItems = computeRotatedTextItems(forPageIndex: index)
         let updatedWatermarkItems = computeRotatedWatermarkItems(forPageIndex: index)
+        let updatedSignatureItems = computeRotatedSignatureItems(forPageIndex: index)
         let pageIndices = pageIndicesForModel(at: index)
 
         // Defer ALL @Published mutations to escape the current SwiftUI view update
@@ -499,6 +508,9 @@ extension OpenDocumentViewModel {
             }
             if let items = updatedWatermarkItems {
                 self.watermarkItems = items
+            }
+            if let items = updatedSignatureItems {
+                self.signatureItems = items
             }
 
             // 3. Update in-memory model (re-render preview)
@@ -539,10 +551,13 @@ extension OpenDocumentViewModel {
                 .filter { $0.pageIndex == index }
             let pageWatermarkItems = (updatedWatermarkItems ?? self.watermarkItems)
                 .filter { $0.pageIndex == index }
+            let pageSignatureItems = (updatedSignatureItems ?? self.signatureItems)
+                .filter { $0.pageIndex == index }
             try? self.documentRepository.saveRotationState(
                 documentID: self.inputModel.documentID,
                 textItems: pageItems,
                 watermarkItems: pageWatermarkItems,
+                signatureItems: pageSignatureItems,
                 pageIndices: pageIndices,
                 rotationAngleDelta: .pi / 2,
                 pageImages: pageImages
@@ -604,6 +619,47 @@ extension OpenDocumentViewModel {
         let cellSize = CGSize(width: cellW, height: cellH)
 
         var updatedItems = watermarkItems
+        var changed = false
+
+        for i in updatedItems.indices where updatedItems[i].pageIndex == pageIndex {
+            let item = updatedItems[i]
+            let pos = CGPoint(x: item.centerX * cellW, y: item.centerY * cellH)
+
+            guard let (beforeRect, afterRect) = contentRectsForRotation(
+                model: model, position: pos, cellSize: cellSize
+            ) else {
+                continue
+            }
+
+            let nx = min(1, max(0, (pos.x - beforeRect.minX) / beforeRect.width))
+            let ny = min(1, max(0, (pos.y - beforeRect.minY) / beforeRect.height))
+
+            let rx = 1 - ny
+            let ry = nx
+
+            let newCX = (afterRect.minX + rx * afterRect.width) / cellW
+            let newCY = (afterRect.minY + ry * afterRect.height) / cellH
+
+            updatedItems[i].centerX = newCX
+            updatedItems[i].centerY = newCY
+            updatedItems[i].rotation = (item.rotation + 90).truncatingRemainder(dividingBy: 360)
+
+            changed = true
+        }
+
+        return changed ? updatedItems : nil
+    }
+
+    private func computeRotatedSignatureItems(forPageIndex pageIndex: Int) -> [DocumentSignatureItem]? {
+        guard let model = models[safe: pageIndex] else { return nil }
+
+        let cellW = Self.cardWidth
+        let cellH = currentCellHeight
+        guard cellW > 0, cellH > 0 else { return nil }
+
+        let cellSize = CGSize(width: cellW, height: cellH)
+
+        var updatedItems = signatureItems
         var changed = false
 
         for i in updatedItems.indices where updatedItems[i].pageIndex == pageIndex {

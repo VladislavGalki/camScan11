@@ -36,3 +36,18 @@ extension DocumentSignatureItem: Equatable {
         lhs.aspectRatio == rhs.aspectRatio
     }
 }
+
+// MARK: - Hashable (exclude image and strokes)
+
+extension DocumentSignatureItem: Hashable {
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(pageIndex)
+        hasher.combine(signatureEntityID)
+        hasher.combine(centerX)
+        hasher.combine(centerY)
+        hasher.combine(width)
+        hasher.combine(height)
+        hasher.combine(rotation)
+    }
+}

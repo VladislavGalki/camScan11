@@ -14,6 +14,7 @@ final class OpenDocumentCarouselController: UIViewController {
     private var models: [ScanPreviewModel]
     private var textItems: [DocumentTextItem]
     private var watermarkItems: [DocumentWatermarkItem]
+    private var signatureItems: [DocumentSignatureItem]
     private var collectionView: UICollectionView!
 
     private var currentIndex: Int = 0
@@ -28,6 +29,7 @@ final class OpenDocumentCarouselController: UIViewController {
         models: [ScanPreviewModel],
         textItems: [DocumentTextItem],
         watermarkItems: [DocumentWatermarkItem] = [],
+        signatureItems: [DocumentSignatureItem] = [],
         onPageChanged: @escaping (Int) -> Void,
         onRotatePage: @escaping (Int) -> Void,
         onCellHeightChanged: @escaping (CGFloat) -> Void = { _ in }
@@ -35,6 +37,7 @@ final class OpenDocumentCarouselController: UIViewController {
         self.models = models
         self.textItems = textItems
         self.watermarkItems = watermarkItems
+        self.signatureItems = signatureItems
         self.onPageChanged = onPageChanged
         self.onRotatePage = onRotatePage
         self.onCellHeightChanged = onCellHeightChanged
@@ -60,20 +63,27 @@ final class OpenDocumentCarouselController: UIViewController {
 
     // MARK: Public
 
-    func update(_ newModels: [ScanPreviewModel], textItems newTextItems: [DocumentTextItem], watermarkItems newWatermarkItems: [DocumentWatermarkItem] = []) {
+    func update(
+        _ newModels: [ScanPreviewModel],
+        textItems newTextItems: [DocumentTextItem],
+        watermarkItems newWatermarkItems: [DocumentWatermarkItem] = [],
+        signatureItems newSignatureItems: [DocumentSignatureItem] = []
+    ) {
         let didModelsChange = models != newModels
         let didTextItemsChange = textItems != newTextItems
         let didWatermarkItemsChange = watermarkItems != newWatermarkItems
+        let didSignatureItemsChange = signatureItems != newSignatureItems
 
         models = newModels
         textItems = newTextItems
         watermarkItems = newWatermarkItems
+        signatureItems = newSignatureItems
 
         if didModelsChange {
             collectionView.reloadData()
             currentIndex = min(currentIndex, max(models.count - 1, 0))
             updateIndicator(index: currentIndex)
-        } else if didTextItemsChange || didWatermarkItemsChange {
+        } else if didTextItemsChange || didWatermarkItemsChange || didSignatureItemsChange {
             updateVisibleOverlays()
         }
     }
@@ -150,7 +160,8 @@ private extension OpenDocumentCarouselController {
 
             let pageTextItems = textItems.filter { $0.pageIndex == indexPath.item }
             let pageWatermarkItems = watermarkItems.filter { $0.pageIndex == indexPath.item }
-            pageCell.updateOverlays(textItems: pageTextItems, watermarkItems: pageWatermarkItems)
+            let pageSignatureItems = signatureItems.filter { $0.pageIndex == indexPath.item }
+            pageCell.updateOverlays(textItems: pageTextItems, watermarkItems: pageWatermarkItems, signatureItems: pageSignatureItems)
         }
     }
 }
@@ -219,7 +230,8 @@ extension OpenDocumentCarouselController: UICollectionViewDataSource {
         let pageIndex = indexPath.item
         let pageTextItems = textItems.filter { $0.pageIndex == pageIndex }
         let pageWatermarkItems = watermarkItems.filter { $0.pageIndex == pageIndex }
-        cell.configure(model: models[pageIndex], textItems: pageTextItems, watermarkItems: pageWatermarkItems)
+        let pageSignatureItems = signatureItems.filter { $0.pageIndex == pageIndex }
+        cell.configure(model: models[pageIndex], textItems: pageTextItems, watermarkItems: pageWatermarkItems, signatureItems: pageSignatureItems)
 
         cell.onZoomChanged = { [weak self] zoomed in
             self?.collectionView.isScrollEnabled = !zoomed

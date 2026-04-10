@@ -104,6 +104,13 @@ final class JPGRendererService {
                 cellHeight: document.cellHeight
             )
 
+            PDFRendererService.UserSignatureItemRenderer.drawForDocuments(
+                items: document.signatureItems,
+                in: ctx.cgContext,
+                fittedRect: rect,
+                cellHeight: document.cellHeight
+            )
+
             PDFRendererService.WatermarkRenderer
                 .drawUIKit(
                     in: ctx.cgContext,
@@ -195,6 +202,13 @@ final class JPGRendererService {
                 cellHeight: document.cellHeight
             )
 
+            PDFRendererService.UserSignatureItemRenderer.drawForIDCard(
+                items: document.signatureItems,
+                in: ctx.cgContext,
+                imageRects: imageRects,
+                cellHeight: document.cellHeight
+            )
+
             PDFRendererService.WatermarkRenderer
                 .drawUIKit(
                     in: ctx.cgContext,
@@ -261,6 +275,13 @@ final class JPGRendererService {
 
             PDFRendererService.UserWatermarkItemRenderer.drawForPassport(
                 items: document.watermarkItems,
+                in: ctx.cgContext,
+                imageRect: rect,
+                cellHeight: document.cellHeight
+            )
+
+            PDFRendererService.UserSignatureItemRenderer.drawForPassport(
+                items: document.signatureItems,
                 in: ctx.cgContext,
                 imageRect: rect,
                 cellHeight: document.cellHeight

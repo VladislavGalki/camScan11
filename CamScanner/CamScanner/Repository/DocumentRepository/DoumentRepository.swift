@@ -918,6 +918,7 @@ extension DocumentRepository {
         documentID: UUID,
         textItems: [DocumentTextItem],
         watermarkItems: [DocumentWatermarkItem],
+        signatureItems: [DocumentSignatureItem] = [],
         pageIndices: [Int],
         rotationAngleDelta: Double,
         pageImages: [(pageIndex: Int, image: UIImage)]
@@ -939,6 +940,20 @@ extension DocumentRepository {
         // 2. Update watermark overlay coordinates
         for item in watermarkItems {
             let request: NSFetchRequest<WatermarkOverlayEntity> = WatermarkOverlayEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else { continue }
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+        }
+
+        // 2b. Update signature overlay coordinates
+        for item in signatureItems {
+            let request: NSFetchRequest<SignatureOverlayEntity> = SignatureOverlayEntity.fetchRequest()
             request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
             request.fetchLimit = 1
 
@@ -1119,6 +1134,134 @@ extension DocumentRepository {
     }
 }
 
+// MARK: - Signature Overlays
+extension DocumentRepository {
+    func fetchSignatureOverlays(documentID: UUID) throws -> [DocumentSignatureItem] {
+        guard let document = try fetchDocument(id: documentID) else { return [] }
+
+        let overlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
+
+        return overlays
+            .sorted {
+                if $0.pageIndex != $1.pageIndex {
+                    return $0.pageIndex < $1.pageIndex
+                }
+                return $0.createdAt < $1.createdAt
+            }
+            .compactMap { entity -> DocumentSignatureItem? in
+                let url = FileStore.shared.url(forRelativePath: entity.imagePath)
+                guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+
+                var strokes: [Stroke]?
+                if let data = entity.strokeData {
+                    let serializable = try? JSONDecoder().decode([SerializableStroke].self, from: data)
+                    strokes = serializable?.map { $0.toStroke() }
+                }
+
+                return DocumentSignatureItem(
+                    id: entity.id,
+                    pageIndex: Int(entity.pageIndex),
+                    signatureEntityID: entity.signatureEntityID,
+                    centerX: entity.centerX,
+                    centerY: entity.centerY,
+                    width: entity.width,
+                    height: entity.height,
+                    rotation: entity.rotation,
+                    colorHex: entity.colorHex,
+                    thickness: entity.thickness,
+                    opacity: entity.opacity,
+                    image: image,
+                    aspectRatio: entity.aspectRatio,
+                    strokes: strokes
+                )
+            }
+    }
+
+    func replaceSignatureOverlays(
+        documentID: UUID,
+        items: [DocumentSignatureItem]
+    ) throws {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 9301,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        // Delete existing overlays and their image files
+        let existing = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
+        for overlay in existing {
+            let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+            try? FileManager.default.removeItem(at: url)
+            context.delete(overlay)
+        }
+
+        let now = Date()
+
+        for item in items {
+            let entity = SignatureOverlayEntity(context: context)
+            entity.id = item.id
+            entity.pageIndex = Int16(item.pageIndex)
+            entity.signatureEntityID = item.signatureEntityID
+            entity.centerX = item.centerX
+            entity.centerY = item.centerY
+            entity.width = item.width
+            entity.height = item.height
+            entity.rotation = item.rotation
+            entity.colorHex = item.colorHex
+            entity.thickness = item.thickness
+            entity.opacity = item.opacity
+            entity.aspectRatio = item.aspectRatio
+            entity.createdAt = now
+            entity.updatedAt = now
+            entity.document = document
+
+            // Save rendered image to disk
+            if let image = item.image, let pngData = image.pngData() {
+                let fileName = "\(item.id.uuidString).png"
+                let fileURL = try FileStore.shared.savePNG(
+                    data: pngData,
+                    folder: "SignatureOverlays",
+                    fileName: fileName
+                )
+                entity.imagePath = FileStore.shared.relativePath(fromAbsolute: fileURL)
+            } else {
+                entity.imagePath = ""
+            }
+
+            // Save stroke data if available
+            if let strokes = item.strokes {
+                let serializable = strokes.map { $0.toSerializable() }
+                entity.strokeData = try? JSONEncoder().encode(serializable)
+            }
+        }
+
+        try context.save()
+        notifyDocumentDidChange(documentID)
+    }
+
+    func deleteSignatureOverlay(
+        documentID: UUID,
+        overlayID: UUID
+    ) throws {
+        let request: NSFetchRequest<SignatureOverlayEntity> = SignatureOverlayEntity.fetchRequest()
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "document.id == %@", documentID as CVarArg),
+            NSPredicate(format: "id == %@", overlayID as CVarArg)
+        ])
+        request.fetchLimit = 1
+
+        if let entity = try context.fetch(request).first {
+            let url = FileStore.shared.url(forRelativePath: entity.imagePath)
+            try? FileManager.default.removeItem(at: url)
+            context.delete(entity)
+            try context.save()
+            notifyDocumentDidChange(documentID)
+        }
+    }
+}
+
 // MARK: - Share
 extension DocumentRepository {
     func loadShareModel(id: UUID) throws -> ShareInputModel {
@@ -1203,6 +1346,17 @@ extension DocumentRepository {
                 overlay.pageIndex -= 1
             }
         }
+
+        let signatureOverlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
+        for overlay in signatureOverlays {
+            if overlay.pageIndex == Int16(pageIndex) {
+                let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+                try? FileManager.default.removeItem(at: url)
+                context.delete(overlay)
+            } else if overlay.pageIndex > Int16(pageIndex) {
+                overlay.pageIndex -= 1
+            }
+        }
     }
 
     private func deleteOverlaysForPage(
@@ -1216,6 +1370,13 @@ extension DocumentRepository {
 
         let watermarkOverlays = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
         for overlay in watermarkOverlays where overlay.pageIndex == Int16(pageIndex) {
+            context.delete(overlay)
+        }
+
+        let signatureOverlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
+        for overlay in signatureOverlays where overlay.pageIndex == Int16(pageIndex) {
+            let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+            try? FileManager.default.removeItem(at: url)
             context.delete(overlay)
         }
     }
@@ -1258,12 +1419,15 @@ extension DocumentRepository {
 
         var allTextItems: [DocumentTextItem] = []
         var allWatermarkItems: [DocumentWatermarkItem] = []
+        var allSignatureItems: [DocumentSignatureItem] = []
         for document in documents {
             guard let docID = document.id else { continue }
             let textItems = try fetchTextOverlays(documentID: docID)
             let watermarkItems = try fetchWatermarkOverlays(documentID: docID)
+            let signatureItems = try fetchSignatureOverlays(documentID: docID)
             allTextItems.append(contentsOf: textItems)
             allWatermarkItems.append(contentsOf: watermarkItems)
+            allSignatureItems.append(contentsOf: signatureItems)
         }
 
         return ShareInputModel(
@@ -1271,7 +1435,8 @@ extension DocumentRepository {
             documentType: firstType,
             pages: pages,
             textItems: allTextItems,
-            watermarkItems: allWatermarkItems
+            watermarkItems: allWatermarkItems,
+            signatureItems: allSignatureItems
         )
     }
     

@@ -107,6 +107,13 @@ final class PDFRendererService {
             cellHeight: document.cellHeight
         )
 
+        UserSignatureItemRenderer.drawForDocuments(
+            items: document.signatureItems,
+            in: ctx,
+            fittedRect: fittedRect,
+            cellHeight: document.cellHeight
+        )
+
         if watermark {
             WatermarkRenderer.draw(
                 in: ctx,
@@ -171,6 +178,13 @@ final class PDFRendererService {
             cellHeight: document.cellHeight
         )
 
+        UserSignatureItemRenderer.drawForIDCard(
+            items: document.signatureItems,
+            in: ctx,
+            imageRects: imageRects,
+            cellHeight: document.cellHeight
+        )
+
         if watermark {
             WatermarkRenderer.draw(
                 in: ctx,
@@ -216,6 +230,13 @@ final class PDFRendererService {
 
         UserWatermarkItemRenderer.drawForPassport(
             items: document.watermarkItems,
+            in: ctx,
+            imageRect: rect,
+            cellHeight: document.cellHeight
+        )
+
+        UserSignatureItemRenderer.drawForPassport(
+            items: document.signatureItems,
             in: ctx,
             imageRect: rect,
             cellHeight: document.cellHeight
@@ -918,6 +939,200 @@ extension PDFRendererService {
             )
 
             return ceil(wrappedRect.height) + verticalInset * 2
+        }
+    }
+}
+
+// MARK: - UserSignatureItemRenderer
+
+extension PDFRendererService {
+    enum UserSignatureItemRenderer {
+        private static let cellWidth: CGFloat = 322
+        private static let idCardImageViewSize = CGSize(width: 171, height: 108)
+        private static let idCardSpacing: CGFloat = 8
+        private static let passportImageViewSize = CGSize(width: 360, height: 250)
+
+        static func drawForDocuments(
+            items: [DocumentSignatureItem],
+            in ctx: CGContext,
+            fittedRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : 456
+            let imageHeightInCell = cellWidth * fittedRect.height / fittedRect.width
+
+            let screenContent = CGRect(
+                x: 0,
+                y: (cellHeight - imageHeightInCell) / 2,
+                width: cellWidth,
+                height: imageHeightInCell
+            )
+
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: fittedRect)
+        }
+
+        static func drawForIDCard(
+            items: [DocumentSignatureItem],
+            in ctx: CGContext,
+            imageRects: [CGRect],
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty, !imageRects.isEmpty else { return }
+
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : 456
+            let imgSize = idCardImageViewSize
+            let imageCount = imageRects.count
+            let totalH = CGFloat(imageCount) * imgSize.height + CGFloat(imageCount - 1) * idCardSpacing
+            let originX = (cellWidth - imgSize.width) / 2
+            var y = (cellHeight - totalH) / 2
+            var screenRects: [CGRect] = []
+
+            for _ in 0..<imageCount {
+                screenRects.append(CGRect(x: originX, y: y, width: imgSize.width, height: imgSize.height))
+                y += imgSize.height + idCardSpacing
+            }
+
+            drawPerImage(items, in: ctx, cellHeight: cellHeight,
+                         screenRects: screenRects, renderRects: imageRects)
+        }
+
+        static func drawForPassport(
+            items: [DocumentSignatureItem],
+            in ctx: CGContext,
+            imageRect: CGRect,
+            cellHeight providedCellHeight: CGFloat = 0
+        ) {
+            guard !items.isEmpty else { return }
+
+            let cellHeight = providedCellHeight > 0 ? providedCellHeight : 456
+            let ivSize = passportImageViewSize
+            let imageAspect = imageRect.width / imageRect.height
+
+            let visibleSize: CGSize
+            if imageAspect > ivSize.width / ivSize.height {
+                visibleSize = CGSize(width: ivSize.width, height: ivSize.width / imageAspect)
+            } else {
+                visibleSize = CGSize(width: ivSize.height * imageAspect, height: ivSize.height)
+            }
+
+            let ivOriginX = (cellWidth - ivSize.width) / 2
+            let ivOriginY = (cellHeight - ivSize.height) / 2
+            let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
+            let visOriginY = ivOriginY + (ivSize.height - visibleSize.height) / 2
+            let screenContent = CGRect(origin: CGPoint(x: visOriginX, y: visOriginY), size: visibleSize)
+
+            drawMapped(items, in: ctx, cellHeight: cellHeight,
+                       screenContent: screenContent, renderRect: imageRect)
+        }
+
+        private static func drawMapped(
+            _ items: [DocumentSignatureItem],
+            in ctx: CGContext,
+            cellHeight: CGFloat,
+            screenContent: CGRect,
+            renderRect: CGRect
+        ) {
+            UIGraphicsPushContext(ctx)
+
+            let scaleX = renderRect.width / screenContent.width
+            let scaleY = renderRect.height / screenContent.height
+
+            for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+                let pdfX = renderRect.midX + (cellX - screenContent.midX) * scaleX
+                let pdfY = renderRect.midY + (cellY - screenContent.midY) * scaleY
+
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        private static func drawPerImage(
+            _ items: [DocumentSignatureItem],
+            in ctx: CGContext,
+            cellHeight: CGFloat,
+            screenRects: [CGRect],
+            renderRects: [CGRect]
+        ) {
+            UIGraphicsPushContext(ctx)
+
+            for item in items {
+                let cellX = item.centerX * cellWidth
+                let cellY = item.centerY * cellHeight
+
+                var bestIdx = 0
+                var bestDist = CGFloat.greatestFiniteMagnitude
+                for (i, sr) in screenRects.enumerated() {
+                    let d = abs(cellY - sr.midY)
+                    if d < bestDist {
+                        bestDist = d
+                        bestIdx = i
+                    }
+                }
+
+                let sr = screenRects[bestIdx]
+                let rr = renderRects[bestIdx]
+                let scaleX = rr.width / sr.width
+                let scaleY = rr.height / sr.height
+                let pdfX = rr.midX + (cellX - sr.midX) * scaleX
+                let pdfY = rr.midY + (cellY - sr.midY) * scaleY
+
+                drawItemAt(item, centerX: pdfX, centerY: pdfY,
+                           cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
+            }
+
+            UIGraphicsPopContext()
+        }
+
+        private static func drawItemAt(
+            _ item: DocumentSignatureItem,
+            centerX: CGFloat,
+            centerY: CGFloat,
+            cellHeight: CGFloat,
+            scaleX: CGFloat,
+            scaleY: CGFloat
+        ) {
+            guard let image = item.image, let cgImage = image.cgImage else { return }
+
+            let screenBlockW = item.width * cellWidth
+            let screenBlockH = item.height * cellHeight
+
+            guard let context = UIGraphicsGetCurrentContext() else { return }
+            context.saveGState()
+            context.translateBy(x: centerX, y: centerY)
+            context.scaleBy(x: scaleX, y: scaleY)
+
+            if item.rotation != 0 {
+                context.rotate(by: item.rotation * .pi / 180)
+            }
+
+            context.setAlpha(item.opacity)
+
+            // Draw image centered in block, flipped for CoreGraphics coordinate system
+            let drawRect = CGRect(
+                x: -screenBlockW / 2,
+                y: -screenBlockH / 2,
+                width: screenBlockW,
+                height: screenBlockH
+            )
+
+            context.translateBy(x: 0, y: 0)
+            context.scaleBy(x: 1, y: -1)
+            let flippedRect = CGRect(
+                x: drawRect.origin.x,
+                y: -drawRect.origin.y - drawRect.height,
+                width: drawRect.width,
+                height: drawRect.height
+            )
+            context.draw(cgImage, in: flippedRect)
+
+            context.restoreGState()
         }
     }
 }

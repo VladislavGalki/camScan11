@@ -34,8 +34,10 @@ final class PlaceSignatureViewModel: ObservableObject {
     private var originalSignatureItems: [DocumentSignatureItem] = []
     private var currentPageSize: CGSize = .zero
     private var rasterOriginals: [UUID: UIImage] = [:]
+    private var didLoadExisting = false
 
     private let openDocumentStore: OpenDocumentStore
+    private let documentRepository = DocumentRepository.shared
     private let inputModel: PlaceSignatureInputModel
     private var cancellables = Set<AnyCancellable>()
 
@@ -51,6 +53,13 @@ final class PlaceSignatureViewModel: ObservableObject {
 // MARK: - Public Actions
 
 extension PlaceSignatureViewModel {
+    func saveSignatureItems() {
+        try? documentRepository.replaceSignatureOverlays(
+            documentID: inputModel.documentID,
+            items: signatureItems
+        )
+    }
+
     func addInitialSignature() {
         addSignature(entityID: inputModel.signatureEntityID)
     }
@@ -310,8 +319,19 @@ private extension PlaceSignatureViewModel {
                 guard let self else { return }
                 self.models = models
                 self.selectedIndex = min(self.selectedIndex, max(models.count - 1, 0))
-                if self.signatureItems.isEmpty {
-                    self.addInitialSignature()
+
+                if !self.didLoadExisting {
+                    self.didLoadExisting = true
+                    let existing = (try? self.documentRepository.fetchSignatureOverlays(
+                        documentID: self.inputModel.documentID
+                    )) ?? []
+
+                    if !existing.isEmpty {
+                        self.signatureItems = existing
+                        self.originalSignatureItems = existing
+                    } else {
+                        self.addInitialSignature()
+                    }
                 }
             }
             .store(in: &cancellables)

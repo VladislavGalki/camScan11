@@ -91,8 +91,8 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
 
     // MARK: Configure
 
-    func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = [], watermarkItems: [DocumentWatermarkItem] = []) {
-        print("📝 OpenDocPageCell | configure docType=\(model.documentType) frames=\(model.frames.count) textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) cellBounds=\(contentView.bounds)")
+    func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = [], watermarkItems: [DocumentWatermarkItem] = [], signatureItems: [DocumentSignatureItem] = []) {
+        print("📝 OpenDocPageCell | configure docType=\(model.documentType) frames=\(model.frames.count) textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) signatureItems=\(signatureItems.count) cellBounds=\(contentView.bounds)")
         scrollView.zoomScale = 1
 
         imageView1.isHidden = true
@@ -152,7 +152,7 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
             break
         }
 
-        updateOverlays(textItems: textItems, watermarkItems: watermarkItems)
+        updateOverlays(textItems: textItems, watermarkItems: watermarkItems, signatureItems: signatureItems)
         layoutIfNeeded()
     }
 
@@ -160,9 +160,13 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
         updateOverlays(textItems: textItems, watermarkItems: [])
     }
 
-    func updateOverlays(textItems: [DocumentTextItem], watermarkItems: [DocumentWatermarkItem]) {
-        print("📝 OpenDocPageCell | updateOverlays textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) zoomContainer=\(zoomContainerView.bounds)")
-        let overlay = OpenDocumentCombinedOverlayView(textItems: textItems, watermarkItems: watermarkItems)
+    func updateOverlays(
+        textItems: [DocumentTextItem],
+        watermarkItems: [DocumentWatermarkItem],
+        signatureItems: [DocumentSignatureItem] = []
+    ) {
+        print("📝 OpenDocPageCell | updateOverlays textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) signatureItems=\(signatureItems.count) zoomContainer=\(zoomContainerView.bounds)")
+        let overlay = OpenDocumentCombinedOverlayView(textItems: textItems, watermarkItems: watermarkItems, signatureItems: signatureItems)
 
         if let overlayHostingController {
             overlayHostingController.rootView = overlay

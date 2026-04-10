@@ -47,11 +47,13 @@ final class ShareViewModel: ObservableObject {
         return inputModel.pages.enumerated().map { index, page in
             let pageTextItems = inputModel.textItems.filter { $0.pageIndex == index }
             let pageWatermarkItems = inputModel.watermarkItems.filter { $0.pageIndex == index }
+            let pageSignatureItems = inputModel.signatureItems.filter { $0.pageIndex == index }
             return SharePreviewModel(
                 documentType: page.documentType,
                 frames: page.frames,
                 textItems: pageTextItems,
                 watermarkItems: pageWatermarkItems,
+                signatureItems: pageSignatureItems,
                 cellHeight: inputModel.cellHeight,
                 isSelected: true
             )

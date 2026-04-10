@@ -400,6 +400,7 @@ private extension OpenDocumentView {
             models: viewModel.models,
             textItems: viewModel.textItems,
             watermarkItems: viewModel.watermarkItems,
+            signatureItems: viewModel.signatureItems,
             actionBottomBarAction: $bottomBarAction,
             onPageChanged: { index in
                 viewModel.updateSelectedIndex(index)

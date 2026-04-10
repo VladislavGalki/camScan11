@@ -25,6 +25,7 @@ extension DocumentEntity {
     
     @NSManaged public var cachedSize: Int64
     
+    @NSManaged public var signatureOverlays: NSSet?
     @NSManaged public var textOverlays: NSSet?
     @NSManaged public var watermarkOverlays: NSSet?
 }
@@ -67,6 +68,18 @@ extension DocumentEntity {
 
     @objc(removeWatermarkOverlays:)
     @NSManaged public func removeFromWatermarkOverlays(_ values: NSSet)
+
+    @objc(addSignatureOverlaysObject:)
+    @NSManaged public func addToSignatureOverlays(_ value: SignatureOverlayEntity)
+
+    @objc(removeSignatureOverlaysObject:)
+    @NSManaged public func removeFromSignatureOverlays(_ value: SignatureOverlayEntity)
+
+    @objc(addSignatureOverlays:)
+    @NSManaged public func addToSignatureOverlays(_ values: NSSet)
+
+    @objc(removeSignatureOverlays:)
+    @NSManaged public func removeFromSignatureOverlays(_ values: NSSet)
 }
 
 extension DocumentEntity: Identifiable {}

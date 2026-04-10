@@ -6,5 +6,6 @@ struct ShareInputModel: Equatable, Hashable {
     let pages: [ScanPreviewModel]
     var textItems: [DocumentTextItem] = []
     var watermarkItems: [DocumentWatermarkItem] = []
+    var signatureItems: [DocumentSignatureItem] = []
     var cellHeight: CGFloat = 0
 }
