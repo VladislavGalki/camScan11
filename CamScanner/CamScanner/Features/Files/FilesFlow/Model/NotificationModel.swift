@@ -10,7 +10,8 @@ enum NotificationModel {
     case addedToFavorites
     case removedFromFavourites
     case fileMoved
-    
+    case pagesReordered
+
     var title: String {
         switch self {
         case .folderCreated:
@@ -32,6 +33,8 @@ enum NotificationModel {
             return "Removed from favourites"
         case .fileMoved:
             return "File moved"
+        case .pagesReordered:
+            return "Pages reordered successfully"
         }
     }
 }

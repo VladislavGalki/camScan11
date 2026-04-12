@@ -343,6 +343,46 @@ extension DocumentRepository {
         try context.save()
     }
 
+    // MARK: - Reorder Pages
+
+    func fetchSortedPageIDs(documentID: UUID) throws -> [UUID] {
+        guard let document = try fetchDocument(id: documentID) else { return [] }
+        return sortedPages(for: document).compactMap(\.id)
+    }
+
+    func reorderPages(documentID: UUID, newOrder: [UUID]) throws {
+        guard let document = try fetchDocument(id: documentID) else {
+            throw NSError(
+                domain: "DocumentRepository",
+                code: 8010,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found"]
+            )
+        }
+
+        let pages = (document.pages as? Set<PageEntity>) ?? []
+        let pagesByID = Dictionary(
+            uniqueKeysWithValues: pages.compactMap { page -> (UUID, PageEntity)? in
+                guard let id = page.id else { return nil }
+                return (id, page)
+            }
+        )
+
+        // Build old→new index mapping for overlay remapping
+        var mapping: [Int16: Int16] = [:]
+        for (newIndex, pageID) in newOrder.enumerated() {
+            guard let page = pagesByID[pageID] else { continue }
+            let oldIndex = page.index
+            mapping[oldIndex] = Int16(newIndex)
+            page.index = Int16(newIndex)
+        }
+
+        remapOverlayPageIndices(in: document, mapping: mapping)
+
+        document.lastViewed = Date()
+        try context.save()
+        notifyDocumentDidChange(documentID)
+    }
+
     @discardableResult
     func replacePageWithLastAdded(
         documentID: UUID,
@@ -1355,6 +1395,32 @@ extension DocumentRepository {
                 context.delete(overlay)
             } else if overlay.pageIndex > Int16(pageIndex) {
                 overlay.pageIndex -= 1
+            }
+        }
+    }
+
+    private func remapOverlayPageIndices(
+        in document: DocumentEntity,
+        mapping: [Int16: Int16]
+    ) {
+        let textOverlays = (document.textOverlays as? Set<TextOverlayEntity>) ?? []
+        for overlay in textOverlays {
+            if let newIndex = mapping[overlay.pageIndex] {
+                overlay.pageIndex = newIndex
+            }
+        }
+
+        let watermarkOverlays = (document.watermarkOverlays as? Set<WatermarkOverlayEntity>) ?? []
+        for overlay in watermarkOverlays {
+            if let newIndex = mapping[overlay.pageIndex] {
+                overlay.pageIndex = newIndex
+            }
+        }
+
+        let signatureOverlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
+        for overlay in signatureOverlays {
+            if let newIndex = mapping[overlay.pageIndex] {
+                overlay.pageIndex = newIndex
             }
         }
     }

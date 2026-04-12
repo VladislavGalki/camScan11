@@ -122,6 +122,14 @@ struct OpenDocumentView: View {
                     activeSheet = nil
                 }
                 .presentationCornerRadius(38)
+            case let .reorderPages(inputModel):
+                ReorderPagesView(inputModel: inputModel) {
+                    viewModel.notificationModel = .pagesReordered
+                    viewModel.shouldShowNotification = true
+                }
+                .presentationDetents([.large])
+                .presentationCornerRadius(38)
+                .presentationDragIndicator(.hidden)
             }
         }
         .sheet(isPresented: Binding(
@@ -761,7 +769,7 @@ private extension OpenDocumentView {
         case .selectPages:
             router.push(OpenDocumentRoute.selectPages(viewModel.makeSelectPagesInputModel()))
         case .reorderPages:
-            break
+            activeSheet = .reorderPages(ReorderPagesInputModel(documentID: viewModel.documentId))
         }
     }
 
