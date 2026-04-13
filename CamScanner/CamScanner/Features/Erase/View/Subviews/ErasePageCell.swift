@@ -81,7 +81,10 @@ final class ErasePageCell: UICollectionViewCell {
 
         let visibleRects = [imageView1, imageView2]
             .filter { !$0.isHidden && $0.image != nil }
-            .map { $0.convert($0.bounds, to: contentView) }
+            .map { imageView -> CGRect in
+                let contentRect = Self.aspectFitContentRect(for: imageView)
+                return imageView.convert(contentRect, to: contentView)
+            }
 
         let compositeRect = visibleRects.reduce(into: CGRect.null) { partialResult, rect in
             partialResult = partialResult.union(rect)
@@ -242,6 +245,26 @@ private extension ErasePageCell {
         case .qrCode:
             break
         }
+    }
+
+    static func aspectFitContentRect(for imageView: UIImageView) -> CGRect {
+        guard let image = imageView.image,
+              image.size.width > 0, image.size.height > 0,
+              imageView.bounds.width > 0, imageView.bounds.height > 0 else {
+            return imageView.bounds
+        }
+        let bounds = imageView.bounds
+        let scale = min(bounds.width / image.size.width, bounds.height / image.size.height)
+        let displayedSize = CGSize(
+            width: image.size.width * scale,
+            height: image.size.height * scale
+        )
+        return CGRect(
+            x: (bounds.width - displayedSize.width) / 2,
+            y: (bounds.height - displayedSize.height) / 2,
+            width: displayedSize.width,
+            height: displayedSize.height
+        )
     }
 
     func makeCompositePreviewImage(for model: ScanPreviewModel) -> UIImage? {
