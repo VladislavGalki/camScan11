@@ -16,7 +16,6 @@ extension DocumentRepositoryOLD {
             let full    = FileStore.shared.loadImage(at: fullURL)
             let quad    = p.quadData.flatMap { QuadCodec.decode($0) }
 
-            // ✅ вот это главное:
             let base: UIImage? = {
                 guard let rel = p.drawingBasePath, !rel.isEmpty else { return nil }
                 let url = FileStore.shared.url(forRelativePath: rel)

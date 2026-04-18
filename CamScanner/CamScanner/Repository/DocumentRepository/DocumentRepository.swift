@@ -367,7 +367,6 @@ extension DocumentRepository {
             }
         )
 
-        // Build old→new index mapping for overlay remapping
         var mapping: [Int16: Int16] = [:]
         for (newIndex, pageID) in newOrder.enumerated() {
             guard let page = pagesByID[pageID] else { continue }
@@ -951,9 +950,6 @@ extension DocumentRepository {
         }
     }
 
-    /// Saves rotated text coordinates, page rotation angles **and** the rotated
-    /// preview images to disk in a single CoreData transaction so everything
-    /// stays in sync on reload.
     func saveRotationState(
         documentID: UUID,
         textItems: [DocumentTextItem],
@@ -963,7 +959,6 @@ extension DocumentRepository {
         rotationAngleDelta: Double,
         pageImages: [(pageIndex: Int, image: UIImage)]
     ) throws {
-        // 1. Update text overlay coordinates
         for item in textItems {
             let request: NSFetchRequest<TextOverlayEntity> = TextOverlayEntity.fetchRequest()
             request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
@@ -977,7 +972,6 @@ extension DocumentRepository {
             entity.rotation = item.rotation
         }
 
-        // 2. Update watermark overlay coordinates
         for item in watermarkItems {
             let request: NSFetchRequest<WatermarkOverlayEntity> = WatermarkOverlayEntity.fetchRequest()
             request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
@@ -991,7 +985,6 @@ extension DocumentRepository {
             entity.rotation = item.rotation
         }
 
-        // 2b. Update signature overlay coordinates
         for item in signatureItems {
             let request: NSFetchRequest<SignatureOverlayEntity> = SignatureOverlayEntity.fetchRequest()
             request.predicate = NSPredicate(format: "id == %@", item.id as CVarArg)
@@ -1005,16 +998,12 @@ extension DocumentRepository {
             entity.rotation = item.rotation
         }
 
-        // 3. Increment page rotation angles + save rotated images to disk
         guard let document = try fetchDocument(id: documentID) else { return }
         let pages = (document.pages as? Set<PageEntity>) ?? []
 
         for page in pages where pageIndices.contains(Int(page.index)) {
-            // Rotation is baked into the saved JPEG, so reset angle to 0.
-            // This prevents double-rotation when filter re-renders from displayBase on reload.
             page.rotationAngle = 0
 
-            // Overwrite the display JPEG with the newly rotated preview
             if let entry = pageImages.first(where: { $0.pageIndex == Int(page.index) }),
                let relativePath = page.imagePath {
                 let fileURL = FileStore.shared.url(forRelativePath: relativePath)
@@ -1229,7 +1218,6 @@ extension DocumentRepository {
             )
         }
 
-        // Delete existing overlays and their image files
         let existing = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
         for overlay in existing {
             let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
@@ -1257,7 +1245,6 @@ extension DocumentRepository {
             entity.updatedAt = now
             entity.document = document
 
-            // Save rendered image to disk
             if let image = item.image, let pngData = image.pngData() {
                 let fileName = "\(item.id.uuidString).png"
                 let fileURL = try FileStore.shared.savePNG(
@@ -1270,7 +1257,6 @@ extension DocumentRepository {
                 entity.imagePath = ""
             }
 
-            // Save stroke data if available
             if let strokes = item.strokes {
                 let serializable = strokes.map { $0.toSerializable() }
                 entity.strokeData = try? JSONEncoder().encode(serializable)
