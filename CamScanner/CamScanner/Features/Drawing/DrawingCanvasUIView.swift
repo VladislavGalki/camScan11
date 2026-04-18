@@ -6,10 +6,8 @@ final class DrawingCanvasUIView: UIView {
     var tool: DrawingTool = .pen
     var penColor: UIColor = .systemRed
     var penAlpha: CGFloat = 1.0
-    /// В UI по-прежнему задаём в px на экране
     var penWidth: CGFloat = 6.0
 
-    /// ✅ rect картинки ВНУТРИ canvas (aspectFit), задаётся снаружи (SwiftUI wrapper)
     private(set) var imageRectInView: CGRect = .zero
 
     var onStrokesChanged: (([Stroke]) -> Void)?
@@ -51,19 +49,15 @@ final class DrawingCanvasUIView: UIView {
 
     // MARK: - External API
 
-    /// ✅ Вызывай при каждом layout/обновлении (из SwiftUI wrapper),
-    /// передавай реальный rect картинки в этом canvas (aspectFit)
     func setImageRectInView(_ rect: CGRect) {
         guard imageRectInView.integral != rect.integral else { return }
         imageRectInView = rect
-        // если rect изменился — надо перерисовать слои
         redrawAllLayers()
     }
 
     func setStrokes(_ new: [Stroke]) {
         guard strokes != new else { return }
 
-        // очистка
         strokeLayers.values.forEach { $0.removeFromSuperlayer() }
         strokeLayers.removeAll()
 
@@ -71,7 +65,6 @@ final class DrawingCanvasUIView: UIView {
         strokes = new
         suppressStrokesChangedCallback = false
 
-        // перерисовка
         for s in strokes {
             let layer = makeLayer(for: s)
             strokeLayers[s.id] = layer
@@ -89,7 +82,7 @@ final class DrawingCanvasUIView: UIView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard tool == .pen, let pView = touches.first?.location(in: self) else { return }
         guard imageRectInView.width > 1, imageRectInView.height > 1 else { return }
-        guard imageRectInView.contains(pView) else { return } // ✅ вне картинки не рисуем
+        guard imageRectInView.contains(pView) else { return }
 
         onTouchBegan?()
 
@@ -99,7 +92,6 @@ final class DrawingCanvasUIView: UIView {
             penColor = sampledColor
         }
 
-        // ✅ widthN фиксируем относительно imageRect (на экране)
         let minSide = max(1, min(imageRectInView.width, imageRectInView.height))
         let widthN = max(0.001, penWidth / minSide)
 
@@ -150,9 +142,7 @@ final class DrawingCanvasUIView: UIView {
 
         guard let hit = hitTestStroke(at: pView) else { return }
 
-        // remove model
         strokes.removeAll { $0.id == hit.id }
-        // remove layer
         if let layer = strokeLayers[hit.id] {
             layer.removeFromSuperlayer()
             strokeLayers[hit.id] = nil
@@ -160,7 +150,6 @@ final class DrawingCanvasUIView: UIView {
     }
 
     private func hitTestStroke(at pView: CGPoint) -> Stroke? {
-        // начинаем с последнего (верхний)
         for s in strokes.reversed() {
             let path = bezierPathViewSpace(stroke: s)
             let cg = path.cgPath
@@ -183,7 +172,6 @@ final class DrawingCanvasUIView: UIView {
         l.fillColor = UIColor.clear.cgColor
         l.strokeColor = s.color.withAlphaComponent(s.opacity).cgColor
 
-        // ✅ lineWidth в view-space из widthN
         l.lineWidth = s.widthN * min(imageRectInView.width, imageRectInView.height)
 
         l.lineCap = .round
@@ -198,7 +186,6 @@ final class DrawingCanvasUIView: UIView {
     }
 
     private func bezierPathViewSpace(stroke: Stroke) -> UIBezierPath {
-        // normalized -> view
         let pts = stroke.points.map { fromNormalized($0) }
         return bezierPath(points: pts)
     }
@@ -213,7 +200,6 @@ final class DrawingCanvasUIView: UIView {
             return path
         }
 
-        // сглаживание (midpoint)
         for i in 1..<points.count {
             let prev = points[i - 1]
             let cur = points[i]
@@ -227,7 +213,6 @@ final class DrawingCanvasUIView: UIView {
     }
 
     private func redrawAllLayers() {
-        // перерисовать толщины/пути (например при смене imageRectInView)
         for s in strokes {
             if let layer = strokeLayers[s.id] {
                 updateLayerPath(layer, stroke: s)
@@ -238,7 +223,6 @@ final class DrawingCanvasUIView: UIView {
                 updateLayerPath(layer, stroke: s)
             }
         }
-        // удалить лишние слои (если вдруг)
         let valid = Set(strokes.map { $0.id })
         for (id, layer) in strokeLayers where !valid.contains(id) {
             layer.removeFromSuperlayer()
@@ -261,7 +245,7 @@ final class DrawingCanvasUIView: UIView {
         )
     }
 
-    // MARK: - Render result (✅ теперь корректно)
+    // MARK: - Render result
 
     func renderStrokesOver(fullImage: UIImage) -> UIImage {
         let base = fullImage.normalizedUp()

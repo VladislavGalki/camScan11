@@ -1,10 +1,3 @@
-//
-//  IdCardDriverLicenseView.swift
-//  CamScanner
-//
-//  Created by Владислав Галкин on 29.01.2026.
-//
-
 import SwiftUI
 
 struct IdCardDriverLicenseView: View {
