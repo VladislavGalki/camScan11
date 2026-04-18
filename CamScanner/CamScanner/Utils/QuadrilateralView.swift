@@ -200,13 +200,11 @@ final class QuadrilateralView: UIView {
         let updatedQuad = update(quad, withPosition: validPoint, forCorner: cornerView.position)
         self.quad = updatedQuad
 
-        // ==== Обновляем stroke квадрата ====
         quadLayer.path = updatedQuad.path.cgPath
         quadLayer.strokeColor = strokeColor ?? UIColor(red: 0/255, green: 136/255, blue: 255/255, alpha: 1).cgColor
         quadLayer.fillColor = UIColor.clear.cgColor
         quadLayer.isHidden = false
 
-        // ==== Обновляем dim вокруг квадрата ====
         if editable {
             let full = UIBezierPath(rect: bounds)
             let hole = UIBezierPath(cgPath: updatedQuad.path.cgPath)
@@ -218,7 +216,6 @@ final class QuadrilateralView: UIView {
             dimLayer.isHidden = false
         }
 
-        // ==== Обновляем позиции cornerViews ====
         layoutCornerViews(forQuad: updatedQuad)
     }
 

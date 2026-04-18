@@ -94,7 +94,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             return nil
         }
 
-        // IMPORTANT: make sure focus/torch uses the same chosen device
         CaptureSession.current.device = device
 
         captureSession.beginConfiguration()
@@ -163,10 +162,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "video_ouput_queue"))
     }
     
-    deinit {
-        print("!!! CaptureSessionManager deinit")
-    }
-
     // MARK: Capture Session Life Cycle
 
     internal func start(mode: FlashMode) {
@@ -238,7 +233,6 @@ final class CaptureSessionManager: NSObject, AVCaptureVideoDataOutputSampleBuffe
             }
 
         } catch {
-            print("Torch error:", error)
         }
     }
     

@@ -8,7 +8,6 @@ enum VisionRectangleDetector {
 
     // MARK: - Public API
 
-    /// Detects the largest rectangle from a CVPixelBuffer.
     static func rectangle(forPixelBuffer pixelBuffer: CVPixelBuffer, completion: @escaping ((Quadrilateral?) -> Void)) {
         let width = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let height = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
@@ -23,7 +22,6 @@ enum VisionRectangleDetector {
         completion(quad)
     }
 
-    /// Detects the largest rectangle from a CIImage.
     static func rectangle(forImage image: CIImage, completion: @escaping ((Quadrilateral?) -> Void)) {
         guard let uiImage = ciImageToUIImage(image) else {
             completion(nil)
@@ -34,7 +32,6 @@ enum VisionRectangleDetector {
         completion(quad)
     }
 
-    /// Detects the largest rectangle from a CIImage with orientation.
     static func rectangle(
         forImage image: CIImage,
         orientation: CGImagePropertyOrientation,
@@ -59,7 +56,6 @@ enum VisionRectangleDetector {
         return UIImage(cgImage: cgImage)
     }
 
-    /// Downscale for faster processing, returns scale factor.
     private static func downscale(_ source: Mat, maxDimension: Double = 640) -> (Mat, Double) {
         let maxSide = Double(max(source.cols(), source.rows()))
         guard maxSide > maxDimension else { return (source, 1.0) }
@@ -97,25 +93,19 @@ enum VisionRectangleDetector {
             sigmaX: 1.5
         )
 
-        // Try multiple edge detection strategies and pick the best result
         var bestQuad: Quadrilateral?
         var bestArea: Double = 0
         let imageArea = Double(small.cols()) * Double(small.rows())
         let minArea = imageArea * 0.02
 
-        // Strategy 1: Canny with low thresholds
         let cannyLow = Mat()
         Imgproc.Canny(image: blurred, edges: cannyLow, threshold1: 30, threshold2: 100)
-        let cannyLowNonZero = Core.countNonZero(src: cannyLow)
-        morphAndFind(cannyLow, minArea: minArea, strategyName: "CannyLow", best: &bestQuad, bestArea: &bestArea)
+        morphAndFind(cannyLow, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
 
-        // Strategy 2: Canny with medium thresholds
         let cannyMed = Mat()
         Imgproc.Canny(image: blurred, edges: cannyMed, threshold1: 50, threshold2: 150)
-        let cannyMedNonZero = Core.countNonZero(src: cannyMed)
-        morphAndFind(cannyMed, minArea: minArea, strategyName: "CannyMed", best: &bestQuad, bestArea: &bestArea)
+        morphAndFind(cannyMed, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
 
-        // Strategy 3: Adaptive threshold + morphological close
         let adaptive = Mat()
         Imgproc.adaptiveThreshold(
             src: blurred,
@@ -126,14 +116,12 @@ enum VisionRectangleDetector {
             blockSize: 11,
             C: 2
         )
-        let adaptiveNonZero = Core.countNonZero(src: adaptive)
-        morphAndFind(adaptive, minArea: minArea, strategyName: "Adaptive", best: &bestQuad, bestArea: &bestArea)
+        morphAndFind(adaptive, minArea: minArea, best: &bestQuad, bestArea: &bestArea)
 
         guard var quad = bestQuad else {
             return nil
         }
 
-        // Scale coordinates back to original size
         if scale != 1.0 {
             let invScale = 1.0 / scale
             quad = Quadrilateral(
@@ -147,11 +135,9 @@ enum VisionRectangleDetector {
         return quad
     }
 
-    /// Apply morphological close, find contours, and update best quad if a better one is found.
     private static func morphAndFind(
         _ edges: Mat,
         minArea: Double,
-        strategyName: String,
         best: inout Quadrilateral?,
         bestArea: inout Double
     ) {
@@ -162,7 +148,6 @@ enum VisionRectangleDetector {
         let closed = Mat()
         Imgproc.morphologyEx(src: edges, dst: closed, op: .MORPH_CLOSE, kernel: kernel)
 
-        // Extra dilation to connect nearby edges
         let dilateKernel = Imgproc.getStructuringElement(
             shape: .MORPH_RECT,
             ksize: Size2i(width: 3, height: 3)
@@ -179,17 +164,10 @@ enum VisionRectangleDetector {
             method: .CHAIN_APPROX_SIMPLE
         )
 
-        var candidateCount = 0
-        var passedAreaCount = 0
-        var fourPointCount = 0
-        var convexCount = 0
-
         for contour in contours {
-            candidateCount += 1
             let pointsMat = MatOfPoint(array: contour)
             let area = Imgproc.contourArea(contour: pointsMat)
             guard area > minArea else { continue }
-            passedAreaCount += 1
             guard area > bestArea else { continue }
 
             let contour2f: [Point2f] = contour.map { Point2f(x: Float($0.x), y: Float($0.y)) }
@@ -198,36 +176,18 @@ enum VisionRectangleDetector {
             var approx = [Point2f]()
             Imgproc.approxPolyDP(curve: contour2f, approxCurve: &approx, epsilon: 0.02 * peri, closed: true)
 
-            if approx.count == 4 {
-                fourPointCount += 1
-            }
             guard approx.count == 4 else { continue }
+            guard isConvex(approx) else { continue }
 
-            let convex = isConvex(approx)
-            if convex { convexCount += 1 }
-            guard convex else {
-                continue
-            }
-
-            // Reject if contour covers >90% of the frame (it's the background, not a document)
             let imageArea = Double(dilated.cols()) * Double(dilated.rows())
             if area / imageArea > 0.90 {
                 continue
             }
 
-            // Check angles are roughly rectangular (each corner within 30° of 90°)
-            guard hasReasonableAngles(approx) else {
-                continue
-            }
-
-            // Check aspect ratio is reasonable (not too extreme like 10:1)
-            guard hasReasonableAspectRatio(approx) else {
-                continue
-            }
+            guard hasReasonableAngles(approx) else { continue }
+            guard hasReasonableAspectRatio(approx) else { continue }
 
             bestArea = area
-            // OpenCV uses top-left origin; convert to bottom-left origin
-            // so that the existing toCartesian() call in CaptureSessionManager works correctly.
             let h = CGFloat(dilated.rows())
             var quad = Quadrilateral(
                 topLeft: CGPoint(x: CGFloat(approx[0].x), y: h - CGFloat(approx[0].y)),
@@ -240,7 +200,6 @@ enum VisionRectangleDetector {
         }
     }
 
-    /// Check that all interior angles are within 30° of 90° (i.e. 60°–120°).
     private static func hasReasonableAngles(_ points: [Point2f]) -> Bool {
         let minAngle: Double = 60
         let maxAngle: Double = 120
@@ -268,7 +227,6 @@ enum VisionRectangleDetector {
         return true
     }
 
-    /// Check aspect ratio is between 1:5 and 5:1.
     private static func hasReasonableAspectRatio(_ points: [Point2f]) -> Bool {
         func dist(_ a: Point2f, _ b: Point2f) -> Double {
             let dx = Double(a.x - b.x)
@@ -299,7 +257,6 @@ enum VisionRectangleDetector {
             else if cross < 0 { negativeCount += 1 }
         }
 
-        // Convex if all same sign (all CW or all CCW)
         return positiveCount == 0 || negativeCount == 0
     }
 }
