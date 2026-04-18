@@ -1,5 +1,3 @@
-//
-
 import SwiftUI
 
 public struct ProgressiveBlurView: UIViewRepresentable, Equatable {
