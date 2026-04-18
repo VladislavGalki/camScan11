@@ -3,6 +3,8 @@ import PhotosUI
 
 struct AppEntryView: View {
 
+    // MARK: - State
+
     @State private var selectedTab: AppTab = .home
     @State private var cameraButtonFrame: CGRect = .zero
 
@@ -15,9 +17,11 @@ struct AppEntryView: View {
     @State private var globalToastTitle = ""
     @AppStorage("home.scanButtonOnboardingShown") private var hasShownScanButtonOnboarding = false
 
+    // MARK: - Dependencies
+
     @EnvironmentObject private var tabBar: TabBarController
     @EnvironmentObject private var router: Router
-    
+
     private var shouldShowScanOnboarding: Bool {
         selectedTab == .home
         && tabBar.isTabBarVisible
@@ -27,6 +31,8 @@ struct AppEntryView: View {
         && !showPhotoPicker
         && !showFilePicker
     }
+
+    // MARK: - Init
 
     init() {
         let appearance = UITabBarAppearance()
@@ -39,6 +45,8 @@ struct AppEntryView: View {
         UITabBar.appearance().isTranslucent = true
         UITabBar.appearance().isHidden = true
     }
+
+    // MARK: - Body
 
     var body: some View {
         TabContainerView(selectedTab: $selectedTab)
@@ -130,6 +138,8 @@ struct AppEntryView: View {
     }
 }
 
+// MARK: - ScanButtonOnboardingOverlay
+
 private struct ScanButtonOnboardingOverlay: View {
     let targetFrame: CGRect
     let onDismiss: () -> Void
@@ -168,13 +178,13 @@ private struct ScanButtonOnboardingOverlay: View {
                 .appTextStyle(.itemTitle)
                 .foregroundStyle(.text(.primary))
                 .padding(.bottom, 8)
-            
+
             Text("Tap the “+” button to scan or upload your first document")
                 .appTextStyle(.bodyPrimary)
                 .foregroundStyle(.text(.secondary))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 16)
-            
+
             AppButton(
                 config: AppButtonConfig(
                     content: .title("Got it!"),
@@ -189,16 +199,5 @@ private struct ScanButtonOnboardingOverlay: View {
         .padding(.bottom, 13)
         .background(.bg(.surface))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
-private struct TooltipPointer: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.closeSubpath()
-        return path
     }
 }
