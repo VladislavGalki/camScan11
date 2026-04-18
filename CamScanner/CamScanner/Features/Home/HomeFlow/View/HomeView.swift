@@ -11,8 +11,6 @@ struct HomeView: View {
     @State private var showDeleteAlert: Bool = false
     @State private var pinDocumentID: UUID?
 
-    @State var showAddCandidate: Bool = false
-
     @State private var selectedFileDocumentItemId: UUID?
     @State private var selectedMenuItem: FilesMenuItem?
     @State private var shouldShowMenuOverlay = false
@@ -45,7 +43,6 @@ struct HomeView: View {
                         
                         ExploreToolsView(model: vm.exploreToolModel) {
                         } onToolTapped: { toolType in
-                            showAddCandidate = true
                         }
                         .padding(.horizontal, 16)
                     }
@@ -65,9 +62,6 @@ struct HomeView: View {
         .overlay(alignment: .top) { toastOverlay }
         .overlay { pinOverlay }
         .sheet(item: $vm.homeActiveSheet) { sheetView($0) }
-        .fullScreenCover(isPresented: $showAddCandidate) {
-            OpenCVFilterDebugView()
-        }
         .onChange(of: vm.documentToOpen) { _, newValue in
             guard let newValue else { return }
             router.push(HomeRoute.openDocument(id: newValue))
