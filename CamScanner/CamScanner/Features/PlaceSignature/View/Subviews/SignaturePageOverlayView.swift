@@ -23,7 +23,6 @@ struct SignaturePageOverlayView: View {
     private enum Constants {
         static let borderWidth: CGFloat = 2
         static let handleSize: CGFloat = 20
-        /// Extra padding around the handle to reach 44pt minimum touch target
         static let handleHitExtra: CGFloat = 12
     }
 

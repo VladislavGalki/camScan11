@@ -1,8 +1,6 @@
 import UIKit
 
 enum SignatureRenderer {
-    /// Re-renders strokes on a fixed-size canvas matching the original image dimensions.
-    /// This avoids bounding-box recalculation which changes proportions when brush size differs.
     static func render(
         strokes: [Stroke],
         colorOverride: UIColor,

@@ -452,7 +452,6 @@ extension FilesViewModel {
             selectableMenuAction = nil
             handleClearSelection()
         } catch {
-            print(error)
         }
     }
     

@@ -35,7 +35,6 @@ final class WatermarkViewModel: ObservableObject {
     @Published var shouldShowStyleSheet = false
     @Published var styleDraft: WatermarkStyleDraft = .default
 
-    /// Placement mode for the CURRENT page
     @Published var placementMode: WatermarkPlacementMode = .single
 
     // MARK: - Internal
@@ -43,17 +42,13 @@ final class WatermarkViewModel: ObservableObject {
     var isEditingText: Bool { editingWatermarkID != nil }
     var isBubbleFrozen = false
 
-    /// Returns items for ALL pages — single items + tile items merged
     var displayItems: [DocumentWatermarkItem] {
         let tilePageIndices = Set(tileItemsByPage.keys)
-        // Single items on pages that DON'T have tiles
         let singleItems = watermarkItems.filter { !tilePageIndices.contains($0.pageIndex) }
-        // All tile items from all pages
         let allTileItems = tileItemsByPage.values.flatMap { $0 }
         return singleItems + allTileItems
     }
 
-    /// Whether the current page is in tile mode
     var isCurrentPageTile: Bool {
         tileItemsByPage[selectedIndex] != nil
     }
@@ -64,10 +59,8 @@ final class WatermarkViewModel: ObservableObject {
     private var editingSession: WatermarkEditingSession?
     private var currentPageSize: CGSize = .zero
 
-    /// Per-page tile templates
     private var tileTemplatesByPage: [Int: TileTemplate] = [:]
 
-    /// Per-page tile items
     @Published private(set) var tileItemsByPage: [Int: [DocumentWatermarkItem]] = [:]
 
     private let store: WatermarkStore

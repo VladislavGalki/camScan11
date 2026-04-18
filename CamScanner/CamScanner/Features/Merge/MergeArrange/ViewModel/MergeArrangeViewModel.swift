@@ -65,7 +65,6 @@ final class MergeArrangeViewModel: ObservableObject {
                     completion(newID)
                 }
             } catch {
-                print("❌ merge error:", error)
                 DispatchQueue.main.async { completion(nil) }
             }
         }
