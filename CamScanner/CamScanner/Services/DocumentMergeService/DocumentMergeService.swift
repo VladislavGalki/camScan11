@@ -24,12 +24,9 @@ final class DocumentMergeService {
             for f in frames {
                 guard let display = f.preview, let full = f.original else { continue }
 
-                // ✅ ВАЖНО:
-                // если у страницы есть drawingData (strokes), то обязана быть и "чистая база"
-                // иначе при открытии merged-дока ластик/редактирование могут не работать корректно.
                 let baseForDrawing: UIImage? = {
-                    if let b = f.drawingBase { return b }      // ✅ правильная база
-                    if f.drawingData != nil { return full }   // ✅ fallback лучше, чем display (display уже с рисунком)
+                    if let b = f.drawingBase { return b }
+                    if f.drawingData != nil { return full }
                     return nil
                 }()
 

@@ -31,12 +31,10 @@ private extension RotationService {
 
         var newFrame = frame
 
-        // ORIGINAL
         if let original = frame.original {
             newFrame.original = rotateImage(original, direction: direction)
         }
 
-        // QUAD
         if let quad = frame.quad,
            let oldOriginal = frame.original {
 
@@ -45,12 +43,10 @@ private extension RotationService {
                 .reorganized()
         }
 
-        // DISPLAY BASE вращаем
         if let display = frame.displayBase ?? frame.previewBase {
             newFrame.displayBase = rotateImage(display, direction: direction)
         }
 
-        // Перерендер preview через displayBase
         if let display = newFrame.displayBase {
             newFrame.preview = filterRenderer.render(
                 image: display,

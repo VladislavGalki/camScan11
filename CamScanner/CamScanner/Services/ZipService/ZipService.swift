@@ -13,11 +13,7 @@ final class ZipService {
             .appendingPathExtension("zip")
 
         if fm.fileExists(atPath: zipURL.path) {
-            do {
-                try fm.removeItem(at: zipURL)
-            } catch {
-                throw error
-            }
+            try fm.removeItem(at: zipURL)
         }
 
         let archive = try Archive(url: zipURL, accessMode: .create)
@@ -27,21 +23,13 @@ final class ZipService {
                 continue
             }
 
-            do {
-                try archive.addEntry(
-                    with: file.lastPathComponent,
-                    fileURL: file,
-                    compressionMethod: .deflate
-                )
-            } catch {
-                throw error
-            }
+            try archive.addEntry(
+                with: file.lastPathComponent,
+                fileURL: file,
+                compressionMethod: .deflate
+            )
         }
-        
+
         return zipURL
     }
-}
-
-enum ZipError: Error {
-    case createFailed
 }

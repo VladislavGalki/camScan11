@@ -48,7 +48,6 @@ final class ShareQuotaService {
                 try KeychainService.shared.save(quota, for: key)
             }
         } catch {
-            print("Quota refresh error:", error)
         }
     }
 }

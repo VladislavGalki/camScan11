@@ -8,9 +8,8 @@ final class PDFRendererService {
     private let pageSize = CGSize(
         width: 595,
         height: 842
-    ) // А4
-    
-    
+    )
+
     func renderCombined(documents: [SharePreviewModel], fileName: String, password: String?, addWatermark: Bool) throws -> URL {
         let url = tempURL(fileName: fileName)
 
@@ -320,10 +319,8 @@ final class PDFRendererService {
 
 extension PDFRendererService {
     enum TextItemRenderer {
-        /// Fixed cell width from AddTextCarouselController
         private static let cellWidth: CGFloat = 322
 
-        /// Screen imageView sizes from AddTextPageCell.configure
         private static let idCardImageViewSize = CGSize(width: 171, height: 108)
         private static let idCardSpacing: CGFloat = 8
         private static let passportImageViewSize = CGSize(width: 360, height: 250)
@@ -348,10 +345,6 @@ extension PDFRendererService {
                 height: imageHeightInCell
             )
 
-            print("🖨️ Renderer | drawForDocuments: items=\(items.count) fittedRect=\(fittedRect)")
-            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) imageHeightInCell=\(imageHeightInCell)")
-            print("🖨️ Renderer |   screenContent=\(screenContent)")
-
             drawMapped(items, in: ctx, cellHeight: cellHeight,
                        screenContent: screenContent, renderRect: fittedRect)
         }
@@ -368,8 +361,6 @@ extension PDFRendererService {
             let imgSize = idCardImageViewSize
             let imageCount = imageRects.count
 
-            // Build screen image rects (same layout as AddTextPageCell)
-            // Use exact mathematical values — avoids pixel-rounding mismatch across devices
             let totalH = CGFloat(imageCount) * imgSize.height
                 + CGFloat(imageCount - 1) * idCardSpacing
             let originX = (cellWidth - imgSize.width) / 2
@@ -380,10 +371,6 @@ extension PDFRendererService {
                                           width: imgSize.width, height: imgSize.height))
                 y += imgSize.height + idCardSpacing
             }
-
-            print("🖨️ Renderer | drawForIDCard: items=\(items.count) imageRects=\(imageRects)")
-            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight)")
-            print("🖨️ Renderer |   screenRects=\(screenRects)")
 
             drawPerImage(items, in: ctx, cellHeight: cellHeight,
                          screenRects: screenRects, renderRects: imageRects)
@@ -399,7 +386,6 @@ extension PDFRendererService {
 
             let cellHeight = resolveCellHeight(from: items, provided: providedCellHeight)
 
-            // Compute visible image rect on screen (aspect fit inside 360×250 imageView)
             let ivSize = passportImageViewSize
             let imageAspect = imageRect.width / imageRect.height
 
@@ -412,8 +398,6 @@ extension PDFRendererService {
                                      height: ivSize.height)
             }
 
-            // ImageView centered in cell → visible image centered in imageView
-            // Use exact mathematical values — avoids pixel-rounding mismatch across devices
             let ivOriginX = (cellWidth - ivSize.width) / 2
             let ivOriginY = (cellHeight - ivSize.height) / 2
             let visOriginX = ivOriginX + (ivSize.width - visibleSize.width) / 2
@@ -422,20 +406,12 @@ extension PDFRendererService {
             let screenContent = CGRect(origin: CGPoint(x: visOriginX, y: visOriginY),
                                        size: visibleSize)
 
-            print("🖨️ Renderer | drawForPassport: items=\(items.count) imageRect=\(imageRect)")
-            print("🖨️ Renderer |   cellWidth=\(cellWidth) cellHeight=\(cellHeight) imageAspect=\(imageAspect)")
-            print("🖨️ Renderer |   ivSize=\(ivSize) visibleSize=\(visibleSize)")
-            print("🖨️ Renderer |   screenContent=\(screenContent)")
-
             drawMapped(items, in: ctx, cellHeight: cellHeight,
                        screenContent: screenContent, renderRect: imageRect)
         }
 
         // MARK: - Core drawing (single rect mapping)
 
-        /// Maps coordinates using screen/render rect CENTERS (not origins).
-        /// Center-constrained views have pixel-exact centers in UIKit,
-        /// while origins are subject to pixel-rounding that varies by device.
         private static func drawMapped(
             _ items: [DocumentTextItem],
             in ctx: CGContext,
@@ -448,14 +424,11 @@ extension PDFRendererService {
             let scaleX = renderRect.width / screenContent.width
             let scaleY = renderRect.height / screenContent.height
 
-            print("🖨️ Renderer | drawMapped: scaleX=\(scaleX) scaleY=\(scaleY)")
-
             for item in items {
                 let cellX = item.centerX * cellWidth
                 let cellY = item.centerY * cellHeight
                 let pdfX = renderRect.midX + (cellX - screenContent.midX) * scaleX
                 let pdfY = renderRect.midY + (cellY - screenContent.midY) * scaleY
-                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → pdfPos=(\(pdfX), \(pdfY)) fontScale=\(scaleX)")
 
                 drawItemAt(item, centerX: pdfX, centerY: pdfY,
                            cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
@@ -466,7 +439,6 @@ extension PDFRendererService {
 
         // MARK: - Core drawing (per-image mapping for ID cards)
 
-        /// Maps coordinates using screen/render rect CENTERS (not origins).
         private static func drawPerImage(
             _ items: [DocumentTextItem],
             in ctx: CGContext,
@@ -480,7 +452,6 @@ extension PDFRendererService {
                 let cellX = item.centerX * cellWidth
                 let cellY = item.centerY * cellHeight
 
-                // Find the closest screen image to this text item
                 var bestIdx = 0
                 var bestDist = CGFloat.greatestFiniteMagnitude
                 for (i, sr) in screenRects.enumerated() {
@@ -496,8 +467,6 @@ extension PDFRendererService {
                 let pdfX = rr.midX + (cellX - sr.midX) * scaleX
                 let pdfY = rr.midY + (cellY - sr.midY) * scaleY
 
-                print("🖨️ Renderer |   \"\(item.text)\" cellPos=(\(cellX), \(cellY)) → img[\(bestIdx)] pdfPos=(\(pdfX), \(pdfY)) scale=(\(scaleX), \(scaleY))")
-
                 drawItemAt(item, centerX: pdfX, centerY: pdfY,
                            cellHeight: cellHeight, scaleX: scaleX, scaleY: scaleY)
             }
@@ -507,9 +476,6 @@ extension PDFRendererService {
 
         // MARK: - Single item drawing
 
-        /// Renders text at the ORIGINAL screen font size using CGContext scaling.
-        /// This ensures the correct SF Pro font variant is used (Text ≤19pt vs Display ≥20pt),
-        /// matching the on-screen SwiftUI rendering exactly.
         private static func drawItemAt(
             _ item: DocumentTextItem,
             centerX: CGFloat,
@@ -518,14 +484,12 @@ extension PDFRendererService {
             scaleX: CGFloat,
             scaleY: CGFloat
         ) {
-            // Screen-space block dimensions (as in AddText/OpenDocument overlay)
             let screenBlockW = item.width * cellWidth
             let screenBlockH = item.height * cellHeight
             let screenPadding: CGFloat = 8
             let screenContentW = max(screenBlockW - screenPadding * 2, 0)
             let screenContentH = max(screenBlockH - screenPadding * 2, 0)
 
-            // Use ORIGINAL screen font size → correct SF Pro variant (Text vs Display)
             let font = UIFont.systemFont(ofSize: item.style.fontSize, weight: .regular)
             let color = UIColor(rgbaHex: item.style.textColorHex) ?? .black
 
@@ -546,8 +510,6 @@ extension PDFRendererService {
                 .paragraphStyle: paragraphStyle
             ]
 
-            // Measure actual text height at screen size to vertically center within content area
-            // (SwiftUI .frame(alignment: .leading) = left + vertically centered)
             let textBounds = (item.text as NSString).boundingRect(
                 with: CGSize(width: screenContentW, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -556,11 +518,6 @@ extension PDFRendererService {
             )
             let vCenterOffset = max((screenContentH - ceil(textBounds.height)) / 2, 0)
 
-            print("🖨️ Renderer | drawItemAt \"\(item.text)\" fontSize=\(item.style.fontSize) scale=(\(scaleX), \(scaleY))")
-            print("🖨️ Renderer |   screenBlock=(\(screenBlockW), \(screenBlockH)) screenContent=(\(screenContentW), \(screenContentH))")
-            print("🖨️ Renderer |   textBounds=\(textBounds) vCenterOffset=\(vCenterOffset)")
-
-            // Screen-space rects relative to block center (0,0)
             let screenContentRect = CGRect(
                 x: -screenBlockW / 2 + screenPadding,
                 y: -screenBlockH / 2 + screenPadding + vCenterOffset,
@@ -575,12 +532,9 @@ extension PDFRendererService {
                 height: screenBlockH
             )
 
-            print("🖨️ Renderer |   screenContentRect=\(screenContentRect) screenClipRect=\(screenClipRect)")
-
             guard let context = UIGraphicsGetCurrentContext() else { return }
             context.saveGState()
 
-            // Translate to PDF center, then scale from screen to PDF
             context.translateBy(x: centerX, y: centerY)
             context.scaleBy(x: scaleX, y: scaleY)
 
@@ -602,8 +556,6 @@ extension PDFRendererService {
 
         // MARK: - Cell height resolution
 
-        /// Prefer provided cellHeight (matches display overlay) over derived.
-        /// Derived is a fallback when provided is unavailable.
         private static func resolveCellHeight(from items: [DocumentTextItem], provided: CGFloat) -> CGFloat {
             if provided > 0 { return provided }
             let derived = deriveCellHeight(from: items)
@@ -613,7 +565,6 @@ extension PDFRendererService {
 
         private static func deriveCellHeight(from items: [DocumentTextItem]) -> CGFloat {
             guard let item = items.first, item.height > 0.001 else {
-                print("🖨️ Renderer | deriveCellHeight: no valid items, returning 0 (will use fallback)")
                 return 0
             }
 
@@ -621,9 +572,7 @@ extension PDFRendererService {
             let heightPoints = measureTextBlockHeight(item: item, widthPoints: widthPoints)
 
             let derived = heightPoints / item.height
-            print("🖨️ Renderer | deriveCellHeight: text=\"\(item.text)\" widthPts=\(widthPoints) heightPts=\(heightPoints) item.height=\(item.height) → derived=\(derived)")
             guard derived > 100, derived < 2000 else {
-                print("🖨️ Renderer | deriveCellHeight: out of range, returning 0 (will use fallback)")
                 return 0
             }
             return derived
@@ -1114,7 +1063,6 @@ extension PDFRendererService {
 
             context.setAlpha(item.opacity)
 
-            // Draw image centered in block, flipped for CoreGraphics coordinate system
             let drawRect = CGRect(
                 x: -screenBlockW / 2,
                 y: -screenBlockH / 2,
@@ -1137,7 +1085,7 @@ extension PDFRendererService {
     }
 }
 
-// MARK: - WatermarkRendere
+// MARK: - WatermarkRenderer
 
 extension PDFRendererService {
     enum WatermarkRenderer {
@@ -1231,8 +1179,7 @@ extension PDFRendererService {
         static func drawUIKit(in ctx: CGContext, pageSize: CGSize) {
             guard let logo = UIImage(named: "appMiniLogo_image") else { return }
 
-            // SCALE относительно страницы
-            let scale = pageSize.width / 375.0   // 375 = базовая ширина iPhone
+            let scale = pageSize.width / 375.0
 
             let logoSize = CGSize(width: 14 * scale, height: 14 * scale)
             let padding: CGFloat = 3 * scale
