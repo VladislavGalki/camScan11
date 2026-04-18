@@ -96,8 +96,6 @@ private struct MergeSelectRow: View {
     private var title: String {
         return ""
 //        let kind = item.kind.lowercased()
-//        if kind == "id" { return "\(item.idType ?? "ID") • \(item.pageCount) стр." }
-//        return "Скан • \(item.pageCount) стр."
     }
 
     private var subtitle: String {

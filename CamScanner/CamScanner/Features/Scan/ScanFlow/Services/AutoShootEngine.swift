@@ -1,41 +1,27 @@
 import UIKit
 import CoreGraphics
 
-/// Решает: нужно ли прямо сейчас делать автошот.
-/// Использует:
-/// - гистерезис по площади (enter/keep)
-/// - EMA (сглаживание центра и площади)
-/// - penalty вместо жесткого reset
 final class AutoShootEngine {
 
-    // MARK: - Tuning (можно подправлять)
+    // MARK: - Tuning
 
-    /// "Входим" в qualified, когда документ занимает >= enter
     var minAreaEnter: CGFloat = 0.055
-    /// "Держим" qualified пока документ >= keep (чтобы не дергалось)
     var minAreaKeep: CGFloat  = 0.045
 
-    /// "Сколько стабильных кадров нужно" (по сути “счетчик стабильности”)
     var requiredStableFrames: CGFloat = 3
 
-    /// Порог по смещению центра (px в координатах детектора)
     var baseCenterShiftThreshold: CGFloat = 10
 
-    /// Порог по относительному изменению площади (0..1)
     var areaDeltaThreshold: CGFloat = 0.12
 
-    /// EMA alpha (0..1). Больше = быстрее реагирует, меньше = сильнее сглаживает
     var emaAlpha: CGFloat = 0.35
 
-    /// Штрафы
     var penaltyOnUnstable: CGFloat = 1.0
     var penaltyOnMissing: CGFloat = 1.5
     var penaltyOnNotQualified: CGFloat = 1.2
 
-    /// Кулдаун между автоснимками
     var minShotInterval: CFTimeInterval = 1.2
 
-    /// Логи
     var isLoggingEnabled: Bool = true
 
     // MARK: - State
@@ -49,7 +35,6 @@ final class AutoShootEngine {
 
     // MARK: - Public API
 
-    /// Возвращает true, если нужно сделать снимок (вызвать shutter).
     func update(
         enabled: Bool,
         canShoot: Bool,
@@ -67,7 +52,6 @@ final class AutoShootEngine {
             return AutoShootState(isStable: false)
         }
 
-        // quad обязателен
         guard var quad,
               imageSize.width > 0,
               imageSize.height > 0 else {
@@ -185,11 +169,10 @@ final class AutoShootEngine {
         )
     }
 
-    /// Вызывай после успешного capture (чтобы не копил старую инерцию)
     func notifyDidCapture() {
         softReset(keepCooldown: true)
     }
-    
+
     func resetOnModeChange(keepCooldown: Bool = true) {
         softReset(keepCooldown: keepCooldown)
     }
@@ -209,11 +192,6 @@ final class AutoShootEngine {
 
     private func applyPenalty(_ value: CGFloat) {
         stableScore = max(0, stableScore - value)
-        // EMA не сбрасываем полностью — это и есть “penalty вместо reset”
-        // но если score в ноль ушел, можно слегка отпускать EMA:
-        if stableScore == 0 {
-            // оставляем EMA как есть — обычно так лучше “прощает” дыхание рамки
-        }
     }
 
     private func quadBoundingBoxArea(_ q: Quadrilateral) -> CGFloat {
@@ -246,7 +224,6 @@ final class AutoShootEngine {
 
     private func log(_ msg: String) {
         guard isLoggingEnabled else { return }
-       // print("📸 AutoShoot | \(msg)")
     }
 
     private func fmt(_ v: CGFloat) -> String {

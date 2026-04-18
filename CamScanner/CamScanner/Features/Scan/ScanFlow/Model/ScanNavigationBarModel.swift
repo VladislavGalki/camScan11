@@ -22,7 +22,6 @@ enum QualityPreset: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// целевые размеры (downscale после capture)
     var maxDimension: CGFloat {
         switch self {
         case .hd: return 4032

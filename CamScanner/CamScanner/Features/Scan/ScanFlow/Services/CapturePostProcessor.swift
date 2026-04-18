@@ -2,9 +2,9 @@ import UIKit
 import CoreImage
 
 struct CapturePostProcessOutput {
-    let original: UIImage            // FULL (для редактора)
-    let preview: UIImage             // CROPPED (для превью)
-    let autoQuadInImageSpace: Quadrilateral?  // quad рамки в координатах original
+    let original: UIImage
+    let preview: UIImage
+    let autoQuadInImageSpace: Quadrilateral?
 }
 
 final class CapturePostProcessor {
@@ -16,10 +16,8 @@ final class CapturePostProcessor {
         autoMode: Bool,
         quality: QualityPreset
     ) -> CapturePostProcessOutput {
-        /// rotation считаем ДО normalize
         let rotationAngle = SmartCropper.rotationAngle(for: image.imageOrientation)
 
-        /// normalize изображение
         let original = image.normalizedUp()
 
         var previewImage = original
@@ -35,20 +33,6 @@ final class CapturePostProcessor {
                 original.size,
                 withRotationAngle: rotationAngle
             )
-
-            let points = [
-                quadInImageSpace.topLeft,
-                quadInImageSpace.topRight,
-                quadInImageSpace.bottomRight,
-                quadInImageSpace.bottomLeft
-            ]
-
-            for (i, p) in points.enumerated() {
-                let inside =
-                    p.x >= 0 && p.y >= 0 &&
-                    p.x <= original.size.width &&
-                    p.y <= original.size.height
-            }
 
             if let cropped = SmartCropper.cropAndDeskew(
                 image: original,
@@ -71,10 +55,6 @@ final class CapturePostProcessor {
         )
     }
 
-    // ✅ ID MODE:
-    // - original = FULL (для редактора)
-    // - preview = CROPPED по рамке (для превью)
-    // - autoQuadInImageSpace = quad рамки в координатах FULL
     func processIdByFrame(
         image: UIImage,
         frameRectInPreview: CGRect,
@@ -89,14 +69,12 @@ final class CapturePostProcessor {
             return .init(original: full, preview: preview, autoQuadInImageSpace: nil)
         }
 
-        // rect рамки -> image coords (aspectFill)
         let imageRect = mapAspectFillRectFromPreviewToImage(
             rect: frameRectInPreview,
             previewSize: previewSize,
             imageSize: full.size
         ).integral
 
-        // quad рамки в координатах full
         let quad = Quadrilateral(
             topLeft: CGPoint(x: imageRect.minX, y: imageRect.minY),
             topRight: CGPoint(x: imageRect.maxX, y: imageRect.minY),
@@ -104,7 +82,6 @@ final class CapturePostProcessor {
             bottomLeft: CGPoint(x: imageRect.minX, y: imageRect.maxY)
         )
 
-        // preview = cropped кусок (как CamScanner)
         let croppedForPreview = full.cropped(to: imageRect) ?? full
         let preview = croppedForPreview.downscaled(maxDimension: quality.maxDimension)
 
@@ -120,7 +97,7 @@ final class CapturePostProcessor {
 
         let sx = previewSize.width / imageSize.width
         let sy = previewSize.height / imageSize.height
-        let scale = max(sx, sy) // aspectFill
+        let scale = max(sx, sy)
 
         let scaledImageSize = CGSize(width: imageSize.width * scale,
                                      height: imageSize.height * scale)

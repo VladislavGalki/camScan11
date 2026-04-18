@@ -92,7 +92,6 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
     // MARK: Configure
 
     func configure(model: ScanPreviewModel, textItems: [DocumentTextItem] = [], watermarkItems: [DocumentWatermarkItem] = [], signatureItems: [DocumentSignatureItem] = []) {
-        print("📝 OpenDocPageCell | configure docType=\(model.documentType) frames=\(model.frames.count) textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) signatureItems=\(signatureItems.count) cellBounds=\(contentView.bounds)")
         scrollView.zoomScale = 1
 
         imageView1.isHidden = true
@@ -165,7 +164,6 @@ final class OpenDocumentPageCell: UICollectionViewCell, UIScrollViewDelegate {
         watermarkItems: [DocumentWatermarkItem],
         signatureItems: [DocumentSignatureItem] = []
     ) {
-        print("📝 OpenDocPageCell | updateOverlays textItems=\(textItems.count) watermarkItems=\(watermarkItems.count) signatureItems=\(signatureItems.count) zoomContainer=\(zoomContainerView.bounds)")
         let overlay = OpenDocumentCombinedOverlayView(textItems: textItems, watermarkItems: watermarkItems, signatureItems: signatureItems)
 
         if let overlayHostingController {

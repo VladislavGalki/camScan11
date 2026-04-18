@@ -44,7 +44,6 @@ struct HomeView: View {
                         }
                         
                         ExploreToolsView(model: vm.exploreToolModel) {
-                            // all click
                         } onToolTapped: { toolType in
                             showAddCandidate = true
                         }

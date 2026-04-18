@@ -12,10 +12,8 @@ final class DocumentExporter {
         case photosNotAuthorized
     }
 
-    // MARK: - ✅ Новый async API: JPEG/PNG -> Photos (без шита), остальное -> URLs
+    // MARK: - Export
 
-    /// Если format == .jpeg/.png -> сохраняем напрямую в Photos, completion вернет пустой массив URL.
-    /// Если format == .pdf/.longImage/... -> создаем файлы во временной папке и возвращаем URL’ы.
     func exportOrSave(
         images: [UIImage],
         format: DocumentExportFormat,
@@ -30,11 +28,10 @@ final class DocumentExporter {
 
         switch format {
         case .jpeg, .png:
-            // ✅ НОВОЕ: сохраняем все изображения в галерею, по отдельности, без share sheet
             saveToPhotos(images) { result in
                 switch result {
                 case .success:
-                    completion(.success([])) // urls не нужны
+                    completion(.success([]))
                 case .failure(let err):
                     completion(.failure(err))
                 }
@@ -50,9 +47,8 @@ final class DocumentExporter {
         }
     }
 
-    // MARK: - ✅ Синхронный API (как база для ShareSheet)
+    // MARK: - URL export
 
-    /// ✅ Возвращаем МАССИВ URL (для мульти-экспорта JPEG/PNG в ShareSheet — если когда-нибудь понадобится)
     func exportURLs(images: [UIImage], format: DocumentExportFormat, fileName: String) throws -> [URL] {
         let images = images.compactMap { $0 }
         guard !images.isEmpty else { throw ExportError.noImages }
@@ -67,7 +63,6 @@ final class DocumentExporter {
             return [url]
 
         case .jpeg:
-            // ✅ если несколько — каждый отдельно
             return try images.enumerated().map { idx, img in
                 let suffix = images.count > 1 ? "_\(idx+1)" : ""
                 let url = tempDir.appendingPathComponent("\(safeName)\(suffix).jpg")
@@ -76,7 +71,6 @@ final class DocumentExporter {
             }
 
         case .png:
-            // ✅ если несколько — каждый отдельно
             return try images.enumerated().map { idx, img in
                 let suffix = images.count > 1 ? "_\(idx+1)" : ""
                 let url = tempDir.appendingPathComponent("\(safeName)\(suffix).png")
@@ -85,28 +79,25 @@ final class DocumentExporter {
             }
 
         case .longImage:
-            // ✅ long image сохраняем в JPEG (как ты просил)
             let stitched = stitchVertically(images: images)
             let url = tempDir.appendingPathComponent("\(safeName)_long.jpg")
             try writeJPEG(stitched, to: url, quality: 0.92)
             return [url]
 
         case .ppt, .word, .excel:
-            // пока не реализуем — fallback в PDF (один файл)
             let url = tempDir.appendingPathComponent("\(safeName).pdf")
             try writePDF(images: images, to: url)
             return [url]
         }
     }
 
-    /// ✅ Старый API оставим для совместимости
     func export(images: [UIImage], format: DocumentExportFormat, fileName: String) throws -> URL {
         let urls = try exportURLs(images: images, format: format, fileName: fileName)
         guard let first = urls.first else { throw ExportError.failedToWrite }
         return first
     }
 
-    // MARK: - Photos save (JPEG/PNG без шита)
+    // MARK: - Photos save
 
     private func saveToPhotos(_ images: [UIImage], completion: @escaping (Result<Void, Error>) -> Void) {
 

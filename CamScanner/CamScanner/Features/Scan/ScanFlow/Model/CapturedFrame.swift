@@ -3,9 +3,7 @@ import UIKit
 struct CapturedFrame: Equatable, Hashable {
     let id: UUID = UUID()
     var preview: UIImage? = nil
-    /// База для фильтров (НЕ вращается)
     var previewBase: UIImage? = nil
-    /// База для отображения (вращается)
     var displayBase: UIImage? = nil
     var original: UIImage? = nil
     var quad: Quadrilateral? = nil

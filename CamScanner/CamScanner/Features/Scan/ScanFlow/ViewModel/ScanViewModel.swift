@@ -30,11 +30,9 @@ final class ScanViewModel: ObservableObject {
     private let autoShootEngine: AutoShootEngine
     private let postProcessor: CapturePostProcessor
     
-    // Scan детект
     private var latestPreviewQuad: Quadrilateral?
     private var latestPreviewImageSize: CGSize = .zero
-    
-    // ID рамка
+
     var idDocumentCropperModel: DocumentCropperModel?
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
@@ -65,10 +63,6 @@ final class ScanViewModel: ObservableObject {
         
         subscribeForSelectedDocuments()
         subscribeForCameraService()
-    }
-    
-    deinit {
-        print("!!! DEINITED !!! ScanViewModel")
     }
     
     // MARK: - Lifecycle

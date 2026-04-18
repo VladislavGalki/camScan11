@@ -5,7 +5,7 @@ struct DocumentCropperView: View {
     let cropperModel: DocumentCropperModel
 
     let onCancel: () -> Void
-    let onDone: (DocumentCropperModel) -> Void   // ✅
+    let onDone: (DocumentCropperModel) -> Void
 
     @State private var action: CropperAction? = nil
 

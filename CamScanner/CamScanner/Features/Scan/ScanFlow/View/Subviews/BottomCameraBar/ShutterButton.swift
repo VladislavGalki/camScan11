@@ -78,7 +78,6 @@ extension CaptureShutterButton {
         countdownValue = 3
         progress = 0
 
-        // плавная animation круга (GPU, без лагов)
         withAnimation(.linear(duration: 3)) {
             progress = 1
         }

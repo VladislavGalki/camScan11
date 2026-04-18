@@ -8,7 +8,6 @@ final class FilterEngine {
     private let context: CIContext
 
     private init() {
-        // ✅ быстрый, переиспользуемый контекст
         self.context = CIContext(options: [
             .useSoftwareRenderer: false
         ])
@@ -17,7 +16,6 @@ final class FilterEngine {
     // MARK: - Public
 
     func apply(_ filter: PreviewFilter, to image: UIImage) -> UIImage {
-        // OmniFix пока не делаем — отображаем как Original
         if filter == .omnifix {
             return image
         }
@@ -62,7 +60,6 @@ final class FilterEngine {
                 ])
 
         case .eco:
-            // “Эко” — мягкий, чуть тёплый
             out = ci
                 .applyingFilter("CIColorControls", parameters: [
                     kCIInputContrastKey: 1.08,
@@ -75,7 +72,6 @@ final class FilterEngine {
                 ])
 
         case .noShadow:
-            // “Без тени” — поднимаем тени, прижимаем хайлайты, слегка выравниваем
             out = ci
                 .applyingFilter("CIHighlightShadowAdjust", parameters: [
                     "inputShadowAmount": 1.00,
@@ -91,8 +87,6 @@ final class FilterEngine {
                 ])
 
         case .noHandwriting:
-            // “Без почерка” (по скрину): выравниваем фон + усиливаем печатный текст
-            // ❗️Это НЕ удаление рукописи, а подавление слабоконтрастных деталей и текстуры.
             out = ci
                 .applyingFilter("CINoiseReduction", parameters: [
                     "inputNoiseLevel": 0.02,
@@ -108,9 +102,6 @@ final class FilterEngine {
                 ])
 
         case .blackWhite:
-            // “Ч/Б” — пороговое
-            // 1) grayscale + высокий контраст
-            // 2) threshold kernel
             let pre = ci
                 .applyingFilter("CIColorControls", parameters: [
                     kCIInputSaturationKey: 0.0,
@@ -133,11 +124,10 @@ final class FilterEngine {
 
     private func render(_ ci: CIImage, like image: UIImage) -> UIImage? {
         guard let cg = context.createCGImage(ci, from: ci.extent) else { return nil }
-        // ✅ выдаём .up (как вы делали в пайплайне кроппера)
         return UIImage(cgImage: cg, scale: image.scale, orientation: .up)
     }
 
-    // MARK: - Threshold kernel (для Ч/Б)
+    // MARK: - Threshold kernel
 
     private lazy var thresholdKernel: CIColorKernel? = {
         let src = """

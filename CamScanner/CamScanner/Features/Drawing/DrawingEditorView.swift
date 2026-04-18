@@ -170,11 +170,10 @@ struct DrawingEditorView: View {
                 .padding(.bottom, 18)
             }
 
-            // ✅ pen options overlay + close on tap outside
             if showPenOptions {
                 Color.black.opacity(0.35)
                     .ignoresSafeArea()
-                    .onTapGesture { showPenOptions = false }   // ✅ FIX #1
+                    .onTapGesture { showPenOptions = false }
 
                 penOptionsSheet
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -226,10 +225,8 @@ struct DrawingEditorView: View {
     private func eraseNearestStroke(at pointView: CGPoint, imageRect: CGRect) -> Bool {
         guard !strokes.isEmpty else { return false }
 
-        // tolerance в пикселях
         let tolerance: CGFloat = 22
 
-        // хиттест: bbox в view-space
         func hit(_ s: Stroke) -> Bool {
             guard let first = s.points.first else { return false }
             var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
@@ -357,7 +354,6 @@ struct DrawingEditorView: View {
                 if ptsPx.count > 1 {
                     for p in ptsPx.dropFirst() { path.addLine(to: p) }
                 } else {
-                    // точка
                     let lw = s.widthN * min(size.width, size.height)
                     let r = max(1, lw / 2)
                     path.append(UIBezierPath(ovalIn: CGRect(x: ptsPx[0].x - r, y: ptsPx[0].y - r, width: 2*r, height: 2*r)))

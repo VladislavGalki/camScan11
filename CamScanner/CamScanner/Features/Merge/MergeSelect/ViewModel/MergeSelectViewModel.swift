@@ -8,7 +8,6 @@ final class MergeSelectViewModel: ObservableObject {
     @Published private(set) var items: [DocumentListItem] = []
     @Published private(set) var thumbnails: [UUID: UIImage] = [:]
 
-    // selected + порядок выбора
     @Published private(set) var selected: Set<UUID> = []
     private(set) var selectedInOrder: [UUID] = []
 

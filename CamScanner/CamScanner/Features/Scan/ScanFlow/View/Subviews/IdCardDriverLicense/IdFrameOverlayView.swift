@@ -203,14 +203,12 @@ final class IdFrameOverlayView: UIView {
         let thirdWidth = rect.width / 3
         let thirdHeight = rect.height / 3
 
-        // Вертикальные линии
         path.move(to: CGPoint(x: rect.minX + thirdWidth, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.minX + thirdWidth, y: rect.maxY))
 
         path.move(to: CGPoint(x: rect.minX + 2 * thirdWidth, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.minX + 2 * thirdWidth, y: rect.maxY))
 
-        // Горизонтальные линии
         path.move(to: CGPoint(x: rect.minX, y: rect.minY + thirdHeight))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + thirdHeight))
 

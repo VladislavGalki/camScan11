@@ -567,7 +567,6 @@ extension OpenDocumentViewModel {
 
     private static let cardWidth: CGFloat = 322
 
-    /// Returns updated text items with rotated coordinates, or nil if nothing changed.
     private func computeRotatedTextItems(forPageIndex pageIndex: Int) -> [DocumentTextItem]? {
         guard let model = models[safe: pageIndex] else { return nil }
 
@@ -691,7 +690,6 @@ extension OpenDocumentViewModel {
         return changed ? updatedItems : nil
     }
 
-    /// Maps a model index to the corresponding PageEntity indices in the DB.
     private func pageIndicesForModel(at modelIndex: Int) -> [Int] {
         var startIndex = 0
         for i in 0..<modelIndex {

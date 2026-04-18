@@ -3,8 +3,6 @@ import SwiftUI
 struct OpenDocumentTextOverlayView: View {
     let items: [DocumentTextItem]
 
-    /// Reference cell width for font scaling. When 0, uses geo.size (no scaling).
-    /// Pass the original cell width (e.g. 322) when displaying in a smaller preview.
     var referenceWidth: CGFloat = 0
 
     var body: some View {
@@ -18,16 +16,6 @@ struct OpenDocumentTextOverlayView: View {
                             x: item.centerX * geo.size.width,
                             y: item.centerY * geo.size.height
                         )
-                }
-            }
-            .onAppear {
-                print("📝 TextOverlay | geo.size=\(geo.size) items=\(items.count) fontScale=\(fontScale)")
-                for item in items {
-                    let posX = item.centerX * geo.size.width
-                    let posY = item.centerY * geo.size.height
-                    let w = item.width * geo.size.width
-                    let h = item.height * geo.size.height
-                    print("📝 TextOverlay |   \"\(item.text)\" center=(\(item.centerX), \(item.centerY)) pos=(\(posX), \(posY)) blockSize=(\(w), \(h)) fontSize=\(item.style.fontSize) rot=\(item.rotation)")
                 }
             }
         }

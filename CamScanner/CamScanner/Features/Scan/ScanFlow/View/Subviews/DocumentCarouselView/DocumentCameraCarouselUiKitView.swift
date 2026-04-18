@@ -231,13 +231,11 @@ final class CameraModePickerView: UIView {
         let distance = nearest.center.x - (currentAttr?.center.x ?? nearest.center.x)
         let threshold: CGFloat = 30
         
-        // сильный свайп → прыжок
         if abs(nearestIndex - selectedIndex) >= 1 {
             selectItem(at: nearestIndex)
             return
         }
-        
-        // слабый свайп → порог
+
         if distance > threshold {
             selectItem(at: selectedIndex + 1)
         } else if distance < -threshold {
