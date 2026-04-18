@@ -65,7 +65,6 @@ final class HomeDocumentsStore: NSObject {
             try fetchResultController.performFetch()
             rebuild()
         } catch {
-            print("Fetch error:", error)
         }
     }
     

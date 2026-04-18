@@ -23,7 +23,6 @@ final class FileStore {
         appSupportURL.appendingPathComponent(rootFolderName, isDirectory: true)
     }
 
-    /// Создаёт папку если надо
     private func ensureRootFolder() throws {
         let fm = FileManager.default
 
@@ -134,7 +133,7 @@ extension FileStore {
         let root = rootURL.path
         let full = url.path
         if full.hasPrefix(root + "/") {
-            return String(full.dropFirst(root.count + 1)) // без ведущего "/"
+            return String(full.dropFirst(root.count + 1))
         }
         return full
     }
