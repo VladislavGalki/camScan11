@@ -360,7 +360,7 @@ final class ScanPreviewViewModel: ObservableObject {
 
         sliderRenderTask?.cancel()
 
-        guard let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue else { return }
+        let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue
         sliderValue = savedAdjustment
 
         var state = frame.currentFilter

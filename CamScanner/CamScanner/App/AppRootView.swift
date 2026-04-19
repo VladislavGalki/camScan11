@@ -90,21 +90,6 @@ struct AppRootView: View {
                 )
             }
 
-        // MARK: - Merge
-
-        case let r as MergeRoute:
-            switch r {
-            case .selectDocuments:
-                return AnyView(
-                    MergeSelectView()
-                )
-
-            case .arrangeDocuments(let ids):
-                return AnyView(
-                    MergeArrangeView(inputIDs: ids)
-                )
-            }
-
         default:
             return AnyView(EmptyView())
         }

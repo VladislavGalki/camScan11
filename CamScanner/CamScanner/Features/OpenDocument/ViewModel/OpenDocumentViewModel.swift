@@ -878,7 +878,7 @@ extension OpenDocumentViewModel {
 
         sliderRenderTask?.cancel()
 
-        guard let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue else { return  }
+        let savedAdjustment = frame.filterAdjustments[type] ?? type.defaultSliderValue
         sliderValue = Double(savedAdjustment)
 
         var state = frame.currentFilter
