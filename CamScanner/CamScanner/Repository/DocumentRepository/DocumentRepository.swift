@@ -3,17 +3,25 @@ import CoreData
 import UIKit
 
 final class DocumentRepository {
-    static let shared = DocumentRepository(
-        context: PersistenceController.shared.container.viewContext
-    )
-    
-    private let passwordCryptoService = PasswordCryptoService.shared
-    private let keychainService = KeychainService.shared
-    
+    private let passwordCryptoService: PasswordCryptoService
+    private let keychainService: KeychainService
+    private let fileStore: FileStore
+    private let imageCompressionService: ImageCompressionService
+
     private let context: NSManagedObjectContext
-    
-    init(context: NSManagedObjectContext) {
+
+    init(
+        context: NSManagedObjectContext,
+        passwordCryptoService: PasswordCryptoService,
+        keychainService: KeychainService,
+        fileStore: FileStore,
+        imageCompressionService: ImageCompressionService
+    ) {
         self.context = context
+        self.passwordCryptoService = passwordCryptoService
+        self.keychainService = keychainService
+        self.fileStore = fileStore
+        self.imageCompressionService = imageCompressionService
     }
 
     private func notifyDocumentDidChange(_ documentID: UUID) {
@@ -177,14 +185,14 @@ extension DocumentRepository {
 
             let pageID = UUID()
 
-            let displayURL = try FileStore.shared.saveJPEG(
+            let displayURL = try fileStore.saveJPEG(
                 image: preview,
                 docID: docID,
                 pageID: pageID,
                 fileName: "\(pageID.uuidString)_display.jpg"
             )
 
-            let originalURL = try FileStore.shared.saveJPEG(
+            let originalURL = try fileStore.saveJPEG(
                 image: original,
                 docID: docID,
                 pageID: pageID,
@@ -194,21 +202,21 @@ extension DocumentRepository {
             let page = PageEntity(context: context)
             page.id = pageID
             page.index = Int16(index)
-            page.imagePath = FileStore.shared.relativePath(fromAbsolute: displayURL)
-            page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
+            page.imagePath = fileStore.relativePath(fromAbsolute: displayURL)
+            page.originalPath = fileStore.relativePath(fromAbsolute: originalURL)
             page.sourceDocumentTypeRaw = payload.sourceDocumentType.rawValue
 
             page.quadData = frame.quad.flatMap { QuadCodec.encode($0) }
             page.drawingData = frame.drawingData
 
             if let drawingBase = frame.drawingBase {
-                let drawingURL = try FileStore.shared.saveJPEG(
+                let drawingURL = try fileStore.saveJPEG(
                     image: drawingBase,
                     docID: docID,
                     pageID: pageID,
                     fileName: "\(pageID.uuidString)_drawingBase.jpg"
                 )
-                page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: drawingURL)
+                page.drawingBasePath = fileStore.relativePath(fromAbsolute: drawingURL)
             }
 
             page.filterTypeRaw = frame.currentFilter.type.rawValue
@@ -217,7 +225,7 @@ extension DocumentRepository {
             page.document = doc
         }
 
-        let totalSize = FileStore.shared.documentFolderSize(docID: docID)
+        let totalSize = fileStore.documentFolderSize(docID: docID)
         doc.cachedSize = totalSize
 
         try context.save()
@@ -251,14 +259,14 @@ extension DocumentRepository {
 
             let pageID = UUID()
 
-            let displayURL = try FileStore.shared.saveJPEG(
+            let displayURL = try fileStore.saveJPEG(
                 image: preview,
                 docID: documentID,
                 pageID: pageID,
                 fileName: "\(pageID.uuidString)_display.jpg"
             )
 
-            let originalURL = try FileStore.shared.saveJPEG(
+            let originalURL = try fileStore.saveJPEG(
                 image: original,
                 docID: documentID,
                 pageID: pageID,
@@ -268,21 +276,21 @@ extension DocumentRepository {
             let page = PageEntity(context: context)
             page.id = pageID
             page.index = Int16(nextIndex)
-            page.imagePath = FileStore.shared.relativePath(fromAbsolute: displayURL)
-            page.originalPath = FileStore.shared.relativePath(fromAbsolute: originalURL)
+            page.imagePath = fileStore.relativePath(fromAbsolute: displayURL)
+            page.originalPath = fileStore.relativePath(fromAbsolute: originalURL)
             page.sourceDocumentTypeRaw = payload.sourceDocumentType.rawValue
 
             page.quadData = frame.quad.flatMap { QuadCodec.encode($0) }
             page.drawingData = frame.drawingData
 
             if let drawingBase = frame.drawingBase {
-                let drawingURL = try FileStore.shared.saveJPEG(
+                let drawingURL = try fileStore.saveJPEG(
                     image: drawingBase,
                     docID: documentID,
                     pageID: pageID,
                     fileName: "\(pageID.uuidString)_drawingBase.jpg"
                 )
-                page.drawingBasePath = FileStore.shared.relativePath(fromAbsolute: drawingURL)
+                page.drawingBasePath = fileStore.relativePath(fromAbsolute: drawingURL)
             }
 
             page.filterTypeRaw = frame.currentFilter.type.rawValue
@@ -296,7 +304,7 @@ extension DocumentRepository {
         document.pageCount = Int16(existingPages.count + pages.count)
         document.lastViewed = Date()
 
-        let totalSize = FileStore.shared.documentFolderSize(docID: documentID)
+        let totalSize = fileStore.documentFolderSize(docID: documentID)
         document.cachedSize = totalSize
 
         try context.save()
@@ -338,7 +346,7 @@ extension DocumentRepository {
 
         document.pageCount = Int16(max(pages.count - 1, 0))
         document.lastViewed = Date()
-        document.cachedSize = FileStore.shared.documentFolderSize(docID: documentID)
+        document.cachedSize = fileStore.documentFolderSize(docID: documentID)
 
         try context.save()
     }
@@ -433,7 +441,7 @@ extension DocumentRepository {
 
         document.pageCount = Int16(max(pages.count - 1, 0))
         document.lastViewed = Date()
-        document.cachedSize = FileStore.shared.documentFolderSize(docID: documentID)
+        document.cachedSize = fileStore.documentFolderSize(docID: documentID)
 
         try context.save()
         return true
@@ -611,7 +619,7 @@ extension DocumentRepository {
         if let document = try context.fetch(documentRequest).first {
 
             if let docID = document.id {
-                FileStore.shared.deleteDocumentFolder(docID: docID)
+                fileStore.deleteDocumentFolder(docID: docID)
             }
 
             context.delete(document)
@@ -628,7 +636,7 @@ extension DocumentRepository {
             if let documents = folder.documents as? Set<DocumentEntity> {
                 for doc in documents {
                     if let docID = doc.id {
-                        FileStore.shared.deleteDocumentFolder(docID: docID)
+                        fileStore.deleteDocumentFolder(docID: docID)
                     }
                     
                     context.delete(doc)
@@ -653,7 +661,7 @@ extension DocumentRepository {
 
         for document in documents {
             if let docID = document.id {
-                FileStore.shared.deleteDocumentFolder(docID: docID)
+                fileStore.deleteDocumentFolder(docID: docID)
             }
 
             context.delete(document)
@@ -668,7 +676,7 @@ extension DocumentRepository {
             if let documents = folder.documents as? Set<DocumentEntity> {
                 for doc in documents {
                     if let docID = doc.id {
-                        FileStore.shared.deleteDocumentFolder(docID: docID)
+                        fileStore.deleteDocumentFolder(docID: docID)
                     }
 
                     context.delete(doc)
@@ -1006,7 +1014,7 @@ extension DocumentRepository {
 
             if let entry = pageImages.first(where: { $0.pageIndex == Int(page.index) }),
                let relativePath = page.imagePath {
-                let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+                let fileURL = fileStore.url(forRelativePath: relativePath)
                 if let data = entry.image.jpegData(compressionQuality: 0.92) {
                     try? data.write(to: fileURL, options: [.atomic])
                 }
@@ -1028,7 +1036,7 @@ extension DocumentRepository {
             guard let entry = pageImages.first(where: { $0.pageIndex == Int(page.index) }),
                   let relativePath = page.imagePath else { continue }
 
-            let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+            let fileURL = fileStore.url(forRelativePath: relativePath)
             if let data = entry.image.jpegData(compressionQuality: 0.92) {
                 try? data.write(to: fileURL, options: [.atomic])
             }
@@ -1050,7 +1058,7 @@ extension DocumentRepository {
 
             if let displayImage = update.frame.preview ?? update.frame.displayBase,
                let relativePath = page.imagePath {
-                let fileURL = FileStore.shared.url(forRelativePath: relativePath)
+                let fileURL = fileStore.url(forRelativePath: relativePath)
                 if let data = displayImage.jpegData(compressionQuality: 0.92) {
                     try? data.write(to: fileURL, options: [.atomic])
                 }
@@ -1178,7 +1186,7 @@ extension DocumentRepository {
                 return $0.createdAt < $1.createdAt
             }
             .compactMap { entity -> DocumentSignatureItem? in
-                let url = FileStore.shared.url(forRelativePath: entity.imagePath)
+                let url = fileStore.url(forRelativePath: entity.imagePath)
                 guard let image = UIImage(contentsOfFile: url.path) else { return nil }
 
                 var strokes: [Stroke]?
@@ -1220,7 +1228,7 @@ extension DocumentRepository {
 
         let existing = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
         for overlay in existing {
-            let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+            let url = fileStore.url(forRelativePath: overlay.imagePath)
             try? FileManager.default.removeItem(at: url)
             context.delete(overlay)
         }
@@ -1247,12 +1255,12 @@ extension DocumentRepository {
 
             if let image = item.image, let pngData = image.pngData() {
                 let fileName = "\(item.id.uuidString).png"
-                let fileURL = try FileStore.shared.savePNG(
+                let fileURL = try fileStore.savePNG(
                     data: pngData,
                     folder: "SignatureOverlays",
                     fileName: fileName
                 )
-                entity.imagePath = FileStore.shared.relativePath(fromAbsolute: fileURL)
+                entity.imagePath = fileStore.relativePath(fromAbsolute: fileURL)
             } else {
                 entity.imagePath = ""
             }
@@ -1279,7 +1287,7 @@ extension DocumentRepository {
         request.fetchLimit = 1
 
         if let entity = try context.fetch(request).first {
-            let url = FileStore.shared.url(forRelativePath: entity.imagePath)
+            let url = fileStore.url(forRelativePath: entity.imagePath)
             try? FileManager.default.removeItem(at: url)
             context.delete(entity)
             try context.save()
@@ -1346,7 +1354,7 @@ extension DocumentRepository {
         ]
 
         for relativePath in relativePaths.compactMap({ $0 }) {
-            let url = FileStore.shared.url(forRelativePath: relativePath)
+            let url = fileStore.url(forRelativePath: relativePath)
             try? FileManager.default.removeItem(at: url)
         }
     }
@@ -1376,7 +1384,7 @@ extension DocumentRepository {
         let signatureOverlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
         for overlay in signatureOverlays {
             if overlay.pageIndex == Int16(pageIndex) {
-                let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+                let url = fileStore.url(forRelativePath: overlay.imagePath)
                 try? FileManager.default.removeItem(at: url)
                 context.delete(overlay)
             } else if overlay.pageIndex > Int16(pageIndex) {
@@ -1427,7 +1435,7 @@ extension DocumentRepository {
 
         let signatureOverlays = (document.signatureOverlays as? Set<SignatureOverlayEntity>) ?? []
         for overlay in signatureOverlays where overlay.pageIndex == Int16(pageIndex) {
-            let url = FileStore.shared.url(forRelativePath: overlay.imagePath)
+            let url = fileStore.url(forRelativePath: overlay.imagePath)
             try? FileManager.default.removeItem(at: url)
             context.delete(overlay)
         }
@@ -1508,7 +1516,7 @@ extension DocumentRepository {
             guard
                 let originalPath = page.originalPath,
                 let originalImage = UIImage(
-                    contentsOfFile: FileStore.shared
+                    contentsOfFile: fileStore
                         .url(forRelativePath: originalPath).path
                 )
             else { return nil }
@@ -1518,7 +1526,7 @@ extension DocumentRepository {
 
             if let drawingPath = page.drawingBasePath,
                let drawingImage = UIImage(
-                    contentsOfFile: FileStore.shared
+                    contentsOfFile: fileStore
                         .url(forRelativePath: drawingPath).path
                ) {
                 frame.drawingBase = drawingImage
@@ -1544,7 +1552,7 @@ extension DocumentRepository {
 
             if let displayPath = page.imagePath,
                let displayImage = UIImage(
-                    contentsOfFile: FileStore.shared
+                    contentsOfFile: fileStore
                         .url(forRelativePath: displayPath).path
                ) {
                 frame.previewBase = displayImage
@@ -1553,7 +1561,7 @@ extension DocumentRepository {
             }
 
             if let base = frame.previewBase {
-                frame.previewBase = ImageCompressionService.shared.compress(
+                frame.previewBase = imageCompressionService.compress(
                     base,
                     maxDimension: 1200,
                     quality: 0.90
@@ -1820,7 +1828,7 @@ extension DocumentRepository {
         let signatureID = UUID()
         let fileName = "\(signatureID.uuidString).png"
 
-        let fileURL = try FileStore.shared.savePNG(
+        let fileURL = try fileStore.savePNG(
             data: pngData,
             folder: "Signatures",
             fileName: fileName
@@ -1828,7 +1836,7 @@ extension DocumentRepository {
 
         let entity = SignatureEntity(context: context)
         entity.id = signatureID
-        entity.imagePath = FileStore.shared.relativePath(fromAbsolute: fileURL)
+        entity.imagePath = fileStore.relativePath(fromAbsolute: fileURL)
         entity.createdAt = Date()
         entity.strokeData = strokeData
         entity.colorHex = colorHex
@@ -1850,8 +1858,8 @@ extension DocumentRepository {
 
         guard let entity = try context.fetch(request).first else { return }
 
-        let fileURL = FileStore.shared.url(forRelativePath: entity.imagePath)
-        FileStore.shared.deleteFileIfExists(atPath: fileURL.path)
+        let fileURL = fileStore.url(forRelativePath: entity.imagePath)
+        fileStore.deleteFileIfExists(atPath: fileURL.path)
 
         context.delete(entity)
         try context.save()

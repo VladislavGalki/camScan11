@@ -26,7 +26,8 @@ final class HomeDocumentsStore: NSObject {
     private let documentEntitiesSubject = CurrentValueSubject<[DocumentEntity], Never>([])
     private let thumbnailsSubject = CurrentValueSubject<[ThumbKey: UIImage], Never>([:])
     
-    private let context: NSManagedObjectContext = PersistenceController.shared.container.viewContext
+    private let context: NSManagedObjectContext
+    private let fileStore: FileStore
     private var fetchResultController: NSFetchedResultsController<DocumentEntity>!
     
     private var thumbInFlight = Set<ThumbKey>()
@@ -34,7 +35,9 @@ final class HomeDocumentsStore: NSObject {
     
     private var cancellables = Set<AnyCancellable>()
     
-    override init() {
+    init(context: NSManagedObjectContext, fileStore: FileStore) {
+        self.context = context
+        self.fileStore = fileStore
         super.init()
         bootstrap()
         subscribe()
@@ -114,13 +117,14 @@ extension HomeDocumentsStore {
             if thumbnailsSubject.value[key] != nil { continue }
             if thumbInFlight.contains(key) { continue }
 
-            let url = FileStore.shared.url(forRelativePath: relPath)
+            let url = fileStore.url(forRelativePath: relPath)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
 
             thumbInFlight.insert(key)
 
+            let fileStore = self.fileStore
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                let img = FileStore.shared.loadImage(at: url)
+                let img = fileStore.loadImage(at: url)
                 let thumb = img?.downscaled(maxDimension: 364)
 
                 DispatchQueue.main.async {

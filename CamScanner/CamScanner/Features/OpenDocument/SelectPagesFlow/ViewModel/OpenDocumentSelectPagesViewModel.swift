@@ -8,10 +8,13 @@ final class OpenDocumentSelectPagesViewModel: ObservableObject {
     @Published var selectedPageIndexes: Set<Int> = []
 
     private let inputModel: OpenDocumentSelectPagesInputModel
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
+    private let imageCompressionService: ImageCompressionService
 
-    init(inputModel: OpenDocumentSelectPagesInputModel) {
+    init(inputModel: OpenDocumentSelectPagesInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
+        self.documentRepository = dependencies.documentRepository
+        self.imageCompressionService = dependencies.imageCompressionService
         reload()
     }
 
@@ -117,7 +120,10 @@ final class OpenDocumentSelectPagesViewModel: ObservableObject {
         let preparedModels = pageGroups.map {
             ScanPreviewModel(
                 documentType: $0.documentType,
-                frames: OpenDocumentFramePreparer.preparedFrames($0.frames)
+                frames: OpenDocumentFramePreparer.preparedFrames(
+                    $0.frames,
+                    imageCompressionService: imageCompressionService
+                )
             )
         }
 

@@ -5,8 +5,11 @@ struct AddTextView: View {
     @State private var shouldShowDeleteConfirmation = false
     @EnvironmentObject private var router: Router
 
-    init(inputModel: AddTextInputModel) {
-        _viewModel = StateObject(wrappedValue: AddTextViewModel(inputModel: inputModel))
+    init(inputModel: AddTextInputModel, dependencies: AppDependencies) {
+        _viewModel = StateObject(wrappedValue: AddTextViewModel(
+            inputModel: inputModel,
+            dependencies: dependencies
+        ))
     }
 
     var body: some View {

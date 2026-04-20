@@ -7,12 +7,11 @@ public enum RotationDirection {
 }
 
 final class RotationService {
+    private let filterRenderer: FilterRenderer
 
-    static let shared = RotationService()
-
-    private let filterRenderer = FilterRenderer.shared
-
-    private init() {}
+    init(filterRenderer: FilterRenderer) {
+        self.filterRenderer = filterRenderer
+    }
 
     func rotateRight(frame: CapturedFrame) -> CapturedFrame {
         rotate(frame: frame, direction: .right)

@@ -1,9 +1,7 @@
 import UIKit
 
 final class ImageCompressionService {
-    static let shared = ImageCompressionService()
-
-    private init() {}
+    init() {}
 
     func compress(
         _ image: UIImage,

@@ -15,14 +15,18 @@ struct FolderView: View {
     
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var tabBar: TabBarController
+    @Environment(\.dependencies) private var dependencies
     
     init(
         inputModel: FolderInputModel,
-        onFolderDeleted: @escaping () -> Void
+        onFolderDeleted: @escaping () -> Void,
+        dependencies: AppDependencies
     ) {
         _viewModel = StateObject(
             wrappedValue: FolderViewModel(
-                inputModel: inputModel, onFolderDeleted: onFolderDeleted
+                inputModel: inputModel,
+                onFolderDeleted: onFolderDeleted,
+                dependencies: dependencies
             )
         )
     }
@@ -150,7 +154,7 @@ private extension FolderView {
         switch sheet {
         case let .share(id):
             if let shareInputModel = viewModel.makeShareModel(id: id) {
-                ShareView(inputModel: shareInputModel) {
+                ShareView(inputModel: shareInputModel, dependencies: dependencies) {
                     viewModel.folderActiveSheet = nil
                 }
                 .presentationCornerRadius(38)
@@ -161,9 +165,13 @@ private extension FolderView {
             }
             .presentationCornerRadius(38)
         case let .move(inputModel):
-            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
-                viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
-            }
+            MoveDocumentsView(
+                inputModel: inputModel,
+                onMove: { documentIds, folderId in
+                    viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+                },
+                dependencies: dependencies
+            )
             .presentationCornerRadius(38)
         }
     }

@@ -2,8 +2,7 @@ import Foundation
 import UIKit
 
 final class FileStore {
-    static let shared = FileStore()
-    private init() {}
+    init() {}
 
     enum FileStoreError: Error {
         case failedToEncodeJPEG

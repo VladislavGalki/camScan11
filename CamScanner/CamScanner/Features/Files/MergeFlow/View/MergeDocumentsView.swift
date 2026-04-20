@@ -9,10 +9,15 @@ struct MergeDocumentsView: View {
 
     init(
         inputModel: MergeDocumentsInputModel,
-        onMerge: @escaping () -> Void
+        onMerge: @escaping () -> Void,
+        dependencies: AppDependencies
     ) {
         _viewModel = StateObject(
-            wrappedValue: MergeDocumentsViewModel(inputModel: inputModel, onMerge: onMerge)
+            wrappedValue: MergeDocumentsViewModel(
+                inputModel: inputModel,
+                onMerge: onMerge,
+                dependencies: dependencies
+            )
         )
     }
 

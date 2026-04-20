@@ -2,10 +2,15 @@ import SwiftUI
 import UIKit
 
 struct HomeView: View {
-    @StateObject private var vm = HomeViewModel()
-    
+    @StateObject private var vm: HomeViewModel
+
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var tabBar: TabBarController
+    @Environment(\.dependencies) private var dependencies
+
+    init(dependencies: AppDependencies) {
+        _vm = StateObject(wrappedValue: HomeViewModel(dependencies: dependencies))
+    }
 
     @State private var deleteCandidate: DocumentListItem? = nil
     @State private var showDeleteAlert: Bool = false
@@ -344,7 +349,7 @@ struct HomeView: View {
         switch sheet {
         case let .share(id):
             if let shareInputModel = vm.makeShareModel(id: id) {
-                ShareView(inputModel: shareInputModel) {
+                ShareView(inputModel: shareInputModel, dependencies: dependencies) {
                     vm.homeActiveSheet = nil
                 }
                 .presentationCornerRadius(38)
@@ -361,9 +366,13 @@ struct HomeView: View {
             }
             .presentationCornerRadius(38)
         case let .move(inputModel):
-            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
-                vm.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
-            }
+            MoveDocumentsView(
+                inputModel: inputModel,
+                onMove: { documentIds, folderId in
+                    vm.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+                },
+                dependencies: dependencies
+            )
             .presentationCornerRadius(38)
         default:
             EmptyView()

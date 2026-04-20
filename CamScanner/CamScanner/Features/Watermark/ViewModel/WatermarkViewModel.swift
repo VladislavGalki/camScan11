@@ -68,8 +68,12 @@ final class WatermarkViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(inputModel: WatermarkInputModel) {
-        self.store = WatermarkStore(documentID: inputModel.documentID)
+    init(inputModel: WatermarkInputModel, dependencies: AppDependencies) {
+        self.store = WatermarkStore(
+            documentID: inputModel.documentID,
+            documentRepository: dependencies.documentRepository,
+            context: dependencies.persistence.container.viewContext
+        )
         subscribe()
     }
 }

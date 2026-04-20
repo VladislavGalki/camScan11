@@ -6,9 +6,16 @@ struct ShareView: View {
     
     private let onClose: (() -> Void)?
     
-    init(inputModel: ShareInputModel, onClose: (() -> Void)? = nil) {
+    init(
+        inputModel: ShareInputModel,
+        dependencies: AppDependencies,
+        onClose: (() -> Void)? = nil
+    ) {
         self.onClose = onClose
-        _viewModel = StateObject(wrappedValue: ShareViewModel(inputModel: inputModel))
+        _viewModel = StateObject(wrappedValue: ShareViewModel(
+            inputModel: inputModel,
+            dependencies: dependencies
+        ))
     }
     
     var body: some View {

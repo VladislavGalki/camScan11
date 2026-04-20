@@ -26,17 +26,24 @@ final class FilesViewModel: ObservableObject {
     private var pendingAction: FilesPendingAction?
     private var selectableMenuAction: FilesSelectableMenuItem?
     
-    private let lockedActionExecutore = LockedActionExecutor.shared
-    private let passwordCryptoService = PasswordCryptoService.shared
+    private let lockedActionExecutore: LockedActionExecutor
+    private let passwordCryptoService: PasswordCryptoService
     private let documentRepository: DocumentRepository
-    private let documentStore = FileDocumentStore()
-    private let faceIdService = FaceIDService.shared
-    
+    private let documentStore: FileDocumentStore
+    private let faceIdService: FaceIDService
+
     private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
-    
-    init() {
-        self.documentRepository = DocumentRepository.shared
+
+    init(dependencies: AppDependencies) {
+        self.documentRepository = dependencies.documentRepository
+        self.lockedActionExecutore = dependencies.lockedActionExecutor
+        self.passwordCryptoService = dependencies.passwordCryptoService
+        self.faceIdService = dependencies.faceIDService
+        self.documentStore = FileDocumentStore(
+            context: dependencies.persistence.container.viewContext,
+            fileStore: dependencies.fileStore
+        )
         bootstrap()
     }
     

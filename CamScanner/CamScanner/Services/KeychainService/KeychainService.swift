@@ -2,7 +2,7 @@ import Security
 import Foundation
 
 final class KeychainService {
-    static let shared = KeychainService()
+    init() {}
 
     func save<T: Codable>(_ value: T, for key: String) throws {
         let data = try JSONEncoder().encode(value)

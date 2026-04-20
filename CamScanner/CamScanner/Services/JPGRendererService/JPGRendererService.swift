@@ -2,10 +2,11 @@ import UIKit
 import AVFoundation
 
 final class JPGRendererService {
+    private let imageCompressionService: ImageCompressionService
 
-    static let shared = JPGRendererService()
-
-    private init() {}
+    init(imageCompressionService: ImageCompressionService) {
+        self.imageCompressionService = imageCompressionService
+    }
 
     private let pageSize = CGSize(width: 1240, height: 1754)
 
@@ -62,7 +63,7 @@ final class JPGRendererService {
         }
 
         let compressed =
-            ImageCompressionService.shared.compress(
+            imageCompressionService.compress(
                 original,
                 maxDimension: 1920,
                 quality: 0.75
@@ -129,7 +130,7 @@ final class JPGRendererService {
 
         let images =
             originals.map {
-                ImageCompressionService.shared.compress(
+                imageCompressionService.compress(
                     $0,
                     maxDimension: 1240,
                     quality: 0.75
@@ -225,7 +226,7 @@ final class JPGRendererService {
         }
 
         let image =
-            ImageCompressionService.shared.compress(
+            imageCompressionService.compress(
                 original,
                 maxDimension: 1600,
                 quality: 0.75

@@ -37,15 +37,16 @@ final class ScanViewModel: ObservableObject {
     private var latestIdFrameRectInPreview: CGRect?
     private var latestIdPreviewSize: CGSize?
     
-    private let documentRepository = DocumentRepository.shared
-    
+    private let documentRepository: DocumentRepository
+
     private var cameraCancellables = Set<AnyCancellable>()
     private var selectedDocumentsCancellable = Set<AnyCancellable>()
-    
+
     // MARK: - Init
     init(
         settings: ScanSettingsStore,
         ui: ScanUIStateStore,
+        dependencies: AppDependencies,
         autoShootEngine: AutoShootEngine = AutoShootEngine(),
         postProcessor: CapturePostProcessor = CapturePostProcessor()
     ) {
@@ -53,6 +54,7 @@ final class ScanViewModel: ObservableObject {
         self.ui = ui
         self.autoShootEngine = autoShootEngine
         self.postProcessor = postProcessor
+        self.documentRepository = dependencies.documentRepository
         
         self.idResult = IdCaptureResult(
             type: ui.selectedDocumentType,

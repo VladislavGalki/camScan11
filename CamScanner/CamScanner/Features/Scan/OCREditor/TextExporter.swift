@@ -1,9 +1,7 @@
 import Foundation
 
 final class TextExporter {
-
-    static let shared = TextExporter()
-    private init() {}
+    init() {}
 
     enum ExportError: Error {
         case emptyText

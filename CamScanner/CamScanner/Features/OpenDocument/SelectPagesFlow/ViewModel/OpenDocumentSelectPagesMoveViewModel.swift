@@ -14,12 +14,17 @@ final class OpenDocumentSelectPagesMoveViewModel: ObservableObject {
     private var thumbInFlight = Set<ThumbKey>()
     private var thumbnails: [ThumbKey: UIImage] = [:]
 
-    private let documentRepository = DocumentRepository.shared
-    private let passwordCryptoService = PasswordCryptoService.shared
-    private let lockedActionExecutor = LockedActionExecutor.shared
+    private let documentRepository: DocumentRepository
+    private let passwordCryptoService: PasswordCryptoService
+    private let lockedActionExecutor: LockedActionExecutor
+    private let fileStore: FileStore
 
-    init(inputModel: OpenDocumentSelectPagesMoveInputModel) {
+    init(inputModel: OpenDocumentSelectPagesMoveInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
+        self.documentRepository = dependencies.documentRepository
+        self.passwordCryptoService = dependencies.passwordCryptoService
+        self.lockedActionExecutor = dependencies.lockedActionExecutor
+        self.fileStore = dependencies.fileStore
         loadRootItems()
     }
 
@@ -256,12 +261,12 @@ private extension OpenDocumentSelectPagesMoveViewModel {
             if thumbInFlight.contains(key) { continue }
 
             thumbInFlight.insert(key)
-            let url = FileStore.shared.url(forRelativePath: relPath)
+            let url = fileStore.url(forRelativePath: relPath)
 
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
 
-                let image = FileStore.shared.loadImage(at: url)
+                let image = self.fileStore.loadImage(at: url)
                 let thumb = image?.downscaled(maxDimension: 364)
 
                 DispatchQueue.main.async {

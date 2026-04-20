@@ -17,17 +17,31 @@ final class HomeViewModel: ObservableObject {
     @Published var shouldShowNotification = false
     @Published var notificationModel: NotificationModel?
 
-    private let documentRepository: DocumentRepository = DocumentRepository.shared
-    private let documentsStore: HomeDocumentsStore = HomeDocumentsStore()
-    private let fileDocumentStore: FileDocumentStore = FileDocumentStore()
-    private let passwordCryptoService = PasswordCryptoService.shared
-    private let lockedActionExecutor = LockedActionExecutor.shared
-    private let faceIdService = FaceIDService.shared
+    private let documentRepository: DocumentRepository
+    private let documentsStore: HomeDocumentsStore
+    private let fileDocumentStore: FileDocumentStore
+    private let passwordCryptoService: PasswordCryptoService
+    private let lockedActionExecutor: LockedActionExecutor
+    private let faceIdService: FaceIDService
 
     private var searchCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
-    
-    init() {
+
+    @MainActor
+    init(dependencies: AppDependencies) {
+        let context = dependencies.persistence.container.viewContext
+        self.documentRepository = dependencies.documentRepository
+        self.documentsStore = HomeDocumentsStore(
+            context: context,
+            fileStore: dependencies.fileStore
+        )
+        self.fileDocumentStore = FileDocumentStore(
+            context: context,
+            fileStore: dependencies.fileStore
+        )
+        self.passwordCryptoService = dependencies.passwordCryptoService
+        self.lockedActionExecutor = dependencies.lockedActionExecutor
+        self.faceIdService = dependencies.faceIDService
         subscribeToRecentDocuments()
         subscribeToSearchDocuments()
         subscribeSearch()

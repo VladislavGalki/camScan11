@@ -3,8 +3,7 @@ import Photos
 
 final class DocumentExporter {
 
-    static let shared = DocumentExporter()
-    private init() {}
+    init() {}
 
     enum ExportError: Error {
         case noImages

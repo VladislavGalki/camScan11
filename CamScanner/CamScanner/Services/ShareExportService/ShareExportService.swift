@@ -12,11 +12,22 @@ enum ShareExportError: LocalizedError {
 }
 
 final class ShareExportService {
-    static let shared = ShareExportService()
+    private let ocrService: OCRService
+    private let zipService: ZipService
+    private let jpgRenderer: JPGRendererService
+    private let pdfRendererFactory: () -> PDFRendererService
 
-    private let ocrService = OCRService.shared
-
-    private init() {}
+    init(
+        ocrService: OCRService,
+        zipService: ZipService,
+        jpgRenderer: JPGRendererService,
+        pdfRendererFactory: @escaping () -> PDFRendererService
+    ) {
+        self.ocrService = ocrService
+        self.zipService = zipService
+        self.jpgRenderer = jpgRenderer
+        self.pdfRendererFactory = pdfRendererFactory
+    }
 
     func exportPDF(
         documents: [SharePreviewModel],
@@ -26,7 +37,7 @@ final class ShareExportService {
         addWatermark: Bool,
         fileName: String
     ) throws -> [URL] {
-        let renderer = PDFRendererService()
+        let renderer = pdfRendererFactory()
         var urls: [URL] = []
         
         if split {
@@ -52,7 +63,7 @@ final class ShareExportService {
         }
 
         if zip {
-            let zipURL = try ZipService.shared.zip(files: urls, fileName: fileName)
+            let zipURL = try zipService.zip(files: urls, fileName: fileName)
             return [zipURL]
         }
 
@@ -84,7 +95,7 @@ final class ShareExportService {
         try combinedText.write(to: url, atomically: true, encoding: .utf8)
 
         if zip {
-            let zipURL = try ZipService.shared.zip(files: [url], fileName: fileName)
+            let zipURL = try zipService.zip(files: [url], fileName: fileName)
             return [zipURL]
         }
 
@@ -92,13 +103,13 @@ final class ShareExportService {
     }
 
     func exportJPG(documents: [SharePreviewModel], zip: Bool, fileName: String) throws -> [URL] {
-        let renderer = JPGRendererService.shared
+        let renderer = jpgRenderer
         
         do {
             let urls = try renderer.renderJPGs(from: documents, fileName: fileName)
             
             if zip {
-                let zipURL = try ZipService.shared.zip(files: urls, fileName: fileName)
+                let zipURL = try zipService.zip(files: urls, fileName: fileName)
                 return [zipURL]
             }
             

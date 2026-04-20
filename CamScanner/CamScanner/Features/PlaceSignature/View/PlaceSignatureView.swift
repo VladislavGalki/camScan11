@@ -13,9 +13,15 @@ struct PlaceSignatureView: View {
     @State private var signatureCropperModel: DocumentCropperModel?
     @State private var signatureToDelete: SignatureEntity?
     @EnvironmentObject private var router: Router
+    @Environment(\.dependencies) private var dependencies
 
-    init(inputModel: PlaceSignatureInputModel) {
-        _viewModel = StateObject(wrappedValue: PlaceSignatureViewModel(inputModel: inputModel))
+    init(inputModel: PlaceSignatureInputModel, dependencies: AppDependencies) {
+        _viewModel = StateObject(
+            wrappedValue: PlaceSignatureViewModel(
+                inputModel: inputModel,
+                dependencies: dependencies
+            )
+        )
     }
 
     var body: some View {
@@ -121,9 +127,12 @@ struct PlaceSignatureView: View {
             }
         }
         .sheet(isPresented: $showCreateSignature) {
-            CreateSignatureView(onSaved: { signatureID in
-                viewModel.addSignature(entityID: signatureID)
-            })
+            CreateSignatureView(
+                onSaved: { signatureID in
+                    viewModel.addSignature(entityID: signatureID)
+                },
+                dependencies: dependencies
+            )
             .presentationDetents([.large])
             .presentationCornerRadius(38)
             .interactiveDismissDisabled()
@@ -184,7 +193,7 @@ struct PlaceSignatureView: View {
 
                     DeleteSignatureView(
                         onDelete: {
-                            try? DocumentRepository.shared.deleteSignature(id: signature.id)
+                            try? dependencies.documentRepository.deleteSignature(id: signature.id)
                             signatureToDelete = nil
                         },
                         onCancel: {
@@ -447,7 +456,10 @@ private extension PlaceSignatureView {
 
     func processSignature(_ croppedImage: UIImage) {
         Task {
-            if let id = await SignatureProcessingService.processAndSave(croppedImage: croppedImage) {
+            if let id = await SignatureProcessingService.processAndSave(
+                croppedImage: croppedImage,
+                documentRepository: dependencies.documentRepository
+            ) {
                 viewModel.addSignature(entityID: id)
             }
         }

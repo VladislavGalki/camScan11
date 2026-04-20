@@ -10,12 +10,19 @@ final class MergeDocumentsViewModel: ObservableObject {
     private var thumbnails: [ThumbKey: UIImage] = [:]
     private var thumbInFlight = Set<ThumbKey>()
     
-    private let documentsReposotory = DocumentRepository.shared
+    private let documentsReposotory: DocumentRepository
+    private let fileStore: FileStore
 
-    init(inputModel: MergeDocumentsInputModel, onMerge: @escaping () -> Void) {
+    init(
+        inputModel: MergeDocumentsInputModel,
+        onMerge: @escaping () -> Void,
+        dependencies: AppDependencies
+    ) {
         self.items = inputModel.items
         self.onMerge = onMerge
-        
+        self.documentsReposotory = dependencies.documentRepository
+        self.fileStore = dependencies.fileStore
+
         loadThumbnails()
     }
 
@@ -54,7 +61,7 @@ final class MergeDocumentsViewModel: ObservableObject {
             if thumbnails[key] != nil { continue }
             if thumbInFlight.contains(key) { continue }
 
-            let url = FileStore.shared.url(forRelativePath: relPath)
+            let url = fileStore.url(forRelativePath: relPath)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
 
             thumbInFlight.insert(key)
@@ -62,7 +69,7 @@ final class MergeDocumentsViewModel: ObservableObject {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
 
-                let image = FileStore.shared.loadImage(at: url)
+                let image = self.fileStore.loadImage(at: url)
                 let thumb = image?.downscaled(maxDimension: 220)
 
                 DispatchQueue.main.async {

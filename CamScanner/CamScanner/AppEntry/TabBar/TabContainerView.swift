@@ -2,13 +2,14 @@ import SwiftUI
 
 struct TabContainerView: View {
     @Binding var selectedTab: AppTab
+    @Environment(\.dependencies) private var dependencies
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView()
+            HomeView(dependencies: dependencies)
                 .tag(AppTab.home)
 
-            FilesView()
+            FilesView(dependencies: dependencies)
                 .tag(AppTab.files)
 
             ToolsPlaceholderView()

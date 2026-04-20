@@ -13,8 +13,11 @@ struct EraseView: View {
         "#BFBFBFFF"
     ]
 
-    init(inputModel: EraseInputModel) {
-        _viewModel = StateObject(wrappedValue: EraseViewModel(inputModel: inputModel))
+    init(inputModel: EraseInputModel, dependencies: AppDependencies) {
+        _viewModel = StateObject(wrappedValue: EraseViewModel(
+            inputModel: inputModel,
+            dependencies: dependencies
+        ))
     }
 
     var body: some View {

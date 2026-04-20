@@ -3,11 +3,10 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 
 final class FilterRenderer {
-    static let shared = FilterRenderer()
     private let context = CIContext(options: nil)
     private let openCVRenderer = OpenCVFilterRenderer()
 
-    private init() {}
+    init() {}
 
     // MARK: - Public
 

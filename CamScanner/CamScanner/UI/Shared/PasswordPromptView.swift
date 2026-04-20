@@ -1,10 +1,8 @@
 import UIKit
 
 final class PasswordPromptView {
-    
-    static let shared = PasswordPromptView()
-    
-    private init() {}
+
+    init() {}
 
     func present(
         title: String,

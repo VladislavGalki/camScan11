@@ -24,6 +24,8 @@ struct TranslatorView: View {
     @State private var sharePayload: TranslatorSharePayload?
     @State private var showCopiedToast = false
 
+    @Environment(\.dependencies) private var dependencies
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -228,7 +230,7 @@ private extension TranslatorView {
     func shareAsTXT() {
         do {
             let fileNameBase = documentName.isEmpty ? "Translated_Text" : documentName + "_Translated"
-            let url = try TextExporter.shared.exportTXT(
+            let url = try dependencies.textExporter.exportTXT(
                 text: displayedText,
                 fileName: fileNameBase
             )

@@ -2,7 +2,11 @@ import SwiftUI
 
 @MainActor
 struct FilesView: View {
-    @StateObject private var viewModel = FilesViewModel()
+    @StateObject private var viewModel: FilesViewModel
+
+    init(dependencies: AppDependencies) {
+        _viewModel = StateObject(wrappedValue: FilesViewModel(dependencies: dependencies))
+    }
 
     @State private var selectedFileDocumentItemId: UUID?
     @State private var selectedMenuItem: FilesMenuItem?
@@ -15,6 +19,7 @@ struct FilesView: View {
 
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var tabBar: TabBarController
+    @Environment(\.dependencies) private var dependencies
 
     var body: some View {
         contentView
@@ -396,14 +401,14 @@ private extension FilesView {
             .presentationCornerRadius(38)
         case let .share(id):
             if let shareInputModel = viewModel.makeShareModel(id: id) {
-                ShareView(inputModel: shareInputModel) {
+                ShareView(inputModel: shareInputModel, dependencies: dependencies) {
                     viewModel.fileActiveSheet = nil
                 }
                 .presentationCornerRadius(38)
             }
         case let .multipleShare(ids):
             if let shareInputModel = viewModel.makeShareModel(ids: ids) {
-                ShareView(inputModel: shareInputModel) {
+                ShareView(inputModel: shareInputModel, dependencies: dependencies) {
                     viewModel.fileActiveSheet = nil
                 }
                 .presentationCornerRadius(38)
@@ -422,15 +427,23 @@ private extension FilesView {
             }
             .presentationCornerRadius(38)
         case let .move(inputModel):
-            MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
-                viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
-            }
+            MoveDocumentsView(
+                inputModel: inputModel,
+                onMove: { documentIds, folderId in
+                    viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+                },
+                dependencies: dependencies
+            )
             .presentationCornerRadius(38)
         case let .merge(inputModel):
-            MergeDocumentsView(inputModel: inputModel) {
-                viewModel.handleClearSelection()
-                viewModel.fileActiveSheet = nil
-            }
+            MergeDocumentsView(
+                inputModel: inputModel,
+                onMerge: {
+                    viewModel.handleClearSelection()
+                    viewModel.fileActiveSheet = nil
+                },
+                dependencies: dependencies
+            )
             .presentationCornerRadius(38)
         }
     }

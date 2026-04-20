@@ -5,8 +5,11 @@ struct WatermarkView: View {
     @State private var shouldShowDeleteConfirmation = false
     @EnvironmentObject private var router: Router
 
-    init(inputModel: WatermarkInputModel) {
-        _viewModel = StateObject(wrappedValue: WatermarkViewModel(inputModel: inputModel))
+    init(inputModel: WatermarkInputModel, dependencies: AppDependencies) {
+        _viewModel = StateObject(wrappedValue: WatermarkViewModel(
+            inputModel: inputModel,
+            dependencies: dependencies
+        ))
     }
 
     var body: some View {

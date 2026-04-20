@@ -3,11 +3,9 @@ import CoreImage
 
 final class FilterEngine {
 
-    static let shared = FilterEngine()
-
     private let context: CIContext
 
-    private init() {
+    init() {
         self.context = CIContext(options: [
             .useSoftwareRenderer: false
         ])

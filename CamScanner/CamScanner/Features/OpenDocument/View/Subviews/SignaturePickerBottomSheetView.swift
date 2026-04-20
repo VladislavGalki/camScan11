@@ -6,6 +6,7 @@ struct SignaturePickerBottomSheetView: View {
     let onDeleteSignature: (SignatureEntity) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dependencies) private var dependencies
     @State private var signatures: [SignatureEntity] = []
 
     var body: some View {
@@ -106,11 +107,11 @@ struct SignaturePickerBottomSheetView: View {
     // MARK: - Data
 
     private func loadSignatures() {
-        signatures = DocumentRepository.shared.fetchSignatures()
+        signatures = dependencies.documentRepository.fetchSignatures()
     }
 
     private func loadImage(for signature: SignatureEntity) -> UIImage? {
-        let url = FileStore.shared.url(forRelativePath: signature.imagePath)
+        let url = dependencies.fileStore.url(forRelativePath: signature.imagePath)
         return UIImage(contentsOfFile: url.path)
     }
 }

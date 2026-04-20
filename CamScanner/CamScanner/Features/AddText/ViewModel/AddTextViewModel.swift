@@ -51,8 +51,12 @@ final class AddTextViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(inputModel: AddTextInputModel) {
-        self.store = AddTextStore(documentID: inputModel.documentID)
+    init(inputModel: AddTextInputModel, dependencies: AppDependencies) {
+        self.store = AddTextStore(
+            documentID: inputModel.documentID,
+            documentRepository: dependencies.documentRepository,
+            context: dependencies.persistence.container.viewContext
+        )
         subscribe()
     }
 }

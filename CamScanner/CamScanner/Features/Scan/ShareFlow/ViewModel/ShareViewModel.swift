@@ -16,12 +16,14 @@ final class ShareViewModel: ObservableObject {
     
     @Published var isLoading: Bool = false
     
-    private let shareQuotaService = ShareQuotaService.shared
-    private let exportService = ShareExportService.shared
+    private let shareQuotaService: ShareQuotaService
+    private let exportService: ShareExportService
     private let inputModel: ShareInputModel
 
-    init(inputModel: ShareInputModel) {
+    init(inputModel: ShareInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
+        self.shareQuotaService = dependencies.shareQuotaService
+        self.exportService = dependencies.shareExportService
         shareQuotaService.refreshQuotaIfNeeded()
         bootstrap()
     }

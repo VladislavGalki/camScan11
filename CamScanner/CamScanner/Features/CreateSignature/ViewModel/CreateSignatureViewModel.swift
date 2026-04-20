@@ -8,6 +8,12 @@ final class CreateSignatureViewModel: ObservableObject {
     @Published var selectedColorHex: String = "#020202FF"
     @Published var brushSize: Double = 10.0
 
+    private let documentRepository: DocumentRepository
+
+    init(dependencies: AppDependencies) {
+        self.documentRepository = dependencies.documentRepository
+    }
+
     var selectedColor: Color {
         Color(rgbaHex: selectedColorHex) ?? .black
     }
@@ -53,7 +59,7 @@ final class CreateSignatureViewModel: ObservableObject {
         let serializableStrokes = strokes.map { $0.toSerializable() }
         let strokeData = try? JSONEncoder().encode(serializableStrokes)
 
-        return try DocumentRepository.shared.saveSignature(
+        return try documentRepository.saveSignature(
             image: image,
             strokeData: strokeData,
             colorHex: selectedColorHex,

@@ -10,9 +10,16 @@ struct ReorderPagesView: View {
 
     // MARK: - Init
 
-    init(inputModel: ReorderPagesInputModel, onSave: @escaping () -> Void) {
+    init(
+        inputModel: ReorderPagesInputModel,
+        onSave: @escaping () -> Void,
+        dependencies: AppDependencies
+    ) {
         _viewModel = StateObject(
-            wrappedValue: ReorderPagesViewModel(inputModel: inputModel)
+            wrappedValue: ReorderPagesViewModel(
+                inputModel: inputModel,
+                dependencies: dependencies
+            )
         )
         self.onSave = onSave
     }

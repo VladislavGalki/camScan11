@@ -1,4 +1,5 @@
 import Foundation
+import CoreData
 import Combine
 
 final class WatermarkStore {
@@ -11,14 +12,23 @@ final class WatermarkStore {
     }
 
     private let openDocumentStore: OpenDocumentStore
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
     private let documentID: UUID
 
     private let watermarkItemsSubject = CurrentValueSubject<[DocumentWatermarkItem], Never>([])
 
-    init(documentID: UUID) {
+    init(
+        documentID: UUID,
+        documentRepository: DocumentRepository,
+        context: NSManagedObjectContext
+    ) {
         self.documentID = documentID
-        self.openDocumentStore = OpenDocumentStore(documentID: documentID)
+        self.documentRepository = documentRepository
+        self.openDocumentStore = OpenDocumentStore(
+            documentID: documentID,
+            context: context,
+            documentRepository: documentRepository
+        )
         loadWatermarkItems()
     }
 

@@ -14,7 +14,8 @@ final class MoveDocumentsViewModel: ObservableObject {
     private var thumbInFlight = Set<ThumbKey>()
     private var thumbnails: [ThumbKey: UIImage] = [:]
 
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
+    private let fileStore: FileStore
 
     let onMove: ([UUID], UUID?) -> Void
 
@@ -22,11 +23,14 @@ final class MoveDocumentsViewModel: ObservableObject {
         viewMode: FilesViewMode,
         folderId: UUID?,
         documentIDs: [UUID],
-        onMove: @escaping ([UUID], UUID?) -> Void
+        onMove: @escaping ([UUID], UUID?) -> Void,
+        dependencies: AppDependencies
     ) {
         self.viewMode = viewMode
         self.documentIDs = documentIDs
         self.onMove = onMove
+        self.documentRepository = dependencies.documentRepository
+        self.fileStore = dependencies.fileStore
 
         if let folderId {
             openFolderTapped(folderId)
@@ -75,12 +79,12 @@ final class MoveDocumentsViewModel: ObservableObject {
 
             thumbInFlight.insert(key)
 
-            let url = FileStore.shared.url(forRelativePath: relPath)
+            let url = fileStore.url(forRelativePath: relPath)
 
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
 
-                let img = FileStore.shared.loadImage(at: url)
+                let img = self.fileStore.loadImage(at: url)
                 let thumb = img?.downscaled(maxDimension: 364)
 
                 DispatchQueue.main.async {

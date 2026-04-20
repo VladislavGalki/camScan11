@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AppRootView: View {
+    @Environment(\.dependencies) private var dependencies
+
     var body: some View {
         RootNavigationView(
             root: AppEntryView(),
@@ -17,7 +19,10 @@ struct AppRootView: View {
             switch r {
             case .openDocument(let id):
                 return AnyView(
-                    OpenDocumentView(inputModel: OpenDocumentInputModel(documentID: id))
+                    OpenDocumentView(
+                        inputModel: OpenDocumentInputModel(documentID: id),
+                        dependencies: dependencies
+                    )
                 )
             }
             
@@ -27,11 +32,15 @@ struct AppRootView: View {
             switch r {
             case let .openFolder(inputModel, onFolderDeleted):
                 return AnyView(
-                    FolderView(inputModel: inputModel, onFolderDeleted: onFolderDeleted)
+                    FolderView(
+                        inputModel: inputModel,
+                        onFolderDeleted: onFolderDeleted,
+                        dependencies: dependencies
+                    )
                 )
             case let .openDocument(inputModel):
                 return AnyView(
-                    OpenDocumentView(inputModel: inputModel)
+                    OpenDocumentView(inputModel: inputModel, dependencies: dependencies)
                 )
             }
             
@@ -51,23 +60,23 @@ struct AppRootView: View {
             switch r {
             case let .scanCropper(inputModel, onFinish):
                 return AnyView(
-                    ScanCropperView(input: inputModel, onFinish: onFinish)
+                    ScanCropperView(input: inputModel, onFinish: onFinish, dependencies: dependencies)
                 )
             case let .addText(inputModel):
                 return AnyView(
-                    AddTextView(inputModel: inputModel)
+                    AddTextView(inputModel: inputModel, dependencies: dependencies)
                 )
             case let .watermark(inputModel):
                 return AnyView(
-                    WatermarkView(inputModel: inputModel)
+                    WatermarkView(inputModel: inputModel, dependencies: dependencies)
                 )
             case let .erase(inputModel):
                 return AnyView(
-                    EraseView(inputModel: inputModel)
+                    EraseView(inputModel: inputModel, dependencies: dependencies)
                 )
             case let .share(inputModel):
                 return AnyView(
-                    ShareView(inputModel: inputModel)
+                    ShareView(inputModel: inputModel, dependencies: dependencies)
                 )
             case let .scanFlow(inputModel, onDismiss):
                 return AnyView(
@@ -75,18 +84,18 @@ struct AppRootView: View {
                 )
             case let .selectPages(inputModel):
                 return AnyView(
-                    OpenDocumentSelectPagesView(inputModel: inputModel)
+                    OpenDocumentSelectPagesView(inputModel: inputModel, dependencies: dependencies)
                 )
             case let .createSignature(onSaved):
                 return AnyView(
-                    CreateSignatureView(onSaved: onSaved)
+                    CreateSignatureView(onSaved: onSaved, dependencies: dependencies)
                         .presentationDetents([.large])
                         .presentationCornerRadius(38)
                         .interactiveDismissDisabled()
                 )
             case let .placeSignature(inputModel):
                 return AnyView(
-                    PlaceSignatureView(inputModel: inputModel)
+                    PlaceSignatureView(inputModel: inputModel, dependencies: dependencies)
                 )
             }
 

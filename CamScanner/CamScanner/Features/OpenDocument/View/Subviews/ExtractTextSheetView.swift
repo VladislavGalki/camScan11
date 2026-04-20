@@ -11,6 +11,8 @@ struct ExtractTextSheetView: View {
     @State private var showDiscardAlert = false
     @State private var originalText: String = ""
 
+    @Environment(\.dependencies) private var dependencies
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -228,7 +230,7 @@ private extension ExtractTextSheetView {
 
     func shareAsTXT() {
         do {
-            let url = try TextExporter.shared.exportTXT(
+            let url = try dependencies.textExporter.exportTXT(
                 text: text,
                 fileName: documentName.isEmpty ? "Extracted_Text" : documentName
             )

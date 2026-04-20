@@ -20,21 +20,32 @@ final class FolderViewModel: ObservableObject {
     var folderItem: FileFolderItem
     
     private let documentStore: FolderDocumentStore
-    private let documentRepository = DocumentRepository.shared
-    private let passwordCryptoService = PasswordCryptoService.shared
-    private let faceIdService = FaceIDService.shared
-    
+    private let documentRepository: DocumentRepository
+    private let passwordCryptoService: PasswordCryptoService
+    private let faceIdService: FaceIDService
+
     private let onFolderDeleted: () -> Void
 
     private var cancellables = Set<AnyCancellable>()
-    
-    init(inputModel: FolderInputModel, onFolderDeleted: @escaping () -> Void) {
-        self.documentStore = FolderDocumentStore(folderID: inputModel.folderItem.id)
+
+    init(
+        inputModel: FolderInputModel,
+        onFolderDeleted: @escaping () -> Void,
+        dependencies: AppDependencies
+    ) {
+        self.documentStore = FolderDocumentStore(
+            folderID: inputModel.folderItem.id,
+            context: dependencies.persistence.container.viewContext,
+            fileStore: dependencies.fileStore
+        )
         self.folderItem = inputModel.folderItem
         self.folderTitle = inputModel.folderItem.title
         self.viewMode = inputModel.viewMode
         self.onFolderDeleted = onFolderDeleted
-        
+        self.documentRepository = dependencies.documentRepository
+        self.passwordCryptoService = dependencies.passwordCryptoService
+        self.faceIdService = dependencies.faceIDService
+
         subscribeFolderDocuments()
     }
     

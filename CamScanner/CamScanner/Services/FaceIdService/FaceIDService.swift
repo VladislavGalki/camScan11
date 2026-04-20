@@ -1,9 +1,7 @@
 import LocalAuthentication
 
 final class FaceIDService {
-    static let shared = FaceIDService()
-    
-    private init() {}
+    init() {}
 
     func requestAuthorizationIfNeeded() async -> Bool {
         if UserDefaults.standard.bool(forKey: "faceIdEnabled") {

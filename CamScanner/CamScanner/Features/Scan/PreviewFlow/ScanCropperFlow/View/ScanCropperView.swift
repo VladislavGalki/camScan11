@@ -7,9 +7,14 @@ struct ScanCropperView: View {
     
     init(
         input: ScanCropperInputModel,
-        onFinish: @escaping (ScanPreviewInputModel) -> Void
+        onFinish: @escaping (ScanPreviewInputModel) -> Void,
+        dependencies: AppDependencies
     ) {
-        _viewModel = StateObject(wrappedValue: ScanCropperViewModel(input: input, onFinish: onFinish))
+        _viewModel = StateObject(wrappedValue: ScanCropperViewModel(
+            input: input,
+            onFinish: onFinish,
+            dependencies: dependencies
+        ))
     }
     
     var body: some View {

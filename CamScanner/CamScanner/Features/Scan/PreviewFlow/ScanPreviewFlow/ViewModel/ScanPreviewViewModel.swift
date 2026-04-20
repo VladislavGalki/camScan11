@@ -21,14 +21,18 @@ final class ScanPreviewViewModel: ObservableObject {
     
     private var sliderRenderTask: Task<Void, Never>?
 
+    private let imageCompressionService: ImageCompressionService
+
     init(
         inputModel: ScanPreviewInputModel,
         onFinish: @escaping (ScanPreviewInputModel) -> Void,
-        onSuccessFlow: @escaping () -> Void
+        onSuccessFlow: @escaping () -> Void,
+        dependencies: AppDependencies
     ) {
         self.inputModel = inputModel
-        self.documentRepository = DocumentRepository.shared
-        self.filterRenderer = FilterRenderer.shared
+        self.documentRepository = dependencies.documentRepository
+        self.filterRenderer = dependencies.filterRenderer
+        self.imageCompressionService = dependencies.imageCompressionService
         self.onFinish = onFinish
         self.onSuccessFlow = onSuccessFlow
         bootstrap()
@@ -562,7 +566,7 @@ extension ScanPreviewViewModel {
             }
 
             if let base = copy.previewBase {
-                copy.previewBase = ImageCompressionService.shared.compress(
+                copy.previewBase = imageCompressionService.compress(
                     base,
                     maxDimension: 1200,
                     quality: 0.90

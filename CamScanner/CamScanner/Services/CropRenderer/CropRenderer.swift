@@ -2,8 +2,8 @@ import UIKit
 import CoreImage
 
 final class CropRenderer {
-    static let shared = CropRenderer()
     private let context = CIContext()
+    init() {}
 
     func crop(image: UIImage, quad: Quadrilateral) -> UIImage? {
         guard let ciImage = CIImage(image: image) else { return nil }

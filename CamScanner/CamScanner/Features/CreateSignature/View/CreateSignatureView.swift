@@ -3,7 +3,7 @@ import SwiftUI
 struct CreateSignatureView: View {
     let onSaved: ((UUID) -> Void)?
 
-    @StateObject private var viewModel = CreateSignatureViewModel()
+    @StateObject private var viewModel: CreateSignatureViewModel
     @State private var showBrushPreview = false
     @State private var brushPreviewTask: Task<Void, Never>?
     @State private var strokesRevision: Int = 0
@@ -11,8 +11,9 @@ struct CreateSignatureView: View {
     @State private var isSaving = false
     @Environment(\.dismiss) private var dismiss
 
-    init(onSaved: ((UUID) -> Void)? = nil) {
+    init(onSaved: ((UUID) -> Void)? = nil, dependencies: AppDependencies) {
         self.onSaved = onSaved
+        _viewModel = StateObject(wrappedValue: CreateSignatureViewModel(dependencies: dependencies))
     }
 
     private let presetColors: [String] = [

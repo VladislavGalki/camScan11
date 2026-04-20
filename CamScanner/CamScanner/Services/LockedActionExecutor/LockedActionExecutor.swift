@@ -1,9 +1,11 @@
 import Foundation
 
-@MainActor
 final class LockedActionExecutor {
-    static let shared = LockedActionExecutor()
-    private let faceIdService = FaceIDService.shared
+    private let faceIdService: FaceIDService
+
+    init(faceIdService: FaceIDService) {
+        self.faceIdService = faceIdService
+    }
 
     struct Result {
         let requiresPin: Bool

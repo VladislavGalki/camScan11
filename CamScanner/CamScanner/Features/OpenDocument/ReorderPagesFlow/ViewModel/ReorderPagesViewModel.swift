@@ -30,12 +30,15 @@ final class ReorderPagesViewModel: ObservableObject {
 
     private var originalOrder: [UUID] = []
     private let inputModel: ReorderPagesInputModel
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
+    private let imageCompressionService: ImageCompressionService
 
     // MARK: - Init
 
-    init(inputModel: ReorderPagesInputModel) {
+    init(inputModel: ReorderPagesInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
+        self.documentRepository = dependencies.documentRepository
+        self.imageCompressionService = dependencies.imageCompressionService
         reload()
     }
 
@@ -74,7 +77,10 @@ private extension ReorderPagesViewModel {
         let preparedModels = pageGroups.map {
             ScanPreviewModel(
                 documentType: $0.documentType,
-                frames: OpenDocumentFramePreparer.preparedFrames($0.frames)
+                frames: OpenDocumentFramePreparer.preparedFrames(
+                    $0.frames,
+                    imageCompressionService: imageCompressionService
+                )
             )
         }
 

@@ -37,15 +37,22 @@ final class PlaceSignatureViewModel: ObservableObject {
     private var didLoadExisting = false
 
     private let openDocumentStore: OpenDocumentStore
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
+    private let fileStore: FileStore
     private let inputModel: PlaceSignatureInputModel
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
-    init(inputModel: PlaceSignatureInputModel) {
+    init(inputModel: PlaceSignatureInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
-        self.openDocumentStore = OpenDocumentStore(documentID: inputModel.documentID)
+        self.openDocumentStore = OpenDocumentStore(
+            documentID: inputModel.documentID,
+            context: dependencies.persistence.container.viewContext,
+            documentRepository: dependencies.documentRepository
+        )
+        self.documentRepository = dependencies.documentRepository
+        self.fileStore = dependencies.fileStore
         subscribe()
     }
 }
@@ -65,10 +72,10 @@ extension PlaceSignatureViewModel {
     }
 
     func addSignature(entityID: UUID) {
-        let entities = DocumentRepository.shared.fetchSignatures()
+        let entities = documentRepository.fetchSignatures()
         guard let entity = entities.first(where: { $0.id == entityID }) else { return }
 
-        let url = FileStore.shared.url(forRelativePath: entity.imagePath)
+        let url = fileStore.url(forRelativePath: entity.imagePath)
         guard let image = UIImage(contentsOfFile: url.path) else { return }
 
         let imageAspect = image.size.width / max(image.size.height, 1)

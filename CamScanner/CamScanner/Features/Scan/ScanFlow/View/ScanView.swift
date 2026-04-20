@@ -18,7 +18,8 @@ struct ScanView: View {
 
     init(
         inputModel: ScanInputModel = ScanInputModel(),
-        oncloseClick: @escaping () -> Void
+        oncloseClick: @escaping () -> Void,
+        dependencies: AppDependencies
     ) {
         self.oncloseClick = oncloseClick
         self.existingDocumentID = inputModel.existingDocumentID
@@ -36,7 +37,11 @@ struct ScanView: View {
             store.ui.selectedDocumentType = .passport
         }
         _store = StateObject(wrappedValue: store)
-        _vm = StateObject(wrappedValue: ScanViewModel(settings: store.settings, ui: store.ui))
+        _vm = StateObject(wrappedValue: ScanViewModel(
+            settings: store.settings,
+            ui: store.ui,
+            dependencies: dependencies
+        ))
     }
 
     var body: some View {

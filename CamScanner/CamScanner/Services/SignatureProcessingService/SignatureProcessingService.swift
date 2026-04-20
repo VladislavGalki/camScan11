@@ -2,7 +2,10 @@ import UIKit
 
 enum SignatureProcessingService {
 
-    static func processAndSave(croppedImage: UIImage) async -> UUID? {
+    static func processAndSave(
+        croppedImage: UIImage,
+        documentRepository: DocumentRepository
+    ) async -> UUID? {
         let processed: UIImage? = await Task.detached(priority: .userInitiated) {
             let renderer = OpenCVFilterRenderer()
             return renderer.extractSignatureWithTransparentBackground(
@@ -16,7 +19,7 @@ enum SignatureProcessingService {
         }
 
         do {
-            let id = try DocumentRepository.shared.saveSignature(
+            let id = try documentRepository.saveSignature(
                 image: processed,
                 strokeData: nil,
                 colorHex: "#020202FF",

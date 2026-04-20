@@ -14,6 +14,8 @@ struct OCREditorView: View {
     
     @State private var sharePayload: SharePayload? = nil
 
+    @Environment(\.dependencies) private var dependencies
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -57,7 +59,7 @@ struct OCREditorView: View {
     
     private func exportTXT() {
         do {
-            let url = try TextExporter.shared.exportTXT(
+            let url = try dependencies.textExporter.exportTXT(
                 text: text,
                 fileName: "OCR_Text"
             )

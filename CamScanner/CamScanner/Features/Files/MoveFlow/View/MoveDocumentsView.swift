@@ -9,13 +9,15 @@ struct MoveDocumentsView: View {
     
     init(
         inputModel: MoveDocumentInputModel,
-        onMove: @escaping ([UUID], UUID?) -> Void
+        onMove: @escaping ([UUID], UUID?) -> Void,
+        dependencies: AppDependencies
     ) {
         _viewModel = StateObject(wrappedValue: MoveDocumentsViewModel(
             viewMode: inputModel.viewMode,
             folderId: inputModel.folderId,
             documentIDs: inputModel.documentIDs,
-            onMove: onMove)
+            onMove: onMove,
+            dependencies: dependencies)
         )
     }
     

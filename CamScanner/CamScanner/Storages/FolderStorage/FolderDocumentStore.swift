@@ -19,7 +19,8 @@ final class FolderDocumentStore: NSObject {
     private let itemsSubject = CurrentValueSubject<[FilesGridItem], Never>([])
     private let thumbnailsSubject = CurrentValueSubject<[ThumbKey: UIImage], Never>([:])
 
-    private let context = PersistenceController.shared.container.viewContext
+    private let context: NSManagedObjectContext
+    private let fileStore: FileStore
 
     private var documentsFRC: NSFetchedResultsController<DocumentEntity>!
 
@@ -28,8 +29,10 @@ final class FolderDocumentStore: NSObject {
 
     private let folderID: UUID
 
-    init(folderID: UUID) {
+    init(folderID: UUID, context: NSManagedObjectContext, fileStore: FileStore) {
         self.folderID = folderID
+        self.context = context
+        self.fileStore = fileStore
         super.init()
         configureFRC()
         performFetch()
@@ -144,16 +147,16 @@ private extension FolderDocumentStore {
             if thumbnailsSubject.value[key] != nil { continue }
             if thumbInFlight.contains(key) { continue }
             
-            let url = FileStore.shared.url(forRelativePath: relPath)
-            
+            let url = fileStore.url(forRelativePath: relPath)
+
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
-            
+
             thumbInFlight.insert(key)
-            
+
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
-                
-                let img = FileStore.shared.loadImage(at: url)
+
+                let img = self.fileStore.loadImage(at: url)
                 let thumb = img?.downscaled(maxDimension: 364)
                 
                 DispatchQueue.main.async {

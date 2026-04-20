@@ -23,11 +23,11 @@ final class ScanCropperViewModel: ObservableObject {
     // MARK: Init
 
     init(
-        cropRenderer: CropRenderer = CropRenderer.shared,
         input: ScanCropperInputModel,
-        onFinish: @escaping (ScanPreviewInputModel) -> Void
+        onFinish: @escaping (ScanPreviewInputModel) -> Void,
+        dependencies: AppDependencies
     ) {
-        self.cropRenderer = cropRenderer
+        self.cropRenderer = dependencies.cropRenderer
         self.input = input
         self.onFinish = onFinish
 

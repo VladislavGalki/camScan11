@@ -4,11 +4,17 @@ import ZIPFoundation
 
 final class PDFRendererService {
     private let pageMargin: CGFloat = 32
-    
+
     private let pageSize = CGSize(
         width: 595,
         height: 842
     )
+
+    private let imageCompressionService: ImageCompressionService
+
+    init(imageCompressionService: ImageCompressionService) {
+        self.imageCompressionService = imageCompressionService
+    }
 
     func renderCombined(documents: [SharePreviewModel], fileName: String, password: String?, addWatermark: Bool) throws -> URL {
         let url = tempURL(fileName: fileName)
@@ -72,7 +78,7 @@ final class PDFRendererService {
             return
         }
 
-        let image = ImageCompressionService.shared.compress(
+        let image = imageCompressionService.compress(
             original,
             maxDimension: 1240,
             quality: 0.75
@@ -126,7 +132,7 @@ final class PDFRendererService {
         guard !originals.isEmpty else { return }
 
         let images = originals.map {
-            ImageCompressionService.shared.compress(
+            imageCompressionService.compress(
                 $0,
                 maxDimension: 842,
                 quality: 0.72
@@ -197,7 +203,7 @@ final class PDFRendererService {
             return
         }
 
-        let image = ImageCompressionService.shared.compress(
+        let image = imageCompressionService.compress(
             original,
             maxDimension: 842,
             quality: 0.72

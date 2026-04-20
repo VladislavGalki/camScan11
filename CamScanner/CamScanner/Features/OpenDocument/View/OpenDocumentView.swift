@@ -21,12 +21,16 @@ struct OpenDocumentView: View {
     @State private var activeSheet: OpenDocumentActiveSheet?
 
     @EnvironmentObject private var router: Router
+    @Environment(\.dependencies) private var dependencies
 
     @Environment(\.dismiss) private var dismiss
 
-    init(inputModel: OpenDocumentInputModel) {
+    init(inputModel: OpenDocumentInputModel, dependencies: AppDependencies) {
         _viewModel = StateObject(
-            wrappedValue: OpenDocumentViewModel(inputModel: inputModel)
+            wrappedValue: OpenDocumentViewModel(
+                inputModel: inputModel,
+                dependencies: dependencies
+            )
         )
     }
 
@@ -117,16 +121,24 @@ struct OpenDocumentView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case let .move(inputModel):
-                MoveDocumentsView(inputModel: inputModel) { documentIds, folderId in
-                    viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
-                    activeSheet = nil
-                }
+                MoveDocumentsView(
+                    inputModel: inputModel,
+                    onMove: { documentIds, folderId in
+                        viewModel.handleDocumentMoved(documentIds: documentIds, folderId: folderId)
+                        activeSheet = nil
+                    },
+                    dependencies: dependencies
+                )
                 .presentationCornerRadius(38)
             case let .reorderPages(inputModel):
-                ReorderPagesView(inputModel: inputModel) {
-                    viewModel.notificationModel = .pagesReordered
-                    viewModel.shouldShowNotification = true
-                }
+                ReorderPagesView(
+                    inputModel: inputModel,
+                    onSave: {
+                        viewModel.notificationModel = .pagesReordered
+                        viewModel.shouldShowNotification = true
+                    },
+                    dependencies: dependencies
+                )
                 .presentationDetents([.large])
                 .presentationCornerRadius(38)
                 .presentationDragIndicator(.hidden)
@@ -589,7 +601,7 @@ private extension OpenDocumentView {
                 case .signatureDeleteConfirmation(let signature):
                     DeleteSignatureView(
                         onDelete: {
-                            try? DocumentRepository.shared.deleteSignature(id: signature.id)
+                            try? dependencies.documentRepository.deleteSignature(id: signature.id)
                             overlayState = .none
                         },
                         onCancel: {
@@ -716,7 +728,7 @@ private extension OpenDocumentView {
                 )
             )
         case .signature:
-            if DocumentRepository.shared.fetchSignatures().isEmpty {
+            if dependencies.documentRepository.fetchSignatures().isEmpty {
                 showSignatureSheet = true
             } else {
                 showSignaturePickerSheet = true
@@ -797,7 +809,10 @@ private extension OpenDocumentView {
     private func processSignature(_ croppedImage: UIImage) {
         isSignatureProcessing = true
         Task {
-            let signatureID = await SignatureProcessingService.processAndSave(croppedImage: croppedImage)
+            let signatureID = await SignatureProcessingService.processAndSave(
+                croppedImage: croppedImage,
+                documentRepository: dependencies.documentRepository
+            )
             isSignatureProcessing = false
             if let signatureID {
                 router.push(OpenDocumentRoute.placeSignature(

@@ -56,9 +56,13 @@ final class EraseViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(inputModel: EraseInputModel) {
+    init(inputModel: EraseInputModel, dependencies: AppDependencies) {
         self.documentID = inputModel.documentID
-        self.store = EraseStore(documentID: inputModel.documentID)
+        self.store = EraseStore(
+            documentID: inputModel.documentID,
+            documentRepository: dependencies.documentRepository,
+            context: dependencies.persistence.container.viewContext
+        )
         subscribe()
     }
 

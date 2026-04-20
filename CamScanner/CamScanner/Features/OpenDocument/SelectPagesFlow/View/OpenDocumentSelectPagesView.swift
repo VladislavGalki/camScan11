@@ -9,15 +9,19 @@ struct OpenDocumentSelectPagesView: View {
 
     @EnvironmentObject private var router: Router
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dependencies) private var dependencies
 
     private let columns = [
         GridItem(.flexible(), spacing: 24),
         GridItem(.flexible(), spacing: 24)
     ]
 
-    init(inputModel: OpenDocumentSelectPagesInputModel) {
+    init(inputModel: OpenDocumentSelectPagesInputModel, dependencies: AppDependencies) {
         _viewModel = StateObject(
-            wrappedValue: OpenDocumentSelectPagesViewModel(inputModel: inputModel)
+            wrappedValue: OpenDocumentSelectPagesViewModel(
+                inputModel: inputModel,
+                dependencies: dependencies
+            )
         )
     }
 
@@ -46,10 +50,14 @@ struct OpenDocumentSelectPagesView: View {
             }
         }
         .sheet(item: $moveInputModel) { inputModel in
-            OpenDocumentSelectPagesMoveView(inputModel: inputModel) { result in
-                handleMoveCompletion(result)
-                moveInputModel = nil
-            }
+            OpenDocumentSelectPagesMoveView(
+                inputModel: inputModel,
+                onComplete: { result in
+                    handleMoveCompletion(result)
+                    moveInputModel = nil
+                },
+                dependencies: dependencies
+            )
             .presentationCornerRadius(38)
         }
         .navigationBarBackButtonHidden()

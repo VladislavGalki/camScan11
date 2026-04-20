@@ -2,8 +2,7 @@ import Foundation
 import ZIPFoundation
 
 final class ZipService {
-    static let shared = ZipService()
-    private init() {}
+    init() {}
 
     func zip(files: [URL], fileName: String) throws -> URL {
         let fm = FileManager.default

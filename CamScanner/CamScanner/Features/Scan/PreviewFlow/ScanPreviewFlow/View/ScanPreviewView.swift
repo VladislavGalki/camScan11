@@ -10,10 +10,16 @@ struct ScanPreviewView: View {
     init(
         inputModel: ScanPreviewInputModel,
         onFinish: @escaping (ScanPreviewInputModel) -> Void,
-        onSuccessFlow: @escaping () -> Void
+        onSuccessFlow: @escaping () -> Void,
+        dependencies: AppDependencies
     ) {
         _viewModel = StateObject(
-            wrappedValue: ScanPreviewViewModel(inputModel: inputModel, onFinish: onFinish, onSuccessFlow: onSuccessFlow)
+            wrappedValue: ScanPreviewViewModel(
+                inputModel: inputModel,
+                onFinish: onFinish,
+                onSuccessFlow: onSuccessFlow,
+                dependencies: dependencies
+            )
         )
     }
     

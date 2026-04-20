@@ -72,9 +72,7 @@ let ocrLanguages: [String] = [
 ]
 
 final class OCRService {
-
-    static let shared = OCRService()
-    private init() {}
+    init() {}
 
     enum OCRError: Error {
         case noCGImage

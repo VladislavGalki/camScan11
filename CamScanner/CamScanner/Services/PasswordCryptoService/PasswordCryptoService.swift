@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 final class PasswordCryptoService {
-    static let shared = PasswordCryptoService()
+    init() {}
 
     func generateSalt() -> Data {
         var data = Data(count: 16)

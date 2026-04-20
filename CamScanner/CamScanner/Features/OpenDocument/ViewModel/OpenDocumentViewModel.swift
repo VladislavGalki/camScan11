@@ -35,25 +35,45 @@ final class OpenDocumentViewModel: ObservableObject {
     private var translationTask: Task<Void, Never>?
     private var didScheduleInitialFilterPreviewGeneration = false
 
-    private let filterPreviewCacheService = FilterPreviewCacheService()
+    private let filterPreviewCacheService: FilterPreviewCacheService
     private let filterPreviewMaxDimension: CGFloat = 240
 
     private let inputModel: OpenDocumentInputModel
     private let store: OpenDocumentStore
-    private let documentRepository = DocumentRepository.shared
-    private let filterRenderer = FilterRenderer.shared
-    private let ocrService = OCRService.shared
-    private let passwordCryptoService = PasswordCryptoService.shared
-    private let faceIdService = FaceIDService.shared
-    private let lockedActionExecutor = LockedActionExecutor.shared
+    private let dependencies: AppDependencies
+    private let documentRepository: DocumentRepository
+    private let filterRenderer: FilterRenderer
+    private let ocrService: OCRService
+    private let passwordCryptoService: PasswordCryptoService
+    private let faceIdService: FaceIDService
+    private let lockedActionExecutor: LockedActionExecutor
+    private let imageCompressionService: ImageCompressionService
+    private let fileStore: FileStore
 
     private var currentCellHeight: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
     private var pendingRetakeContext: PendingRetakeContext?
 
-    init(inputModel: OpenDocumentInputModel) {
+    @MainActor
+    init(inputModel: OpenDocumentInputModel, dependencies: AppDependencies) {
         self.inputModel = inputModel
-        self.store = OpenDocumentStore(documentID: inputModel.documentID)
+        self.store = OpenDocumentStore(
+            documentID: inputModel.documentID,
+            context: dependencies.persistence.container.viewContext,
+            documentRepository: dependencies.documentRepository
+        )
+        self.dependencies = dependencies
+        self.documentRepository = dependencies.documentRepository
+        self.filterRenderer = dependencies.filterRenderer
+        self.ocrService = dependencies.ocrService
+        self.passwordCryptoService = dependencies.passwordCryptoService
+        self.faceIdService = dependencies.faceIDService
+        self.lockedActionExecutor = dependencies.lockedActionExecutor
+        self.imageCompressionService = dependencies.imageCompressionService
+        self.fileStore = dependencies.fileStore
+        self.filterPreviewCacheService = FilterPreviewCacheService(
+            filterRenderer: dependencies.filterRenderer
+        )
 
         subscribe()
         bootstrap()
@@ -77,12 +97,16 @@ final class OpenDocumentViewModel: ObservableObject {
         store.previewModelsPublisher
             .sink { [weak self] models in
                 guard let self else { return }
+                let imageCompressionService = self.imageCompressionService
 
                 Task.detached(priority: .userInitiated) {
                     let preparedModels = models.map { model in
                         ScanPreviewModel(
                             documentType: model.documentType,
-                            frames: OpenDocumentFramePreparer.preparedFrames(model.frames)
+                            frames: OpenDocumentFramePreparer.preparedFrames(
+                                model.frames,
+                                imageCompressionService: imageCompressionService
+                            )
                         )
                     }
 
@@ -188,7 +212,10 @@ extension OpenDocumentViewModel {
         let preparedModels = output.pageGroups.map {
             ScanPreviewModel(
                 documentType: $0.documentType,
-                frames: OpenDocumentFramePreparer.preparedFrames($0.frames)
+                frames: OpenDocumentFramePreparer.preparedFrames(
+                    $0.frames,
+                    imageCompressionService: imageCompressionService
+                )
             )
         }
 
@@ -1106,7 +1133,10 @@ private extension OpenDocumentViewModel {
 // MARK: - Helpers
 
 enum OpenDocumentFramePreparer {
-    static func preparedFrames(_ frames: [CapturedFrame]) -> [CapturedFrame] {
+    static func preparedFrames(
+        _ frames: [CapturedFrame],
+        imageCompressionService: ImageCompressionService
+    ) -> [CapturedFrame] {
         let validFrames = frames.filter { $0.preview != nil }
 
         return validFrames.map { frame in
@@ -1119,7 +1149,7 @@ enum OpenDocumentFramePreparer {
                     copy.preview
 
                 if let sourceBase {
-                    copy.previewBase = ImageCompressionService.shared.compress(
+                    copy.previewBase = imageCompressionService.compress(
                         sourceBase,
                         maxDimension: 1200,
                         quality: 0.90
@@ -1139,7 +1169,11 @@ enum OpenDocumentFramePreparer {
 
 actor FilterPreviewCacheService {
     private var cache: [String: [DocumentFilterType: UIImage]] = [:]
-    private let filterRenderer = FilterRenderer.shared
+    private let filterRenderer: FilterRenderer
+
+    init(filterRenderer: FilterRenderer) {
+        self.filterRenderer = filterRenderer
+    }
 
     func preview(
         cacheKey: String,

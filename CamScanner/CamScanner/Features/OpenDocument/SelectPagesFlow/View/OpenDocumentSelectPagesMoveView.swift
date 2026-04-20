@@ -11,10 +11,14 @@ struct OpenDocumentSelectPagesMoveView: View {
 
     init(
         inputModel: OpenDocumentSelectPagesMoveInputModel,
-        onComplete: @escaping (OpenDocumentSelectPagesMoveResult) -> Void
+        onComplete: @escaping (OpenDocumentSelectPagesMoveResult) -> Void,
+        dependencies: AppDependencies
     ) {
         _viewModel = StateObject(
-            wrappedValue: OpenDocumentSelectPagesMoveViewModel(inputModel: inputModel)
+            wrappedValue: OpenDocumentSelectPagesMoveViewModel(
+                inputModel: inputModel,
+                dependencies: dependencies
+            )
         )
         self.onComplete = onComplete
     }

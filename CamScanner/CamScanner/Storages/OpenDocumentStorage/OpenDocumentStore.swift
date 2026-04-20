@@ -30,15 +30,21 @@ final class OpenDocumentStore: NSObject {
     private let watermarkItemsSubject = CurrentValueSubject<[DocumentWatermarkItem], Never>([])
     private let signatureItemsSubject = CurrentValueSubject<[DocumentSignatureItem], Never>([])
 
-    private let context = PersistenceController.shared.container.viewContext
+    private let context: NSManagedObjectContext
     private let documentID: UUID
-    private let documentRepository = DocumentRepository.shared
+    private let documentRepository: DocumentRepository
     private var cancellables = Set<AnyCancellable>()
 
     private var frc: NSFetchedResultsController<DocumentEntity>!
 
-    init(documentID: UUID) {
+    init(
+        documentID: UUID,
+        context: NSManagedObjectContext,
+        documentRepository: DocumentRepository
+    ) {
         self.documentID = documentID
+        self.context = context
+        self.documentRepository = documentRepository
         super.init()
         configureFRC()
         subscribe()
@@ -100,7 +106,7 @@ private extension OpenDocumentStore {
     func rebuild() {
         guard let document = frc.fetchedObjects?.first,
               let id = document.id,
-              let inputModel = try? DocumentRepository.shared.loadPreviewInputModel(id: id)
+              let inputModel = try? documentRepository.loadPreviewInputModel(id: id)
         else {
             previewModelsSubject.send([])
             return
