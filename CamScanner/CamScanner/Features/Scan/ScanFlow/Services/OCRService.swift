@@ -90,6 +90,49 @@ final class OCRService {
         return language.rawValue
     }
 
+    /// Строки, отсортированные top→bottom по boundingBox. Пустые/whitespace-only выбрасываются.
+    func recognizeSortedLines(in image: UIImage) async throws -> [String] {
+        guard let cgImage = image.cgImage ?? image.normalizedUp().cgImage else {
+            throw OCRError.noCGImage
+        }
+
+        return try await withCheckedThrowingContinuation { cont in
+            let request = VNRecognizeTextRequest { req, err in
+                if let err {
+                    cont.resume(throwing: err)
+                    return
+                }
+                guard let observations = req.results as? [VNRecognizedTextObservation] else {
+                    cont.resume(throwing: OCRError.failed)
+                    return
+                }
+
+                // Vision bbox: Y от нижнего угла. Чтобы получить top→bottom, сортируем по (1 - midY).
+                let sorted = observations.sorted { lhs, rhs in
+                    (1.0 - lhs.boundingBox.midY) < (1.0 - rhs.boundingBox.midY)
+                }
+
+                let lines: [String] = sorted.compactMap { obs in
+                    obs.topCandidates(1).first?.string
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                }.filter { !$0.isEmpty }
+
+                cont.resume(returning: lines)
+            }
+
+            request.recognitionLanguages = ocrLanguages
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+            request.minimumTextHeight = 0.02
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            DispatchQueue.global(qos: .userInitiated).async {
+                do { try handler.perform([request]) }
+                catch { cont.resume(throwing: error) }
+            }
+        }
+    }
+
     func recognizeText(in image: UIImage) async throws -> OCRResult {
         guard let cgImage = image.cgImage ?? image.normalizedUp().cgImage else {
             throw OCRError.noCGImage

@@ -16,17 +16,49 @@ final class ShareExportService {
     private let zipService: ZipService
     private let jpgRenderer: JPGRendererService
     private let pdfRendererFactory: () -> PDFRendererService
+    private let excelConverter: ImageToExcelConverting
+    private let wordConverter: ImageToWordConverting
 
     init(
         ocrService: OCRService,
         zipService: ZipService,
         jpgRenderer: JPGRendererService,
-        pdfRendererFactory: @escaping () -> PDFRendererService
+        pdfRendererFactory: @escaping () -> PDFRendererService,
+        excelConverter: ImageToExcelConverting,
+        wordConverter: ImageToWordConverting
     ) {
         self.ocrService = ocrService
         self.zipService = zipService
         self.jpgRenderer = jpgRenderer
         self.pdfRendererFactory = pdfRendererFactory
+        self.excelConverter = excelConverter
+        self.wordConverter = wordConverter
+    }
+
+    func exportDOCX(documents: [SharePreviewModel], zip: Bool, fileName: String) async throws -> [URL] {
+        let images: [UIImage] = documents.flatMap { $0.frames.compactMap(\.preview) }
+        guard !images.isEmpty else { throw ShareExportError.emptyOCRResult }
+
+        let url = try await wordConverter.convert(images: images, fileName: fileName)
+
+        if zip {
+            let zipURL = try zipService.zip(files: [url], fileName: fileName)
+            return [zipURL]
+        }
+        return [url]
+    }
+
+    func exportXLSX(documents: [SharePreviewModel], zip: Bool, fileName: String) async throws -> [URL] {
+        let images: [UIImage] = documents.flatMap { $0.frames.compactMap(\.preview) }
+        guard !images.isEmpty else { throw ShareExportError.emptyOCRResult }
+
+        let url = try await excelConverter.convert(images: images, fileName: fileName)
+
+        if zip {
+            let zipURL = try zipService.zip(files: [url], fileName: fileName)
+            return [zipURL]
+        }
+        return [url]
     }
 
     func exportPDF(

@@ -142,6 +142,18 @@ final class ShareViewModel: ObservableObject {
                         zip: isNeetCreateZipArchve,
                         fileName: documentName
                     )
+                case .xls:
+                    urls = try await exportService.exportXLSX(
+                        documents: selected,
+                        zip: isNeetCreateZipArchve,
+                        fileName: documentName
+                    )
+                case .doc:
+                    urls = try await exportService.exportDOCX(
+                        documents: selected,
+                        zip: isNeetCreateZipArchve,
+                        fileName: documentName
+                    )
                 default:
                     await MainActor.run {
                         self.isLoading = false

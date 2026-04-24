@@ -37,13 +37,18 @@ final class AppDependencies {
 
     lazy var documentExporter = DocumentExporter()
 
+    lazy var imageToExcelConverter: ImageToExcelConverting = ImageToExcelConverter()
+    lazy var imageToWordConverter: ImageToWordConverting = ImageToWordConverter(ocrService: ocrService)
+
     lazy var shareExportService = ShareExportService(
         ocrService: ocrService,
         zipService: zipService,
         jpgRenderer: jpgRenderer,
         pdfRendererFactory: { [imageCompressionService] in
             PDFRendererService(imageCompressionService: imageCompressionService)
-        }
+        },
+        excelConverter: imageToExcelConverter,
+        wordConverter: imageToWordConverter
     )
 
     lazy var lockedActionExecutor = LockedActionExecutor(
